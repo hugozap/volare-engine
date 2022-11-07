@@ -1,6 +1,7 @@
 use crate::bounding_box::{BoundingBox};
 use crate::location::{Location, PositionableWithBoundingBox};
 use crate::shape_box::ShapeBox;
+use crate::diagram_layout::ShapeType;
 
 /**
  * The group has its own position separated from its children
@@ -9,7 +10,7 @@ use crate::shape_box::ShapeBox;
  */
 pub struct ShapeGroup {
     pub location: Location,
-    pub children: Vec<Box<dyn PositionableWithBoundingBox>>,
+    pub children: Vec<ShapeType>,
 }
 
 //impl box
@@ -44,7 +45,11 @@ impl PositionableWithBoundingBox for ShapeGroup {
         let mut max_y = 0.0;
 
         for child in &self.children {
-            let bb = child.get_bounding_box();
+            let bb = match child {
+                ShapeType::ShapeText(text) => text.get_bounding_box(),
+                ShapeType::ShapeGroup(group) => group.get_bounding_box(),
+                ShapeType::ShapeBox(box_) => box_.get_bounding_box(),
+            };
             if bb.x < min_x {
                 min_x = bb.x;
             }
@@ -81,13 +86,13 @@ mod tests {
         shape_box.location.y = 10.0;
         shape_box.width = 10.0;
         shape_box.height = 10.0;
-        shape_group.children.push(Box::new(shape_box));
+        shape_group.children.push(ShapeType::ShapeBox(shape_box));
         let mut shape_box = ShapeBox::new();
         shape_box.location.x = 20.0;
         shape_box.location.y = 20.0;
         shape_box.width = 10.0;
         shape_box.height = 10.0;
-        shape_group.children.push(Box::new(shape_box));
+        shape_group.children.push(ShapeType::ShapeBox(shape_box));
         let bb = shape_group.get_bounding_box();
         assert_eq!(bb.x, 0f64);
         assert_eq!(bb.y, 0f64);

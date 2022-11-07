@@ -3,4 +3,5 @@
 members = [
     "./svg_generation_poc",
     "./volare_engine_layout",
+    "./svg_renderer"
 ]
