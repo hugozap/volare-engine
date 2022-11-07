@@ -1,13 +1,10 @@
 [package]
-name = "svg_generation_poc"
+name = "svg_renderer"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
-#add dep to crate in local workspace
 volare_engine_layout = { path = "../volare_engine_layout" }
-svg_renderer = { path = "../svg_renderer" }
-resvg = "0.25.0"
+

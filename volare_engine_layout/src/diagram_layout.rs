@@ -1,13 +1,21 @@
 use crate::location::{Location, PositionableWithBoundingBox};
 use crate::bounding_box::{BoundingBox};
+use crate::shape_text::ShapeText;
+use crate::shape_box::ShapeBox;
+use crate::shape_group::ShapeGroup;
 
 
+pub enum ShapeType {
+   ShapeText(ShapeText),
+   ShapeGroup(ShapeGroup),
+   ShapeBox(ShapeBox),
+}
 
 //struct diagram layout that implements Positionable and HasBoundingBox traits
 pub struct DiagramLayout {
     pub location: Location,
     //children is a vector of Positionable and HasBoundingBox objects
-    pub children: Vec<Box<dyn PositionableWithBoundingBox>>,
+    pub children: Vec<ShapeType>,
 }
 
 //impl diagram layout
@@ -41,7 +49,12 @@ impl PositionableWithBoundingBox for DiagramLayout {
         let mut max_y = 0.0;
 
         for child in &self.children {
-            let bb = child.get_bounding_box();
+            let bb = match child {
+                ShapeType::ShapeText(text) => text.get_bounding_box(),
+                ShapeType::ShapeGroup(group) => group.get_bounding_box(),
+                ShapeType::ShapeBox(box_) => box_.get_bounding_box(),
+            };
+
             if bb.x < min_x {
                 min_x = bb.x;
             }
@@ -88,8 +101,8 @@ mod tests {
         box2.width = 10.0;
         box2.height = 10.0;
 
-        dl.children.push(Box::new(box1));
-        dl.children.push(Box::new(box2));
+        dl.children.push(ShapeType::ShapeBox(box1));
+        dl.children.push(ShapeType::ShapeBox(box2));
 
         let bb = dl.get_bounding_box();
 
