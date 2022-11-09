@@ -56,6 +56,8 @@ fn render_text(text: &ShapeText) -> String {
     svg
 }
 
+
+
 fn render_group(group: &ShapeGroup) -> String {
     let mut svg = String::new();
     svg.push_str("<g>");
@@ -70,5 +72,31 @@ fn render_box(box_: &ShapeBox) -> String {
     let mut svg = String::new();
     svg.push_str(&format!(r#"<rect x="{}" y="{}" width="{}" height="{}" />"#, box_.location.x, box_.location.y, box_.width, box_.height));
     svg
+}
+
+
+//test for render_text
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shape_text::ShapeText;
+    use crate::bounding_box::{BoundingBox};
+    use crate::location::{Location, PositionableWithBoundingBox};
+    use crate::shape_text::TextOptions;
+
+    #[test]
+    fn render_text_test() {
+        let mut text = ShapeText::new();
+        text.text = String::from("Hello World\nThis is a test");
+        text.location.x = 10.0;
+        text.location.y = 20.0;
+        text.text_options.font_family = String::from("Arial");
+        text.text_options.font_size = 12.0;
+        text.text_options.text_color = String::from("black");
+        let svg = render_text(&text);
+
+        assert_eq!(svg, "<text fill=\"black\" transform=\"translate(10,20)\" font-family=\"Arial\" font-size=\"12\"><tspan x=\"0\" dy=\"12\" font-family=\"Arial\">Hello\u{a0}World</tspan><tspan x=\"0\" dy=\"12\" font-family=\"Arial\">This\u{a0}is\u{a0}a\u{a0}test</tspan></text>");
+    }
 }
 
