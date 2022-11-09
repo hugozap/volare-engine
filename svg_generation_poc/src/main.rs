@@ -9,14 +9,29 @@ use volare_engine_layout::diagram_layout::ShapeType;
 fn main() {
     //get session instance and set text measure method
     let mut session = volare_engine_layout::session::Session::get_instance();
-    session.set_measure_text_fn(|text, font_size| {
-        return (text.len() as f64 * font_size, font_size);
+    //set the measure_text function
+    session.set_measure_text_fn(|text, text_options| {
+        //get lines, replace space and tab with utf8 space character
+        let textv2 = text.replace(" ", "\u{00A0}").replace("\t", "\u{00A0}\u{00A0}");
+        let lines = textv2.lines();
+        
+        let number_of_lines = lines.clone().count();
+  
+        
+        //get max line length
+        let max_line_length = lines.map(|line| line.len()).max().unwrap_or(0);
+        let text_height = number_of_lines as f64 * text_options.font_size;
+        (text.len() as f64 * text_options.font_size, text_options.font_size)
     });
     let args: Vec<String> = env::args().collect();
     let mut layout = DiagramLayout::new();
     let mut text = ShapeText::new();
     text.text = args[1].clone();
-    layout.children.push(ShapeType::ShapeText(text));
+    let mut shape_box = volare_engine_layout::ShapeBox::new();
+    shape_box.elem = Some(Box::new(ShapeType::ShapeText(text)));
+    shape_box.padding = 10.0;
+
+    layout.children.push(ShapeType::ShapeBox(shape_box));
     //call trait method get_bounding_box for layout
     let bb = layout.get_bounding_box();
     println!("bounding box: x: {}, y: {}, width: {}, height: {}", bb.x, bb.y, bb.width, bb.height);
