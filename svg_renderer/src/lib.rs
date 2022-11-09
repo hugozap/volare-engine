@@ -37,9 +37,22 @@ fn render_shape(shape: &ShapeType) -> String {
 
 fn render_text(text: &ShapeText) -> String {
     let mut svg = String::new();
-    svg.push_str(&format!(r#"<text x="{}" y="{}" font-size="{}">"#, text.location.x, text.location.y, text.font_size));
-    svg.push_str(&text.text);
-    svg.push_str("</text>");
+    let transformStr = format!("translate({},{})", text.location.x, text.location.y);
+    let lines = text.text.lines();
+    //replace space and tabs with character u00a0 for each line
+    let lines = lines.map(|line| line.replace(" ", "\u{00a0}").replace("\t", "\u{00a0}\u{00A0}"));
+    //for each line create a tspan element, with x=0, dy=font size, font family and line text
+    let tspan = lines.map(|line| format!(r#"<tspan x="0" dy="{}" font-family="{}">{}</tspan>"#, text.text_options.font_size, text.text_options.font_family, line));
+
+    //concatenate all tspan elements
+    let tspan = tspan.collect::<Vec<String>>().join("");
+    svg.push_str(&format!(r#"<text fill="{}" transform="{}" font-family="{}" font-size="{}">{}</text>"#,
+        text.text_options.text_color,
+        transformStr,
+        text.text_options.font_family,
+        text.text_options.font_size,
+        tspan));
+
     svg
 }
 
