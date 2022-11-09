@@ -27,7 +27,11 @@ fn main() {
     let mut layout = DiagramLayout::new();
     let mut text = ShapeText::new();
     text.text = args[1].clone();
-    layout.children.push(ShapeType::ShapeText(text));
+    let mut shape_box = volare_engine_layout::ShapeBox::new();
+    shape_box.elem = Some(Box::new(ShapeType::ShapeText(text)));
+    shape_box.padding = 10.0;
+
+    layout.children.push(ShapeType::ShapeBox(shape_box));
     //call trait method get_bounding_box for layout
     let bb = layout.get_bounding_box();
     println!("bounding box: x: {}, y: {}, width: {}, height: {}", bb.x, bb.y, bb.width, bb.height);
