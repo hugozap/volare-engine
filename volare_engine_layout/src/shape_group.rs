@@ -1,8 +1,7 @@
-use crate::bounding_box::{BoundingBox};
+use crate::bounding_box::BoundingBox;
 use crate::location::{Location, PositionableWithBoundingBox};
 use crate::shape_box::ShapeBox;
-use crate::diagram_layout::ShapeType;
-
+use crate::utils::*;
 /**
  * The group has its own position separated from its children
  * When painting, the rendering layer should transform the space to move
@@ -37,7 +36,6 @@ impl PositionableWithBoundingBox for ShapeGroup {
     }
 
     fn get_bounding_box(&self) -> BoundingBox {
-
         //calculate the bounding box getting the min and max values from children
         let mut min_x = 0.0;
         let mut min_y = 0.0;
@@ -45,11 +43,7 @@ impl PositionableWithBoundingBox for ShapeGroup {
         let mut max_y = 0.0;
 
         for child in &self.children {
-            let bb = match child {
-                ShapeType::ShapeText(text) => text.get_bounding_box(),
-                ShapeType::ShapeGroup(group) => group.get_bounding_box(),
-                ShapeType::ShapeBox(box_) => box_.get_bounding_box(),
-            };
+            let bb = get_shape_type_bounding_box(child);
             if bb.x < min_x {
                 min_x = bb.x;
             }
@@ -68,7 +62,7 @@ impl PositionableWithBoundingBox for ShapeGroup {
             x: min_x,
             y: min_y,
             width: max_x - min_x,
-            height: max_y - min_y
+            height: max_y - min_y,
         }
     }
 }

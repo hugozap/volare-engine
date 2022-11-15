@@ -1,6 +1,6 @@
 use volare_engine_layout::DiagramLayout;
 use volare_engine_layout::*;
-use volare_engine_layout::diagram_layout::ShapeType;
+use volare_engine_layout::utils::*;
 use std::io::Write;
 //use error
 use std::io::Error;
@@ -31,6 +31,7 @@ fn render_shape(shape: &ShapeType) -> String {
         ShapeType::ShapeText(text) => svg.push_str(&render_text(text)),
         ShapeType::ShapeGroup(group) => svg.push_str(&render_group(group)),
         ShapeType::ShapeBox(box_) => svg.push_str(&render_box(box_)),
+        ShapeType::VerticalStack(stack) => svg.push_str(&render_stack(stack)),
     }
     svg
 }
@@ -106,15 +107,18 @@ fn render_box(box_: &ShapeBox) -> String {
     svg
 }
 
-//TODO: move this function to volare_engine_layout (is already in shape_box, refactor!
-fn get_shape_type_bounding_box(shape_type: &Box<ShapeType>) -> BoundingBox {
-    match &**shape_type {
-        ShapeType::ShapeBox(shape_box) => shape_box.get_bounding_box(),
-        ShapeType::ShapeText(shape_text) => shape_text.get_bounding_box(),
-        ShapeType::ShapeGroup(shape_group) => shape_group.get_bounding_box(),
+fn render_vertical_stack(stack: &VerticalStack) -> String {
+    let mut svg = String::new();
+    let transformStr = format!("translate({},{})", stack.location.x, stack.location.y);
+    svg.push_str(&format!(r#"<g transform="{}">"#, transformStr));
+    for child in &stack.children {
+        svg.push_str(&render_shape(child));
     }
-
+    svg.push_str("</g>");
+    svg
 }
+
+
 
 //test for render_text
 

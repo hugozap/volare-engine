@@ -1,7 +1,8 @@
 use crate::bounding_box::{BoundingBox};
 use crate::location::{Location, PositionableWithBoundingBox};
 //use shapetype enum
-use crate::diagram_layout::{ShapeType};
+use crate::utils::*;
+
 pub struct ShapeBox {
     pub location: Location,
     pub width: f64,
@@ -67,7 +68,7 @@ impl PositionableWithBoundingBox for ShapeBox {
         //
         match &self.elem {
             Some(elem) => {
-                let mut bounding_box = get_shape_type_bounding_box(&elem);
+                let mut bounding_box = get_shape_type_bounding_box(&**elem);
                 bounding_box.width += self.padding * 2.0;
                 bounding_box.height += self.padding * 2.0;
                 println!("bounding box for elem,  width: {}", bounding_box.width);
@@ -82,15 +83,6 @@ impl PositionableWithBoundingBox for ShapeBox {
         }
     }
 }
-
-fn get_shape_type_bounding_box(shape_type: &Box<ShapeType>) -> BoundingBox {
-    match &**shape_type {
-        ShapeType::ShapeBox(shape_box) => shape_box.get_bounding_box(),
-        ShapeType::ShapeText(shape_text) => shape_text.get_bounding_box(),
-        ShapeType::ShapeGroup(shape_group) => shape_group.get_bounding_box(),
-    }
-
-}
 //tests
 
 #[cfg(test)]
@@ -100,6 +92,7 @@ mod tests {
     use crate::bounding_box::{BoundingBox};
     use crate::location::{ PositionableWithBoundingBox};
     use crate::session::Session;
+    use crate::diagram_layout::{ShapeType};
 
     #[test]
     fn test_get_bounding_box() {
