@@ -48,6 +48,8 @@ pub struct BoxOptions {
     pub stroke_color: String,
     pub stroke_width: f64,
     pub padding: f64,
+    pub round_corners: bool,
+    pub border_radius: f64,
 }
 
 impl BoxOptions {
@@ -57,6 +59,8 @@ impl BoxOptions {
             stroke_color: String::from("black"),
             stroke_width: 1.0,
             padding: 10.0,
+            round_corners: false,
+            border_radius: 0.0,
         }
     }
 }
