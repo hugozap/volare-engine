@@ -10,18 +10,27 @@
  *
  */
 //use TextOptions
-use crate::shape_text::TextOptions;
+use crate::components::*;
 //wrap library features in a struct
 
-//new type EntityID that is a u64
-pub type EntityID = u64;
-
-const MAX_CAPACITY: usize = 10000;
+const MAX_ENTITIES: usize = 10000;
 pub struct Session {
     pub measure_text: Option<fn(&str, &TextOptions) -> (f64, f64)>,
-    pub entities: [EntityID; MAX_CAPACITY],
-    pub positions: [f64; MAX_CAPACITY * 2],
-    pub sizes: [f64; MAX_CAPACITY * 2],
+    pub entities: [EntityID; MAX_ENTITIES],
+    pub positions: [f64; MAX_ENTITIES * 2],
+    pub sizes: [f64; MAX_ENTITIES * 2],
+
+    pub root: EntityID,
+    // Components
+    pub boxes: Vec<ShapeBox>,
+    pub texts: Vec<ShapeText>,
+    pub lines: Vec<ShapeLine>,
+    pub groups: Vec<ShapeGroup>,
+    pub vertical_stacks: Vec<VerticalStack>,
+    pub horizontal_stacks: Vec<HorizontalStack>,
+
+    
+    
 }
 
 /* New architecture (data driven)
@@ -32,30 +41,22 @@ pub struct Session {
  * We have a type enum with all the types
 */
 
-//Note: add new items to the end of the enum to avoid breaking the serialization
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EntityType {
-    DiagramLayout,
-    BoxShape,
-    TextShape,
-    LineShape,
-    ArrowShape,
-    EllipseShape,
-    ImageShape,
-    GroupShape,
-    VerticalStackShape,
-    HorizontalStackShape,
-}
-
 impl Session {
     pub fn new() -> Session {
         Session {
             measure_text: Some(|text, _text_options| {
                 panic!("measure_text not implemented");
             }),
-            entities: [0; MAX_CAPACITY],
-            positions: [0.0; MAX_CAPACITY * 2],
-            sizes: [0.0; MAX_CAPACITY * 2],
+            entities: [0; MAX_ENTITIES],
+            positions: [0.0; MAX_ENTITIES * 2],
+            sizes: [0.0; MAX_ENTITIES * 2],
+            root: 0,
+            boxes: Vec::new(),
+            texts: Vec::new(),
+            lines: Vec::new(),
+            groups: Vec::new(),
+            vertical_stacks: Vec::new(),
+            horizontal_stacks: Vec::new(),
         }
     }
 
@@ -72,9 +73,9 @@ impl Session {
     }
 
     pub fn clear_cache(&mut self) {
-        self.entities = [0; MAX_CAPACITY];
-        self.positions = [0.0; MAX_CAPACITY * 2];
-        self.sizes = [0.0; MAX_CAPACITY * 2];
+        self.entities = [0; MAX_ENTITIES];
+        self.positions = [0.0; MAX_ENTITIES * 2];
+        self.sizes = [0.0; MAX_ENTITIES * 2];
     }
 
     //set the measure_text function
@@ -96,27 +97,30 @@ impl Session {
         let index = get_index(entity_id);
         (self.positions[index * 2], self.positions[index * 2 + 1])
     }
+
+    pub fn set_position(&mut self, entity_id: EntityID, x: f64, y: f64) {
+        let index = get_index(entity_id);
+        self.positions[index * 2] = x;
+        self.positions[index * 2 + 1] = y;
+    }
+
+    //get the size of an entity
+    pub fn get_size(&self, entity_id: EntityID) -> (f64, f64) {
+        let index = get_index(entity_id);
+        (self.sizes[index * 2], self.sizes[index * 2 + 1])
+    }
+
+    pub fn set_size(&mut self, entity_id: EntityID, width: f64, height: f64) {
+        let index = get_index(entity_id);
+        self.sizes[index * 2] = width;
+        self.sizes[index * 2 + 1] = height;
+    }
 }
 
 pub fn get_index(entity_id: EntityID) -> usize {
     (entity_id & 0xFFFFFFFF) as usize
 }
 
-pub fn get_type(entity_id: EntityID) -> EntityType {
-    match (entity_id >> 32) as u32 {
-        0 => EntityType::DiagramLayout,
-        1 => EntityType::BoxShape,
-        2 => EntityType::TextShape,
-        3 => EntityType::LineShape,
-        4 => EntityType::ArrowShape,
-        5 => EntityType::EllipseShape,
-        6 => EntityType::ImageShape,
-        7 => EntityType::GroupShape,
-        8 => EntityType::VerticalStackShape,
-        9 => EntityType::HorizontalStackShape,
-        _ => panic!("Invalid entity type"),
-    }
-}
 
 //test
 #[cfg(test)]
@@ -187,11 +191,11 @@ mod tests {
     #[test]
     fn test_session_entities() {
         let mut session = Session::get_instance();
-        let id = session.new_entity(EntityType::DiagramLayout);
+        let id = session.new_entity(EntityType::GroupShape);
         assert_eq!(id, 0);
         let index = get_index(id);
-        assert_eq!(index, 0);
-        let entity_type = get_type(id);
-        assert_eq!(entity_type, EntityType::DiagramLayout);
+        assert_eq!(index, 6);
+        let entity_type = get_entity_type(id);
+        assert_eq!(entity_type, EntityType::GroupShape);
     }
 }
