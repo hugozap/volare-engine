@@ -28,8 +28,6 @@ pub struct Session {
     pub groups: Vec<ShapeGroup>,
     pub vertical_stacks: Vec<VerticalStack>,
     pub horizontal_stacks: Vec<HorizontalStack>,
-
-    
     
 }
 

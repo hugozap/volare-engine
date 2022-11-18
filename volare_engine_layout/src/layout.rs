@@ -1,6 +1,6 @@
 /* Layout calculation for each type of entity */
 
-use crate::{Session, ShapeBox, ShapeGroup, ShapeLine, ShapeText, ShapeEllipse, ShapeArrow, ShapeImage, VerticalStack, HorizontalStack};
+use crate::{Session, ShapeBox, ShapeGroup, ShapeLine, ShapeText, ShapeEllipse, ShapeArrow, ShapeImage, VerticalStack, HorizontalStack, Table, EntityID};
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
@@ -142,5 +142,78 @@ pub fn layout_horizontal_stack(session: &mut Session, horizontal_stack: &Horizon
     }
     session.set_size(horizontal_stack.entity, x, height);
 
+}
+
+/**
+ * Calculates the layout for each of the cells according to table rules:
+ * - Cells in the same column have the same width (eq to the max of widths)
+ * - Cells in the same row have the same height (eq to the max of heights)
+ * - Rows on top of each other
+ * - Cols to the right of each other
+ * - The sizes of the internal elements should be previously computed for this to work
+ */
+pub fn layout_table(session: &mut Session, table: &Table) {
+    //we need to group elements by row and column, calculate their
+    //natural sizes and then update their rows and columns
+    let mut rows: Vec<Vec<EntityID>> = Vec::new();
+    let mut cols: Vec<Vec<EntityID>> = Vec::new();
+    let mut row_heights: Vec<f64> = Vec::new();
+    let mut col_widths: Vec<f64> = Vec::new();
+
+    //iterate through table cells, use index to calculate row and col
+    for (i, elem) in table.cells.iter().enumerate() {
+        let row = i / table.cols;
+        let col = i % table.cols;
+        //add the element to the row and col
+        if row >= rows.len() {
+            rows.push(Vec::new());
+            row_heights.push(0.0);
+        }
+        if col >= cols.len() {
+            cols.push(Vec::new());
+            col_widths.push(0.0);
+        }
+        rows[row].push(*elem);
+        cols[col].push(*elem);
+        //update the row and col sizes
+        let elem_size = session.get_size(*elem);
+        if elem_size.0 > col_widths[col] {
+            col_widths[col] = elem_size.0;
+        }
+        if elem_size.1 > row_heights[row] {
+            row_heights[row] = elem_size.1;
+        }
+    }
+
+    //we already have each row and col and their sizes.
+    //Now we have to update the position of each element
+    //and the size of the table
+
+    //iterate through rows and cols and update the position of each element
+    let mut x = 0.0;
+    for (i, col) in cols.iter().enumerate() {
+        let mut y = 0.0;
+        for elem in col.iter() {
+            session.set_position(*elem, x, y);
+            y += row_heights[i];
+        }
+        x += col_widths[i];
+    }
+
+    //update the size of the table
+    let mut width = 0.0;
+    let mut height = 0.0;
+
+    for w in col_widths.iter() {
+        width += w; 
+    }
+
+    for h in row_heights.iter() {
+        height += h; 
+    }
+
+    session.set_size(table.entity, width, height);
+
+    
 }
   

@@ -173,3 +173,15 @@ pub struct ShapeImage {
     pub image: String,
     pub preferred_size: (f64, f64),
 }
+
+
+/* A table contains a list of rows, each row has a cell 
+* which is a group that contains other elements.
+
+Tables are defined with an array of cells and the number of columns
+*/
+pub struct Table {
+    pub entity: u64,
+    pub cols: usize, 
+    pub cells: Vec<u64>
+}

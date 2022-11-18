@@ -1,22 +1,22 @@
-use volare_engine_layout::DiagramLayout;
 use volare_engine_layout::*;
 use volare_engine_layout::utils::*;
 use std::io::Write;
 //use error
 use std::io::Error;
 
-pub fn render<W: Write>(layout: &DiagramLayout, stream: &mut W) -> Result<(), Error> {
+pub fn render<W: Write>(root: EntityID, stream: &mut W) -> Result<(), Error> {
     let mut svg = String::new();
-    let bbox = layout.get_bounding_box();
+    let mut session = Session::get_instance();
+
+    let root_size = session.get_size(root);
+    let root_pos = session.get_position(root);
 
     svg.push_str(&format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"));
 
-    svg.push_str(&format!(r#"<svg viewBox="{} {} {} {}">"#, bbox.x, bbox.y, bbox.width, bbox.height));
+    svg.push_str(&format!(r#"<svg viewBox="{} {} {} {}">"#, root_size.0, root_size.1, root_size.0, root_size.1));
 
-    for child in &layout.children {
-        svg.push_str(&render_shape(child));
-    }
+    svg.push_str(render_entity(root, &mut session));
     //close svg tag
     svg.push_str("</svg>");
     svg.push_str("\n");
@@ -24,21 +24,23 @@ pub fn render<W: Write>(layout: &DiagramLayout, stream: &mut W) -> Result<(), Er
     Ok(())
 }
 
-fn render_shape(shape: &ShapeType) -> String {
+fn render_entity(entity_id: EntityID, session: &mut Session) -> String {
+
     let mut svg = String::new();
-    //call a separate function for each type
-    match shape {
-        ShapeType::ShapeText(text) => svg.push_str(&render_text(text)),
-        ShapeType::ShapeGroup(group) => svg.push_str(&render_group(group)),
-        ShapeType::ShapeBox(box_) => svg.push_str(&render_box(box_)),
-        ShapeType::VerticalStack(stack) => svg.push_str(&render_stack(stack)),
-    }
-    svg
+    let entity_type = get_entity_type(entity_id);
+    
+
+
 }
 
-fn render_text(text: &ShapeText) -> String {
+
+
+fn render_text(entity: EntityID, session: &mut Session) -> String {
     let mut svg = String::new();
-    let transformStr = format!("translate({},{})", text.location.x, text.location.y);
+    let text = session.get_text(entity);
+    let pos = session.get_position(entity);
+    let size = session.get_size(entity);
+    let transformStr = format!("translate({},{})", pos.0, pos.1);
     let lines = text.text.lines();
     //replace space and tabs with character u00a0 for each line
     let lines = lines.map(|line| line.replace(" ", "\u{00a0}").replace("\t", "\u{00a0}\u{00A0}"));
