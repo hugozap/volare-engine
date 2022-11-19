@@ -2,6 +2,11 @@
 //new type EntityID that is a u64
 pub type EntityID = u64;
 
+pub trait Entity {
+    fn get_id(&self) -> EntityID;
+    fn get_type(&self) -> EntityType;
+}
+
 //Note: add new items to the end of the enum to avoid breaking the serialization
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityType {
@@ -14,6 +19,7 @@ pub enum EntityType {
     GroupShape,
     VerticalStackShape,
     HorizontalStackShape,
+    TableShape,
 }
 
 pub fn get_entity_type(entity_id: EntityID) -> EntityType {
@@ -27,6 +33,7 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
         6 => EntityType::GroupShape,
         7 => EntityType::VerticalStackShape,
         8 => EntityType::HorizontalStackShape,
+        9 => EntityType::TableShape,
         _ => panic!("Invalid entity type"),
     }
 }
@@ -36,10 +43,30 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
  * Boxes show a rectangle around the wrapped entity
  */
 pub struct ShapeBox {
-    pub entity: u64,
+    pub entity: EntityID,
     //Each box wraps another entity
     pub wrapped_entity: u64,
     pub box_options: BoxOptions,
+}
+
+impl Entity for ShapeBox {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::BoxShape
+    }
+}
+
+impl ShapeBox {
+    pub fn new(entity: EntityID, wrapped_entity: EntityID, box_options: BoxOptions) -> ShapeBox {
+        ShapeBox {
+            entity,            
+            wrapped_entity,
+            box_options,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -67,14 +94,34 @@ impl BoxOptions {
 
 /* A group of entities */
 pub struct ShapeGroup {
-    pub entity: u64,
+    pub entity: EntityID,
     pub elements: Vec<u64>,
 }
 
+impl Entity for ShapeGroup {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::GroupShape
+    }
+}
+
 pub struct ShapeText {
-    pub entity: u64,
+    pub entity: EntityID,
     pub text: String,
     pub text_options: TextOptions,
+}
+
+impl Entity for ShapeText {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::TextShape
+    }
 }
 
 //struct with text options: font family, font size
@@ -88,20 +135,52 @@ pub struct TextOptions {
 pub struct VerticalStack {
     pub entity: u64,
     //List of entity ids
-    pub elements: Vec<u64>,
+    pub elements: Vec<EntityID>,
 }
+
+impl Entity for VerticalStack {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::VerticalStackShape
+    }
+}
+    
 
 pub struct HorizontalStack {
     pub entity: u64,
     //List of entity ids
-    pub elements: Vec<u64>,
+    pub elements: Vec<EntityID>,
+}
+
+impl Entity for HorizontalStack {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::HorizontalStackShape
+    }
 }
 
 pub struct ShapeLine {
-    pub entity: u64,
+    pub entity: EntityID,
     pub start: (f64, f64),
     pub end: (f64, f64),
     pub line_options: LineOptions,
+}
+
+
+impl Entity for ShapeLine {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::LineShape
+    }
 }
 
 #[derive(Default)]
@@ -120,10 +199,20 @@ impl LineOptions {
 }
 
 pub struct ShapeArrow {
-    pub entity: u64,
+    pub entity: EntityID,
     pub start: (f64, f64),
     pub end: (f64, f64),
     pub arrow_options: ArrowOptions,
+}
+
+impl Entity for ShapeArrow {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ArrowShape
+    }
 }
 
 #[derive(Default)]
@@ -150,6 +239,16 @@ pub struct ShapeEllipse {
     pub ellipse_options: EllipseOptions,
 }
 
+impl Entity for ShapeEllipse {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::EllipseShape
+    }
+}
+
 #[derive(Default)]
 pub struct EllipseOptions {
     pub fill_color: String,
@@ -174,6 +273,16 @@ pub struct ShapeImage {
     pub preferred_size: (f64, f64),
 }
 
+impl Entity for ShapeImage {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ImageShape
+    }
+}
+
 
 /* A table contains a list of rows, each row has a cell 
 * which is a group that contains other elements.
@@ -181,7 +290,17 @@ pub struct ShapeImage {
 Tables are defined with an array of cells and the number of columns
 */
 pub struct Table {
-    pub entity: u64,
+    pub entity: EntityID,
     pub cols: usize, 
-    pub cells: Vec<u64>
+    pub cells: Vec<EntityID>
+}
+
+impl Entity for Table {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::TableShape
+    }
 }
