@@ -1,11 +1,12 @@
 /**
- * Main data structure for the layout engine.
- * Contains the positions and sizes of all the elements.
- * They are allocated in the stack for super fast access.
- *
- * Check the utils module for utilties for accessing the entity id information.
- * The session also stores host dependent information, such as the text measurement function.
- * Other components must set this information before using the session.
+ * This object encapsulates diagram creation logic in a user friendly API
+ * Usage:
+ *```rust 
+ * let builder = DiagramBuilder::new();
+ * let group = builder.new_group(
+ *   builder.new_box(builder.new_text("Hello World!"), BoxOptions{fill_color: "white".to_string(), stroke_color: "black".to_string(), stroke_width: 1.0, padding: 10.0, round_corners: false, border_radius: 0.0}),
+ * );
+ * 
  *
  *
  */
@@ -20,16 +21,43 @@ pub struct Session {
     pub positions: [f64; MAX_ENTITIES * 2],
     pub sizes: [f64; MAX_ENTITIES * 2],
 
-    pub root: EntityID,
+
     // Components
-    pub boxes: Vec<ShapeBox>,
-    pub texts: Vec<ShapeText>,
-    pub lines: Vec<ShapeLine>,
-    pub groups: Vec<ShapeGroup>,
-    pub vertical_stacks: Vec<VerticalStack>,
-    pub horizontal_stacks: Vec<HorizontalStack>,
+    boxes: Vec<ShapeBox>,
+    groups: Vec<ShapeGroup>,
+    texts: Vec<ShapeText>,
+    horizontal_stacks: Vec<HorizontalStack>,
+    vertical_stacks: Vec<VerticalStack>,
+    ellipses: Vec<ShapeEllipse>,
+    lines: Vec<ShapeLine>,
+    arrows: Vec<ShapeArrow>,
+    tables: Vec<Table>,
+    images: Vec<ShapeImage>,
     
 }
+
+// Stores the type of entity and the index of the entity in the corresponding vector
+// Used when building the diagram tree.
+#[derive(Debug, Clone)]
+ pub struct DiagramTreeNode{
+    entity_type: EntityType,
+    index: usize,
+    children: Vec<Box<DiagramTreeNode>>,
+ }
+
+ impl DiagramTreeNode {
+    fn new(entity_type: EntityType, index: usize) -> DiagramTreeNode {
+        DiagramTreeNode {
+            entity_type,
+            index,
+            children: Vec::new(),
+        }
+    }
+
+    fn add_child(&mut self, child: DiagramTreeNode) {
+        self.children.push(Box::new(child));
+    }
+ }
 
 /* New architecture (data driven)
  * We have an array of entities, each entity is an id
@@ -42,20 +70,23 @@ pub struct Session {
 impl Session {
     pub fn new() -> Session {
         Session {
-            measure_text: Some(|text, _text_options| {
-                panic!("measure_text not implemented");
+            measure_text: Some(|_text, _text_options| {
+                (0.0,0.0)
             }),
             entities: [0; MAX_ENTITIES],
             positions: [0.0; MAX_ENTITIES * 2],
             sizes: [0.0; MAX_ENTITIES * 2],
-            root: 0,
-            boxes: Vec::new(),
-            texts: Vec::new(),
-            lines: Vec::new(),
+             boxes: Vec::new(),
             groups: Vec::new(),
-            vertical_stacks: Vec::new(),
+            texts: Vec::new(),
             horizontal_stacks: Vec::new(),
-        }
+            vertical_stacks: Vec::new(),
+            ellipses: Vec::new(),
+            lines: Vec::new(),
+            arrows: Vec::new(),
+            tables: Vec::new(),
+            images: Vec::new(),
+       }
     }
 
     /* Create a new entity of a given type
@@ -113,6 +144,83 @@ impl Session {
         self.sizes[index * 2] = width;
         self.sizes[index * 2 + 1] = height;
     }
+  
+    // Returns the Entity for the specified type and index
+    pub fn get_entity(&self, entity_type: EntityType, index: usize) -> &dyn Entity {
+        match entity_type {
+            EntityType::GroupShape => &self.groups[index],
+            EntityType::TextShape => &self.texts[index],
+            EntityType::HorizontalStackShape => &self.horizontal_stacks[index],
+            EntityType::VerticalStackShape => &self.vertical_stacks[index],
+            EntityType::EllipseShape => &self.ellipses[index],
+            EntityType::LineShape => &self.lines[index],
+            EntityType::ArrowShape => &self.arrows[index],
+            EntityType::TableShape => &self.tables[index],
+            EntityType::ImageShape => &self.images[index],
+            EntityType::BoxShape => &self.boxes[index],
+        }
+    }
+
+    // This methods are used to build the diagram tree
+    // TODO: review the architecture of this
+
+    // Wraps an element in a box
+    pub fn new_box(&mut self, child: DiagramTreeNode,options: BoxOptions) -> DiagramTreeNode {
+        let box_index = self.boxes.len();
+        let box_id = self.new_entity(EntityType::BoxShape);
+        let child_entity = self.get_entity(child.entity_type, child.index);
+        let sbox = ShapeBox::new(box_id, child_entity.get_id(), options);
+        self.boxes.push(sbox);
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::BoxShape,
+            index: box_index,
+            children: Vec::new(),
+        };
+        node.children.push(Box::new(child.clone()));
+        node
+    }
+
+    // Creates a new Text element
+    // text: the text to display
+    // options: the options for the text
+    // ```rust
+    // let text = session.new_text("Hello World", TextOptions::new());
+    // ```
+    pub fn new_text(&mut self, text: &str, options: TextOptions) -> DiagramTreeNode {
+        let text_index = self.texts.len();
+        let text_id = self.new_entity(EntityType::TextShape);
+        let text = ShapeText::new(text_id, text, options);
+        self.texts.push(text);
+        DiagramTreeNode::new(EntityType::TextShape, text_index)
+    }
+
+    // Creates a new Group.
+    pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+        let group_index = self.groups.len();
+        let group_id = self.new_entity(EntityType::GroupShape);
+        let mut sgroup = ShapeGroup{
+         entity: group_id,
+         elements: Vec::new(),   
+        };
+         let mut node = DiagramTreeNode {
+            entity_type: EntityType::GroupShape,
+            index: group_index,
+            children: Vec::new(),
+        };
+ 
+     
+        //set children
+        for child in children {
+            let child_entity = self.get_entity(child.entity_type, child.index);
+            sgroup.elements.push(child_entity.get_id());
+            node.add_child(child)
+        }
+
+        self.groups.push(sgroup);
+
+        
+        node
+    }  
 }
 
 pub fn get_index(entity_id: EntityID) -> usize {
@@ -128,10 +236,10 @@ mod tests {
     #[test]
     fn test_session() {
         let mut session = Session::new();
-        session.set_measure_text_fn(|text, textOptions| {
+        session.set_measure_text_fn(|text, text_options| {
             (
-                text.len() as f64 * textOptions.font_size,
-                textOptions.font_size,
+                text.len() as f64 * text_options.font_size,
+                text_options.font_size,
             )
         });
         let (w, h) = session.measure_text.unwrap()(
@@ -147,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_session_singleton() {
-        let mut session = Session::get_instance();
+        let session = Session::get_instance();
         session.set_measure_text_fn(|text, text_options| {
             (
                 text.len() as f64 * text_options.font_size,
@@ -167,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_session_singleton_2() {
-        let mut session = Session::get_instance();
+        let session = Session::get_instance();
         session.set_measure_text_fn(|text, text_options| {
             (
                 text.len() as f64 * text_options.font_size,
@@ -188,7 +296,7 @@ mod tests {
     //Test entities
     #[test]
     fn test_session_entities() {
-        let mut session = Session::get_instance();
+        let session = Session::get_instance();
         let id = session.new_entity(EntityType::GroupShape);
         assert_eq!(id, 0);
         let index = get_index(id);

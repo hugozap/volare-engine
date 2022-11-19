@@ -114,6 +114,16 @@ pub struct ShapeText {
     pub text_options: TextOptions,
 }
 
+impl ShapeText{
+    pub fn new(entity: EntityID, text: &str, text_options: TextOptions) -> ShapeText {
+        ShapeText {
+            entity,
+            text: text.to_string(),
+            text_options,
+        }
+    }
+}
+
 impl Entity for ShapeText {
     fn get_id(&self) -> EntityID {
         self.entity
