@@ -1,10 +1,52 @@
 
+use std::any::Any;
 //new type EntityID that is a u64
 pub type EntityID = u64;
 
 pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_type(&self) -> EntityType;
+    //as_any
+    fn as_any(&self) -> &dyn Any;
+}
+
+//default implementation of Entity
+impl dyn Entity {
+
+    pub fn as_group(&self) -> Option<&ShapeGroup> {
+        self.as_any().downcast_ref::<ShapeGroup>()
+    }
+
+    pub fn as_horizontal_stack(&self) -> Option<&HorizontalStack> {
+        self.as_any().downcast_ref::<HorizontalStack>()
+    }
+
+    pub fn as_vertical_stack(&self) -> Option<&VerticalStack> {
+        self.as_any().downcast_ref::<VerticalStack>()
+    }
+
+    pub fn as_text(&self) -> Option<&ShapeText> {
+        self.as_any().downcast_ref::<ShapeText>()
+    }
+
+    pub fn as_line(&self) -> Option<&ShapeLine> {
+        self.as_any().downcast_ref::<ShapeLine>()
+    }
+
+    pub fn as_arrow(&self) -> Option<&ShapeArrow> {
+        self.as_any().downcast_ref::<ShapeArrow>()
+    }
+
+    pub fn as_ellipse(&self) -> Option<&ShapeEllipse> {
+        self.as_any().downcast_ref::<ShapeEllipse>()
+    }
+
+    pub fn as_image(&self) -> Option<&ShapeImage> {
+        self.as_any().downcast_ref::<ShapeImage>()
+    }
+    pub fn as_table(&self) -> Option<&Table> {
+        self.as_any().downcast_ref::<Table>()
+    }
 }
 
 //Note: add new items to the end of the enum to avoid breaking the serialization
@@ -57,6 +99,10 @@ impl Entity for ShapeBox {
     fn get_type(&self) -> EntityType {
         EntityType::BoxShape
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl ShapeBox {
@@ -106,6 +152,10 @@ impl Entity for ShapeGroup {
     fn get_type(&self) -> EntityType {
         EntityType::GroupShape
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct ShapeText {
@@ -132,6 +182,10 @@ impl Entity for ShapeText {
     fn get_type(&self) -> EntityType {
         EntityType::TextShape
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 //struct with text options: font family, font size
@@ -156,6 +210,10 @@ impl Entity for VerticalStack {
     fn get_type(&self) -> EntityType {
         EntityType::VerticalStackShape
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
     
 
@@ -172,6 +230,10 @@ impl Entity for HorizontalStack {
 
     fn get_type(&self) -> EntityType {
         EntityType::HorizontalStackShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -190,6 +252,10 @@ impl Entity for ShapeLine {
 
     fn get_type(&self) -> EntityType {
         EntityType::LineShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -222,6 +288,10 @@ impl Entity for ShapeArrow {
 
     fn get_type(&self) -> EntityType {
         EntityType::ArrowShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -257,6 +327,10 @@ impl Entity for ShapeEllipse {
     fn get_type(&self) -> EntityType {
         EntityType::EllipseShape
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 #[derive(Default)]
@@ -291,6 +365,11 @@ impl Entity for ShapeImage {
     fn get_type(&self) -> EntityType {
         EntityType::ImageShape
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
 }
 
 
@@ -312,5 +391,9 @@ impl Entity for Table {
 
     fn get_type(&self) -> EntityType {
         EntityType::TableShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

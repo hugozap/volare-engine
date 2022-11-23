@@ -1,21 +1,28 @@
 use volare_engine_layout::*;
+use volare_engine_layout::session::DiagramTreeNode;
+use std::cell::RefCell;
 use std::io::Write;
 //use error
 use std::io::Error;
 
-pub fn render<W: Write>(root: EntityID, stream: &mut W) -> Result<(), Error> {
-    let mut svg = String::new();
-    let mut session = Session::get_instance();
 
-    let root_size = session.get_size(root);
-    let root_pos = session.get_position(root);
+// Entry point for the SVG renderer
+// The renderer will write the SVG to the output stream
+pub fn render<W: Write>(session_ref: RefCell<Session>, diagram_node: &DiagramTreeNode, stream: &mut W) -> Result<(), Error> {
+    
+    let mut svg = String::new();
+    let session = session_ref.borrow();
+    let entity_id = session.get_entity_id(diagram_node.entity_type, diagram_node.index);
+    let root_size = session.get_size(entity_id);
+    let root_pos = session.get_position(entity_id);
 
     svg.push_str(&format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"));
 
-    svg.push_str(&format!(r#"<svg viewBox="{} {} {} {}">"#, root_size.0, root_size.1, root_size.0, root_size.1));
+    svg.push_str(&format!(r#"<svg viewBox="{} {} {} {}">"#, root_pos.0, root_pos.1, root_size.0, root_size.1));
+    
 
-    svg.push_str(render_entity(root, &mut session));
+    svg.push_str(render_node(diagram_node, &session_ref).as_str());
     //close svg tag
     svg.push_str("</svg>");
     svg.push_str("\n");
@@ -23,19 +30,92 @@ pub fn render<W: Write>(root: EntityID, stream: &mut W) -> Result<(), Error> {
     Ok(())
 }
 
-fn render_entity(entity_id: EntityID, session: &mut Session) -> String {
 
+/*
+  The reason why we get an error with the session lifetime
+  even if session is not a static variable, is because the
+    render_node function is recursive and the compiler cannot
+    infer the lifetime of the session variable.
+    The solution is to use the static lifetime for the session.
+
+    We can solve it with refcell doing this:
+    let session = RefCell::new(session);
+    let session = session.borrow();
+    render_node(&session, diagramNode, stream);
+    but it is not a good solution because it is not thread safe.
+
+    To receive a refcell we need to define arguments like this:
+
+ 
+ */
+fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> String {
     let mut svg = String::new();
-    let entity_type = get_entity_type(entity_id);
-    
+    let session = session_ref.borrow();
 
+    let entity_id = session.get_entity_id(node.entity_type, node.index);
+    let pos = session.get_position(entity_id);
+
+    match node.entity_type {
+        EntityType::GroupShape => {
+            svg.push_str(&format!(r#"<g transform="translate({} {})" >"#, pos.0, pos.1));
+            for child in node.children.iter() {
+                svg.push_str(render_node(child, session_ref).as_str());
+            } 
+            svg.push_str("</g>");
+        }
+        _ => {
+            svg.push_str("");
+        }
+    }
+
+    svg
 
 }
 
+// All the layout elements already have their positions updated
+// We just need to render them, that is, create the SVG elements.
+// fn render_entity(entity: &dyn Entity, session: &Session) -> String {
+
+//     let entity_type = entity.get_type();
+//     let entity_id = entity.get_id();
+//     let entity = session.get_entity(entity_type, get_entity_index_from_id(entity_id));
+//     let svg = match entity_type {
+//         EntityType::GroupShape => {
+//             let group_shape = entity.as_any().downcast_ref::<ShapeGroup>().unwrap();
+//             render_group(session, group_shape)
+//         },
+//         _ => {
+//             String::from("")
+//         }
+//     };
+
+//     svg
+// }
 
 
-fn render_text(entity: EntityID, session: &mut Session) -> String {
+// fn render_group(session: &Session, group: &ShapeGroup) -> String {
+//     let mut svg = String::new();
+//     let pos = session.get_position(group.entity);
+//     let size = session.get_size(group.entity);
+//     svg.push_str(&format!(r#"<g transform="translate({} {})" >"#, pos.0, pos.1));
+//     for child_id in &group.elements {
+//         let entity_type = get_entity_type_from_id(*child_id);
+//         let entity_index = get_entity_index_from_id(*child_id);
+//         let entity = session.get_entity(entity_type, entity_index);
+//         svg.push_str(&render_entity(entity, session));
+//     }
+//     svg.push_str("</g>");
+//     svg
+// }
+
+
+/* 
+fn render_text(entity_id: EntityID, session: &Session) -> String {
     let mut svg = String::new();
+    //get index from entity id
+    let entity_index = get_entity_index_from_id(entity_id);
+    //TODO: get_entity should only take the entity id.
+    let entity = session.get_entity(EntityType::TextShape, entity_index);
     let text = session.get_text(entity);
     let pos = session.get_position(entity);
     let size = session.get_size(entity);
@@ -60,15 +140,6 @@ fn render_text(entity: EntityID, session: &mut Session) -> String {
 
 
 
-fn render_group(group: &ShapeGroup) -> String {
-    let mut svg = String::new();
-    svg.push_str("<g>");
-    for child in &group.children {
-        svg.push_str(&render_shape(child));
-    }
-    svg.push_str("</g>");
-    svg
-}
 
 fn render_box(box_: &ShapeBox) -> String {
     let mut svg = String::new();
@@ -119,67 +190,13 @@ fn render_vertical_stack(stack: &VerticalStack) -> String {
     svg
 }
 
+*/
 
-
-//test for render_text
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::shape_text::ShapeText;
-    use crate::bounding_box::{BoundingBox};
-    use crate::location::{Location, PositionableWithBoundingBox};
-    use crate::shape_text::TextOptions;
-
-
-    #[test]
-    fn render_text_test() {
-         let mut session = crate::session::Session::get_instance();
-        session.set_measure_text_fn(|text, _textOptions| {
-           (200f64,20f64) 
-        });
-
-
-        let mut text = ShapeText::new();
-        text.text = String::from("Hello World\nThis is a test");
-        text.location.x = 10.0;
-        text.location.y = 20.0;
-        text.text_options.font_family = String::from("Arial");
-        text.text_options.font_size = 12.0;
-        text.text_options.text_color = String::from("black");
-        let svg = render_text(&text);
-
-        assert_eq!(svg, "<text fill=\"black\" transform=\"translate(10,20)\" font-family=\"Arial\" font-size=\"12\"><tspan x=\"0\" dy=\"12\" font-family=\"Arial\">Hello\u{a0}World</tspan><tspan x=\"0\" dy=\"12\" font-family=\"Arial\">This\u{a0}is\u{a0}a\u{a0}test</tspan></text>");
-    }
-
-    #[test]
-    fn render_box_test() {
-
-        //set test text measure fn
-
-        let mut session = crate::session::Session::get_instance();
-        session.set_measure_text_fn(|text, _textOptions| {
-           (200f64,20f64) 
-        });
-
-        let mut box_ = ShapeBox::new();
-        box_.location.x = 10.0;
-        box_.location.y = 20.0;
-        box_.padding = 10.0;
-        box_.box_options.fill_color = String::from("white");
-        box_.box_options.stroke_color = String::from("black");
-        box_.box_options.stroke_width = 1.0;
-
-        let mut text = ShapeText::new();
-        text.text = String::from("Hola");
-        text.text_options.font_family = String::from("Arial");
-        text.text_options.font_size = 12.0;
-        text.text_options.text_color = String::from("black");
-        box_.elem = Some(Box::new(ShapeType::ShapeText(text)));
-
-        let svg = render_box(&box_);
-
-        assert_eq!(svg, r#"<g transform="translate(10,20)"><rect x="0" y="0" width="220" height="40" fill="white" stroke="black" stroke-width="1" /><g transform="translate(10,10)"><text fill="black" transform="translate(0,0)" font-family="Arial" font-size="12"><tspan x="0" dy="12" font-family="Arial">Hola</tspan></text></g></g>"#);
-    }
+//test that groups are rendered correctly
+#[test]
+fn test_render_group() {
+    let mut session = Session::new();
+    let group = session.new_group(Vec::new());
+    let node = render_node(&group, &RefCell::new(session));
+    assert_eq!(node, r#"<g transform="translate(0 0)" ></g>"#);
 }
-

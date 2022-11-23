@@ -11,7 +11,7 @@
  *
  */
 //use TextOptions
-use crate::components::*;
+use crate::{components::*, get_entity_index_from_id};
 //wrap library features in a struct
 
 const MAX_ENTITIES: usize = 10000;
@@ -40,9 +40,9 @@ pub struct Session {
 // Used when building the diagram tree.
 #[derive(Debug, Clone)]
  pub struct DiagramTreeNode{
-    entity_type: EntityType,
-    index: usize,
-    children: Vec<Box<DiagramTreeNode>>,
+    pub entity_type: EntityType,
+    pub index: usize,
+    pub children: Vec<Box<DiagramTreeNode>>,
  }
 
  impl DiagramTreeNode {
@@ -112,54 +112,32 @@ impl Session {
         self.measure_text = Option::Some(measure_text);
     }
 
-    //get singleton instance
-    pub fn get_instance() -> &'static mut Session {
-        static mut INSTANCE: Option<Session> = None;
-        unsafe {
-            INSTANCE.get_or_insert_with(Session::new);
-            INSTANCE.as_mut().unwrap()
-        }
-    }
+    
 
     //get the position of an entity
     pub fn get_position(&self, entity_id: EntityID) -> (f64, f64) {
-        let index = get_index(entity_id);
+        let index = get_entity_index_from_id(entity_id);
         (self.positions[index * 2], self.positions[index * 2 + 1])
     }
 
     pub fn set_position(&mut self, entity_id: EntityID, x: f64, y: f64) {
-        let index = get_index(entity_id);
+        let index = get_entity_index_from_id(entity_id);
         self.positions[index * 2] = x;
         self.positions[index * 2 + 1] = y;
     }
 
     //get the size of an entity
     pub fn get_size(&self, entity_id: EntityID) -> (f64, f64) {
-        let index = get_index(entity_id);
+        let index = get_entity_index_from_id(entity_id);
         (self.sizes[index * 2], self.sizes[index * 2 + 1])
     }
 
     pub fn set_size(&mut self, entity_id: EntityID, width: f64, height: f64) {
-        let index = get_index(entity_id);
+        let index = get_entity_index_from_id(entity_id);
         self.sizes[index * 2] = width;
         self.sizes[index * 2 + 1] = height;
     }
   
-    // Returns the Entity for the specified type and index
-    pub fn get_entity(&self, entity_type: EntityType, index: usize) -> &dyn Entity {
-        match entity_type {
-            EntityType::GroupShape => &self.groups[index],
-            EntityType::TextShape => &self.texts[index],
-            EntityType::HorizontalStackShape => &self.horizontal_stacks[index],
-            EntityType::VerticalStackShape => &self.vertical_stacks[index],
-            EntityType::EllipseShape => &self.ellipses[index],
-            EntityType::LineShape => &self.lines[index],
-            EntityType::ArrowShape => &self.arrows[index],
-            EntityType::TableShape => &self.tables[index],
-            EntityType::ImageShape => &self.images[index],
-            EntityType::BoxShape => &self.boxes[index],
-        }
-    }
 
     // This methods are used to build the diagram tree
     // TODO: review the architecture of this
@@ -168,8 +146,10 @@ impl Session {
     pub fn new_box(&mut self, child: DiagramTreeNode,options: BoxOptions) -> DiagramTreeNode {
         let box_index = self.boxes.len();
         let box_id = self.new_entity(EntityType::BoxShape);
-        let child_entity = self.get_entity(child.entity_type, child.index);
-        let sbox = ShapeBox::new(box_id, child_entity.get_id(), options);
+        // we need to get the wrapped entity id
+        
+       
+        let sbox = ShapeBox::new(box_id, self.get_entity_id(child.entity_type, child.index ), options);
         self.boxes.push(sbox);
         let mut node = DiagramTreeNode {
             entity_type: EntityType::BoxShape,
@@ -178,6 +158,22 @@ impl Session {
         };
         node.children.push(Box::new(child.clone()));
         node
+    }
+
+    // Returns the entityID given the entity type and the index
+    pub fn get_entity_id(&self, entity_type: EntityType, index: usize) -> EntityID {
+        match entity_type {
+            EntityType::GroupShape => self.groups[index].get_id(),
+            EntityType::TextShape => self.texts[index].get_id(),
+            EntityType::HorizontalStackShape => self.horizontal_stacks[index].get_id(),
+            EntityType::VerticalStackShape => self.vertical_stacks[index].get_id(),
+            EntityType::EllipseShape => self.ellipses[index].get_id(),
+            EntityType::LineShape => self.lines[index].get_id(),
+            EntityType::ArrowShape => self.arrows[index].get_id(),
+            EntityType::TableShape => self.tables[index].get_id(),
+            EntityType::ImageShape => self.images[index].get_id(),
+            EntityType::BoxShape => self.boxes[index].get_id(),
+        }
     }
 
     // Creates a new Text element
@@ -211,8 +207,8 @@ impl Session {
      
         //set children
         for child in children {
-            let child_entity = self.get_entity(child.entity_type, child.index);
-            sgroup.elements.push(child_entity.get_id());
+            let entity_id = self.get_entity_id(child.entity_type, child.index);
+            sgroup.elements.push(entity_id);
             node.add_child(child)
         }
 
@@ -223,14 +219,56 @@ impl Session {
     }  
 }
 
-pub fn get_index(entity_id: EntityID) -> usize {
-    (entity_id & 0xFFFFFFFF) as usize
+// element list accessors
+impl Session {
+    pub fn get_text(&self, index: usize) -> &ShapeText {
+        &self.texts[index]
+    }
+
+    pub fn get_group(&self, index: usize) -> &ShapeGroup {
+        &self.groups[index]
+    }
+
+    pub fn get_horizontal_stack(&self, index: usize) -> &HorizontalStack {
+        &self.horizontal_stacks[index]
+    }
+
+    pub fn get_vertical_stack(&self, index: usize) -> &VerticalStack {
+        &self.vertical_stacks[index]
+    }
+
+    pub fn get_ellipse(&self, index: usize) -> &ShapeEllipse {
+        &self.ellipses[index]
+    }
+
+    pub fn get_line(&self, index: usize) -> &ShapeLine {
+        &self.lines[index]
+    }
+
+    pub fn get_arrow(&self, index: usize) -> &ShapeArrow {
+        &self.arrows[index]
+    }
+
+    pub fn get_table(&self, index: usize) -> &Table {
+        &self.tables[index]
+    }
+
+    pub fn get_image(&self, index: usize) -> &ShapeImage {
+        &self.images[index]
+    }
+
+    pub fn get_box(&self, index: usize) -> &ShapeBox {
+        &self.boxes[index]
+    }
 }
+
 
 
 //test
 #[cfg(test)]
 mod tests {
+    use crate::{get_entity_type_from_id, get_entity_index_from_id};
+
     use super::*;
 
     #[test]
@@ -253,55 +291,15 @@ mod tests {
         assert_eq!(h, 12.0);
     }
 
-    #[test]
-    fn test_session_singleton() {
-        let session = Session::get_instance();
-        session.set_measure_text_fn(|text, text_options| {
-            (
-                text.len() as f64 * text_options.font_size,
-                text_options.font_size,
-            )
-        });
-        let (w, h) = session.measure_text.unwrap()(
-            "hello",
-            &TextOptions {
-                font_size: 12.0,
-                ..Default::default()
-            },
-        );
-        assert_eq!(w, 60.0);
-        assert_eq!(h, 12.0);
-    }
-
-    #[test]
-    fn test_session_singleton_2() {
-        let session = Session::get_instance();
-        session.set_measure_text_fn(|text, text_options| {
-            (
-                text.len() as f64 * text_options.font_size,
-                text_options.font_size,
-            )
-        });
-        let (w, h) = session.measure_text.unwrap()(
-            "hello",
-            &TextOptions {
-                font_size: 12.0,
-                ..Default::default()
-            },
-        );
-        assert_eq!(w, 60.0);
-        assert_eq!(h, 12.0);
-    }
-
     //Test entities
     #[test]
     fn test_session_entities() {
-        let session = Session::get_instance();
+        let mut session = Session::new();
         let id = session.new_entity(EntityType::GroupShape);
         assert_eq!(id, 0);
-        let index = get_index(id);
+        let index = get_entity_index_from_id(id);
         assert_eq!(index, 6);
-        let entity_type = get_entity_type(id);
+        let entity_type = get_entity_type_from_id(id);
         assert_eq!(entity_type, EntityType::GroupShape);
     }
 }
