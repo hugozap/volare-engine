@@ -59,6 +59,7 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
         EntityType::GroupShape => {
             svg.push_str(&format!(r#"<g transform="translate({} {})" >"#, pos.0, pos.1));
             for child in node.children.iter() {
+                print!("render_node recursive");
                 svg.push_str(render_node(child, session_ref).as_str());
             } 
             svg.push_str("</g>");
