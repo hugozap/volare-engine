@@ -63,7 +63,18 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
                 svg.push_str(render_node(child, session_ref).as_str());
             } 
             svg.push_str("</g>");
-        }
+        },
+        EntityType::BoxShape => {
+            let size = session.get_size(entity_id);
+            svg.push_str(&format!(r#"<g transform="translate({} {})" >"#, pos.0, pos.1));
+            svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" />"#, size.0, size.1));
+            //Paint the inner node
+            for child in node.children.iter() {
+                svg.push_str(render_node(child, session_ref).as_str())
+            }
+            svg.push_str("</g>");
+        },
+
         _ => {
             svg.push_str("");
         }
@@ -200,4 +211,14 @@ fn test_render_group() {
     let group = session.new_group(Vec::new());
     let node = render_node(&group, &RefCell::new(session));
     assert_eq!(node, r#"<g transform="translate(0 0)" ></g>"#);
+}
+
+//test that BoxShape with wrapped group is rendered correctly
+#[test]
+fn test_render_box_with_group() {
+    let mut session = Session::new();
+    let group = session.new_group(Vec::new());
+    let box_ = session.new_box(group,  BoxOptions::default());
+    let node = render_node(&box_, &RefCell::new(session));
+    assert_eq!(node, r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" /><g transform="translate(0 0)" ></g></g>"#);
 }
