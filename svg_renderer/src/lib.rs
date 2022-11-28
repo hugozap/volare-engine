@@ -1,15 +1,17 @@
-use volare_engine_layout::*;
-use volare_engine_layout::session::DiagramTreeNode;
 use std::cell::RefCell;
 use std::io::Write;
+use volare_engine_layout::session::DiagramTreeNode;
+use volare_engine_layout::*;
 //use error
 use std::io::Error;
 
-
 // Entry point for the SVG renderer
 // The renderer will write the SVG to the output stream
-pub fn render<W: Write>(session_ref: RefCell<Session>, diagram_node: &DiagramTreeNode, stream: &mut W) -> Result<(), Error> {
-    
+pub fn render<W: Write>(
+    session_ref: RefCell<Session>,
+    diagram_node: &DiagramTreeNode,
+    stream: &mut W,
+) -> Result<(), Error> {
     let mut svg = String::new();
     let session = session_ref.borrow();
     let entity_id = session.get_entity_id(diagram_node.entity_type, diagram_node.index);
@@ -17,10 +19,13 @@ pub fn render<W: Write>(session_ref: RefCell<Session>, diagram_node: &DiagramTre
     let root_pos = session.get_position(entity_id);
 
     svg.push_str(&format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"));
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
+    ));
 
-    svg.push_str(&format!(r#"<svg viewBox="{} {} {} {}">"#, root_pos.0, root_pos.1, root_size.0, root_size.1));
-    
+    svg.push_str(&format!(
+        r#"<svg viewBox="{} {} {} {}">"#,
+        root_pos.0, root_pos.1, root_size.0, root_size.1
+    ));
 
     svg.push_str(render_node(diagram_node, &session_ref).as_str());
     //close svg tag
@@ -30,24 +35,23 @@ pub fn render<W: Write>(session_ref: RefCell<Session>, diagram_node: &DiagramTre
     Ok(())
 }
 
-
 /*
-  The reason why we get an error with the session lifetime
-  even if session is not a static variable, is because the
-    render_node function is recursive and the compiler cannot
-    infer the lifetime of the session variable.
-    The solution is to use the static lifetime for the session.
+ The reason why we get an error with the session lifetime
+ even if session is not a static variable, is because the
+   render_node function is recursive and the compiler cannot
+   infer the lifetime of the session variable.
+   The solution is to use the static lifetime for the session.
 
-    We can solve it with refcell doing this:
-    let session = RefCell::new(session);
-    let session = session.borrow();
-    render_node(&session, diagramNode, stream);
-    but it is not a good solution because it is not thread safe.
+   We can solve it with refcell doing this:
+   let session = RefCell::new(session);
+   let session = session.borrow();
+   render_node(&session, diagramNode, stream);
+   but it is not a good solution because it is not thread safe.
 
-    To receive a refcell we need to define arguments like this:
+   To receive a refcell we need to define arguments like this:
 
- 
- */
+
+*/
 fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> String {
     let mut svg = String::new();
     let session = session_ref.borrow();
@@ -57,23 +61,37 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
 
     match node.entity_type {
         EntityType::GroupShape => {
-            svg.push_str(&format!(r#"<g transform="translate({} {})" >"#, pos.0, pos.1));
+            svg.push_str(&format!(
+                r#"<g transform="translate({} {})" >"#,
+                pos.0, pos.1
+            ));
             for child in node.children.iter() {
                 print!("render_node recursive");
                 svg.push_str(render_node(child, session_ref).as_str());
-            } 
+            }
             svg.push_str("</g>");
-        },
+        }
         EntityType::BoxShape => {
             let size = session.get_size(entity_id);
-            svg.push_str(&format!(r#"<g transform="translate({} {})" >"#, pos.0, pos.1));
-            svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" />"#, size.0, size.1));
+            let box_shape = session.get_box(node.index);
+            svg.push_str(&format!(
+                r#"<g transform="translate({} {})" >"#,
+                pos.0, pos.1
+            ));
+            svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+             size.0, 
+             size.1, 
+             box_shape.box_options.fill_color,
+             box_shape.box_options.stroke_color,
+             box_shape.box_options.stroke_width,
+             box_shape.box_options.border_radius,
+             box_shape.box_options.border_radius));
             //Paint the inner node
             for child in node.children.iter() {
                 svg.push_str(render_node(child, session_ref).as_str())
             }
             svg.push_str("</g>");
-        },
+        }
 
         _ => {
             svg.push_str("");
@@ -81,7 +99,6 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
     }
 
     svg
-
 }
 
 // All the layout elements already have their positions updated
@@ -104,7 +121,6 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
 //     svg
 // }
 
-
 // fn render_group(session: &Session, group: &ShapeGroup) -> String {
 //     let mut svg = String::new();
 //     let pos = session.get_position(group.entity);
@@ -120,8 +136,7 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
 //     svg
 // }
 
-
-/* 
+/*
 fn render_text(entity_id: EntityID, session: &Session) -> String {
     let mut svg = String::new();
     //get index from entity id
@@ -158,7 +173,7 @@ fn render_box(box_: &ShapeBox) -> String {
     let transformStr = format!("translate({},{})", box_.location.x, box_.location.y);
     //add a group
     svg.push_str(&format!(r#"<g transform="{}">"#, transformStr));
-   
+
     //if the box has an elem, ignore the width and height and use the elemen bounding box
     if let Some(elem) = &box_.elem {
 
@@ -218,7 +233,34 @@ fn test_render_group() {
 fn test_render_box_with_group() {
     let mut session = Session::new();
     let group = session.new_group(Vec::new());
-    let box_ = session.new_box(group,  BoxOptions::default());
+    let box_ = session.new_box(group, BoxOptions{
+        fill_color: "white".to_string(),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+        padding: 0.0,
+        border_radius: 0.0,
+    });
     let node = render_node(&box_, &RefCell::new(session));
-    assert_eq!(node, r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" /><g transform="translate(0 0)" ></g></g>"#);
+    assert_eq!(
+        node,
+        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" /><g transform="translate(0 0)" ></g></g>"#
+    );
+}
+
+#[test]
+fn test_render_box_rounded_corners_with_group() {
+    let mut session = Session::new();
+    let group = session.new_group(Vec::new());
+    let box_ = session.new_box(group, BoxOptions{
+        fill_color: "white".to_string(),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+        padding: 0.0,
+        border_radius: 5.5,
+    });
+    let node = render_node(&box_, &RefCell::new(session));
+    assert_eq!(
+        node,
+        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" /><g transform="translate(0 0)" ></g></g>"#
+    );
 }

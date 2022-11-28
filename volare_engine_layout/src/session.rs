@@ -14,7 +14,7 @@
 use crate::{components::*, get_entity_index_from_id};
 //wrap library features in a struct
 
-const MAX_ENTITIES: usize = 10000;
+const MAX_ENTITIES: usize = 1000;
 pub struct Session {
     pub measure_text: Option<fn(&str, &TextOptions) -> (f64, f64)>,
     pub entities: [EntityID; MAX_ENTITIES],
@@ -40,7 +40,9 @@ pub struct Session {
 // Used when building the diagram tree.
 #[derive(Debug, Clone)]
  pub struct DiagramTreeNode{
+
     pub entity_type: EntityType,
+    // Index of the entity in the corresponding vector
     pub index: usize,
     pub children: Vec<Box<DiagramTreeNode>>,
  }
