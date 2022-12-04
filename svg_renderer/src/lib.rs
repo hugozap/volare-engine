@@ -66,7 +66,15 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
         EntityType::BoxShape => {
             render_box(session_ref, &mut svg, entity_id, node);
         }
-
+        EntityType::TextShape => {
+            render_text(session_ref, &mut svg, entity_id, node);
+        }
+        EntityType::VerticalStackShape => {
+            render_vertical_stack(session_ref, &mut svg, entity_id, node);
+        }
+        EntityType::HorizontalStackShape => {
+            render_horizontal_stack(session_ref, &mut svg, entity_id, node);
+        }
         _ => {
             svg.push_str("");
         }
