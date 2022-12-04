@@ -26,6 +26,7 @@ pub struct Session {
     boxes: Vec<ShapeBox>,
     groups: Vec<ShapeGroup>,
     texts: Vec<ShapeText>,
+    textlines: Vec<TextLine>,
     horizontal_stacks: Vec<HorizontalStack>,
     vertical_stacks: Vec<VerticalStack>,
     ellipses: Vec<ShapeEllipse>,
@@ -81,6 +82,7 @@ impl Session {
              boxes: Vec::new(),
             groups: Vec::new(),
             texts: Vec::new(),
+            textlines: Vec::new(),
             horizontal_stacks: Vec::new(),
             vertical_stacks: Vec::new(),
             ellipses: Vec::new(),
@@ -175,6 +177,7 @@ impl Session {
             EntityType::TableShape => self.tables[index].get_id(),
             EntityType::ImageShape => self.images[index].get_id(),
             EntityType::BoxShape => self.boxes[index].get_id(),
+            EntityType::TextLine =>  self.textlines[index].get_id(),
         }
     }
 
@@ -298,9 +301,9 @@ mod tests {
     fn test_session_entities() {
         let mut session = Session::new();
         let id = session.new_entity(EntityType::GroupShape);
-        assert_eq!(id, 0);
+        //the id has 32 bits for the index and 32 bits for the type
         let index = get_entity_index_from_id(id);
-        assert_eq!(index, 6);
+        assert_eq!(index, 0);
         let entity_type = get_entity_type_from_id(id);
         assert_eq!(entity_type, EntityType::GroupShape);
     }

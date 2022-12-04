@@ -45,13 +45,28 @@ pub fn layout_group(session: &mut Session, shape_group: &ShapeGroup) {
     session.set_size(shape_group.entity, width, height);
 }
 
-/**
- * Updates the size of the text entity based on the text and text options
- */
 pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
-    let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
-    session.set_size(shape_text.entity, w, h);
+    // let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
+    // session.set_size(shape_text.entity, w, h);
+    
+    /* for each line in lines, get the size and use it to position the next */
+    let mut y = 0.0;
+    let mut max_line_width = 0f64;
+    for line in shape_text.lines.iter() {
+        let line_size = session.measure_text.unwrap()(&line.text, &shape_text.text_options);
+        if line_size.0 > max_line_width {
+            max_line_width = line_size.0;
+        }
+        session.set_position(line.entity, 0.0, y);
+        session.set_size(line.entity, line_size.0, line_size.1);
+        y += line_size.1;
+    }
+    //set the size of the text element
+    session.set_size(shape_text.entity, max_line_width, y);
+
 }
+
+
 
 /**
  * Updates the size of the line entity based on the start and end points
@@ -160,7 +175,7 @@ pub fn layout_table(session: &mut Session, table: &Table) {
     let mut row_heights: Vec<f64> = Vec::new();
     let mut col_widths: Vec<f64> = Vec::new();
 
-    //iterate through table cells, use index to calculate row and col
+    //initialize rows and cols
     for (i, elem) in table.cells.iter().enumerate() {
         let row = i / table.cols;
         let col = i % table.cols;
@@ -175,6 +190,7 @@ pub fn layout_table(session: &mut Session, table: &Table) {
         }
         rows[row].push(*elem);
         cols[col].push(*elem);
+        
         //update the row and col sizes
         let elem_size = session.get_size(*elem);
         if elem_size.0 > col_widths[col] {

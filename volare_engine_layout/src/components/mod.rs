@@ -62,6 +62,7 @@ pub enum EntityType {
     VerticalStackShape,
     HorizontalStackShape,
     TableShape,
+    TextLine,
 }
 
 pub fn get_entity_type(entity_id: EntityID) -> EntityType {
@@ -156,18 +157,42 @@ impl Entity for ShapeGroup {
     }
 }
 
+// Represents a line after adding breaks
+pub struct TextLine {
+    pub entity: EntityID,
+    pub text: String,
+}
+
+impl Entity for TextLine {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::TextLine
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 pub struct ShapeText {
     pub entity: EntityID,
     pub text: String,
     pub text_options: TextOptions,
+    pub lines: Vec<TextLine>,
 }
 
 impl ShapeText{
     pub fn new(entity: EntityID, text: &str, text_options: TextOptions) -> ShapeText {
+        //wrap the text to generate the lines we'll position.
+        let lines = textwrap::wrap(&text, text_options.line_width);
+
         ShapeText {
             entity,
             text: text.to_string(),
             text_options,
+            lines: lines.iter().map(|line| TextLine { entity: 0, text: line.to_string() }).collect(),
         }
     }
 }
@@ -192,6 +217,19 @@ pub struct TextOptions {
     pub font_family: String,
     pub font_size: f64,
     pub text_color: String,
+    // (number of max characters per line)used to know when to insert breaks
+    pub line_width: usize,
+}
+
+impl TextOptions {
+    pub fn new() -> TextOptions {
+        TextOptions {
+            font_family: String::from("Arial"),
+            font_size: 12.0,
+            text_color: String::from("black"),
+            line_width: 20,
+        }
+    }
 }
 
 pub struct VerticalStack {
