@@ -195,6 +195,22 @@ impl Session {
         DiagramTreeNode::new(EntityType::TextShape, text_index)
     }
 
+    pub fn new_line(&mut self, options: LineOptions) -> DiagramTreeNode {
+        let line_index = self.lines.len();
+        let line_id = self.new_entity(EntityType::LineShape);
+        let line = ShapeLine::new(line_id, options);
+        self.lines.push(line);
+        DiagramTreeNode::new(EntityType::LineShape, line_index)
+    }
+
+    pub fn new_elipse(&mut self,center: (f64,f64) , radius: (f64,f64),  options: EllipseOptions) -> DiagramTreeNode {
+        let ellipse_index = self.ellipses.len();
+        let ellipse_id = self.new_entity(EntityType::EllipseShape);
+        let ellipse = ShapeEllipse::new(ellipse_id, center, radius, options);
+        self.ellipses.push(ellipse);
+        DiagramTreeNode::new(EntityType::EllipseShape, ellipse_index)
+    }
+
     // Creates a new Group.
     pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
         let group_index = self.groups.len();

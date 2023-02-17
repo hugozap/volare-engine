@@ -35,23 +35,7 @@ pub fn render<W: Write>(
     Ok(())
 }
 
-/*
- The reason why we get an error with the session lifetime
- even if session is not a static variable, is because the
-   render_node function is recursive and the compiler cannot
-   infer the lifetime of the session variable.
-   The solution is to use the static lifetime for the session.
-
-   We can solve it with refcell doing this:
-   let session = RefCell::new(session);
-   let session = session.borrow();
-   render_node(&session, diagramNode, stream);
-   but it is not a good solution because it is not thread safe.
-
-   To receive a refcell we need to define arguments like this:
-
-
-*/
+// Render a node and its children
 fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> String {
     let mut svg = String::new();
     let session = session_ref.borrow();
@@ -75,6 +59,15 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
         EntityType::HorizontalStackShape => {
             render_horizontal_stack(session_ref, &mut svg, entity_id, node);
         }
+        EntityType::LineShape => {
+            render_line(session_ref, &mut svg, entity_id, node);
+        }
+        EntityType::ArrowShape => {
+            render_arrow(session_ref, &mut svg, entity_id, node);
+        }
+        EntityType::EllipseShape => {
+            render_ellipse(session_ref, &mut svg, entity_id, node);
+        }
         _ => {
             svg.push_str("");
         }
@@ -82,6 +75,61 @@ fn render_node<'a>(node: &DiagramTreeNode, session_ref: &RefCell<Session>) -> St
 
     svg
 }
+
+fn render_line(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+    let session = session_ref.borrow();
+    let size = session.get_size(entity_id);
+    let line_shape = session.get_line(node.index);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+     size.0, 
+     size.1, 
+     line_shape.line_options.stroke_color,
+     line_shape.line_options.stroke_width));
+    svg.push_str("</g>");
+}
+fn render_arrow(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+    let session = session_ref.borrow();
+    let size = session.get_size(entity_id);
+    let arrow_shape = session.get_arrow(node.index);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+     size.0, 
+     size.1, 
+     arrow_shape.arrow_options.stroke_color,
+     arrow_shape.arrow_options.stroke_width));
+    //TODO: paint arrow head
+    svg.push_str("</g>");
+}
+
+fn render_ellipse(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+    let session = session_ref.borrow();
+    let size = session.get_size(entity_id);
+    let ellipse_shape = session.get_ellipse(node.index);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
+     size.0/2.0, 
+     size.1/2.0, 
+     size.0/2.0, 
+     size.1/2.0, 
+     ellipse_shape.ellipse_options.stroke_color,
+     ellipse_shape.ellipse_options.stroke_width,
+     ellipse_shape.ellipse_options.fill_color));
+    svg.push_str("</g>");
+}
+
 
 fn render_group(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64,  node: &DiagramTreeNode ) {
     let session = session_ref.borrow();
@@ -124,7 +172,6 @@ fn render_box(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, 
 
 fn render_text(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
     let session = session_ref.borrow();
-    let size = session.get_size(entity_id);
     let text_shape = session.get_text(node.index);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
@@ -148,7 +195,6 @@ fn render_text(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64,
 
 fn render_vertical_stack(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
     let session = session_ref.borrow();
-    let size = session.get_size(entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -164,7 +210,6 @@ fn render_vertical_stack(session_ref: &RefCell<Session>, svg: &mut String, entit
 
 fn render_horizontal_stack(session_ref: &RefCell<Session>, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
     let session = session_ref.borrow();
-    let size = session.get_size(entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -204,6 +249,41 @@ fn test_render_box_with_group() {
     assert_eq!(
         node,
         r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" /><g transform="translate(0 0)" ></g></g>"#
+    );
+}
+
+//test line
+#[test]
+fn test_render_line() {
+    let options = LineOptions{
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+    };
+    let mut session = Session::new();
+    let line = session.new_line(options);
+    
+    let node = render_node(&line, &RefCell::new(session));
+    assert_eq!(
+        node,
+        r#"<g transform="translate(0 0)" ><line x1="0" y1="0" x2="0" y2="0" stroke="black" stroke-width="1" /></g>"#
+    );
+}
+
+//test eclipse
+#[test]
+fn test_render_ellipse() {
+    let options = EllipseOptions{
+        fill_color: "white".to_string(),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+    };
+    let mut session = Session::new();
+    let ellipse = session.new_elipse((0.0, 0.0), (0.0, 0.0), options);
+    
+    let node = render_node(&ellipse, &RefCell::new(session));
+    assert_eq!(
+        node,
+        r#"<g transform="translate(0 0)" ><ellipse cx="0" cy="0" rx="0" ry="0" stroke="black" stroke-width="1" fill="white" /></g>"#
     );
 }
 

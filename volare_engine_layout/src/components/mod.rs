@@ -279,6 +279,16 @@ pub struct ShapeLine {
     pub end: (f64, f64),
     pub line_options: LineOptions,
 }
+impl ShapeLine {
+    pub fn new(line_id: u64, options: LineOptions) -> ShapeLine {
+        ShapeLine {
+            entity: line_id,
+            start: (0.0, 0.0),
+            end: (0.0, 0.0),
+            line_options: options,
+        }
+    }
+}
 
 
 impl Entity for ShapeLine {
@@ -353,6 +363,17 @@ pub struct ShapeEllipse {
     pub center: (f64, f64),
     pub radius: (f64, f64),
     pub ellipse_options: EllipseOptions,
+}
+
+impl ShapeEllipse {
+    pub fn new(entity: u64, center: (f64, f64), radius: (f64, f64), ellipse_options: EllipseOptions) -> ShapeEllipse {
+        ShapeEllipse {
+            entity,
+            center,
+            radius,
+            ellipse_options,
+        }
+    }
 }
 
 impl Entity for ShapeEllipse {
