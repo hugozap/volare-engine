@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "./svg_generation_poc",
+    "./demo",
     "./volare_engine_layout",
     "./svg_renderer"
 ]
