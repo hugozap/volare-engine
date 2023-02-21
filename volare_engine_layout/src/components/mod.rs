@@ -215,7 +215,7 @@ impl Entity for ShapeText {
 #[derive(Default)]
 pub struct TextOptions {
     pub font_family: String,
-    pub font_size: f64,
+    pub font_size: f32,
     pub text_color: String,
     // (number of max characters per line)used to know when to insert breaks
     pub line_width: usize,

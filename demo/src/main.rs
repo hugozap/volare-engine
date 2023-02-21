@@ -1,13 +1,15 @@
 // Create an SVG file with all supported elements
 
 
+pub mod measure_text;
+
 //import svg_renderer
 use svg_renderer::*;
 //import layout
-use volare_engine_layout::{layout::*, Session, TextOptions};
+use volare_engine_layout::{layout::*, Session, TextOptions, BoxOptions};
 //import io modules to write to file
 use std::{fs::File, cell::RefCell};
-
+use measure_text::measure_text;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
@@ -18,12 +20,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         line_width: 100,
         text_color: "black".to_string(),
     };
-    session.set_measure_text_fn(|text, options| -> (f64, f64) {
-        (100.0,100.0)
-    });
+    session.set_measure_text_fn(measure_text);
 
     let mut text = session.new_text("Hello World", textOptions);
-    let mut group = session.new_group(vec![text]);
+    let box1 = session.new_box(text, BoxOptions{
+        border_radius: 5.0,
+        ..Default::default()
+    });
+
+    //get box
+
+    let mut group = session.new_group(vec![box1]);
 
     //create writer to file ~/temp/svg-render-test.svg
     //get path for ~/temp

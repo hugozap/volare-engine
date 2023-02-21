@@ -11,3 +11,4 @@ edition = "2021"
 volare_engine_layout = { path = "../volare_engine_layout" }
 svg_renderer = { path = "../svg_renderer" }
 resvg = "0.25.0"
+rusttype = "0.9.3"
