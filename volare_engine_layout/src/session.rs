@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 /**
  * This object encapsulates diagram creation logic in a user friendly API
  * Usage:
@@ -13,6 +15,7 @@
 //use TextOptions
 use crate::{components::*, get_entity_index_from_id};
 //wrap library features in a struct
+use crate::layout;
 
 const MAX_ENTITIES: usize = 1000;
 pub struct Session {
@@ -113,7 +116,9 @@ impl Session {
 
     //set the measure_text function
     pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (f64, f64)) {
+        println!("Setting measure text function");
         self.measure_text = Option::Some(measure_text);
+
     }
 
     
@@ -141,6 +146,24 @@ impl Session {
         self.sizes[index * 2] = width;
         self.sizes[index * 2 + 1] = height;
     }
+
+
+    // Returns the entityID given the entity type and the index
+    pub fn get_entity_id(&self, entity_type: EntityType, index: usize) -> EntityID {
+        match entity_type {
+            EntityType::GroupShape => self.groups[index].get_id(),
+            EntityType::TextShape => self.texts[index].get_id(),
+            EntityType::HorizontalStackShape => self.horizontal_stacks[index].get_id(),
+            EntityType::VerticalStackShape => self.vertical_stacks[index].get_id(),
+            EntityType::EllipseShape => self.ellipses[index].get_id(),
+            EntityType::LineShape => self.lines[index].get_id(),
+            EntityType::ArrowShape => self.arrows[index].get_id(),
+            EntityType::TableShape => self.tables[index].get_id(),
+            EntityType::ImageShape => self.images[index].get_id(),
+            EntityType::BoxShape => self.boxes[index].get_id(),
+            EntityType::TextLine =>  self.textlines[index].get_id(),
+        }
+    }
   
 
     // This methods are used to build the diagram tree
@@ -164,22 +187,6 @@ impl Session {
         node
     }
 
-    // Returns the entityID given the entity type and the index
-    pub fn get_entity_id(&self, entity_type: EntityType, index: usize) -> EntityID {
-        match entity_type {
-            EntityType::GroupShape => self.groups[index].get_id(),
-            EntityType::TextShape => self.texts[index].get_id(),
-            EntityType::HorizontalStackShape => self.horizontal_stacks[index].get_id(),
-            EntityType::VerticalStackShape => self.vertical_stacks[index].get_id(),
-            EntityType::EllipseShape => self.ellipses[index].get_id(),
-            EntityType::LineShape => self.lines[index].get_id(),
-            EntityType::ArrowShape => self.arrows[index].get_id(),
-            EntityType::TableShape => self.tables[index].get_id(),
-            EntityType::ImageShape => self.images[index].get_id(),
-            EntityType::BoxShape => self.boxes[index].get_id(),
-            EntityType::TextLine =>  self.textlines[index].get_id(),
-        }
-    }
 
     // Creates a new Text element
     // text: the text to display
@@ -284,7 +291,6 @@ impl Session {
 }
 
 
-
 //test
 #[cfg(test)]
 mod tests {
@@ -295,10 +301,14 @@ mod tests {
     #[test]
     fn test_session() {
         let mut session = Session::new();
+        
+        
         session.set_measure_text_fn(|text, text_options| {
+            let textW:f64 = text.len() as f64 * text_options.font_size as f64;
+
             (
-                text.len() as f64 * text_options.font_size,
-                text_options.font_size,
+                textW,
+                text_options.font_size.into(),
             )
         });
         let (w, h) = session.measure_text.unwrap()(

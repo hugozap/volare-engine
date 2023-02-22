@@ -8,7 +8,7 @@ use std::io::Error;
 // Entry point for the SVG renderer
 // The renderer will write the SVG to the output stream
 pub fn render<W: Write>(
-    session_ref: RefCell<Session>,
+    session_ref: &RefCell<Session>,
     diagram_node: &DiagramTreeNode,
     stream: &mut W,
 ) -> Result<(), Error> {
