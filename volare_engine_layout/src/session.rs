@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /**
  * This object encapsulates diagram creation logic in a user friendly API

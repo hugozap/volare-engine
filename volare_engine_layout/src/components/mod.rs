@@ -92,6 +92,16 @@ pub struct ShapeBox {
     pub box_options: BoxOptions,
 }
 
+impl Clone for ShapeBox {
+    fn clone(&self) -> Self {
+        ShapeBox {
+            entity: self.entity,
+            wrapped_entity: self.wrapped_entity,
+            box_options: self.box_options.clone(),
+        }
+    }
+}
+
 impl Entity for ShapeBox {
     fn get_id(&self) -> EntityID {
         self.entity
@@ -125,6 +135,18 @@ pub struct BoxOptions {
     pub border_radius: f64,
 }
 
+impl Clone for BoxOptions {
+    fn clone(&self) -> Self {
+        BoxOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            padding: self.padding,
+            border_radius: self.border_radius,
+        }
+    }
+}
+
 impl BoxOptions {
     pub fn new() -> BoxOptions {
         BoxOptions {
@@ -143,6 +165,15 @@ pub struct ShapeGroup {
     pub elements: Vec<u64>,
 }
 
+impl Clone for ShapeGroup {
+    fn clone(&self) -> Self {
+        ShapeGroup {
+            entity: self.entity,
+            elements: self.elements.clone(),
+        }
+    }
+}
+
 impl Entity for ShapeGroup {
     fn get_id(&self) -> EntityID {
         self.entity
@@ -158,9 +189,19 @@ impl Entity for ShapeGroup {
 }
 
 // Represents a line after adding breaks
+#[derive(Debug)]
 pub struct TextLine {
     pub entity: EntityID,
     pub text: String,
+}
+
+impl Clone for TextLine {
+    fn clone(&self) -> Self {
+        TextLine {
+            entity: self.entity,
+            text: self.text.clone(),
+        }
+    }
 }
 
 impl Entity for TextLine {
@@ -176,12 +217,27 @@ impl Entity for TextLine {
         self
     }
 }
+//add copy trait
+#[derive(Debug)]
 pub struct ShapeText {
     pub entity: EntityID,
     pub text: String,
     pub text_options: TextOptions,
     pub lines: Vec<TextLine>,
 }
+
+impl Clone for ShapeText {
+    fn clone(&self) -> Self {
+        ShapeText {
+            entity: self.entity,
+            text: self.text.clone(),
+            text_options: self.text_options.clone(),
+            lines: self.lines.clone(),
+        }
+    }
+}
+
+
 
 impl ShapeText{
     pub fn new(entity: EntityID, text: &str, text_options: TextOptions) -> ShapeText {
@@ -212,13 +268,24 @@ impl Entity for ShapeText {
 }
 
 //struct with text options: font family, font size
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TextOptions {
     pub font_family: String,
     pub font_size: f32,
     pub text_color: String,
     // (number of max characters per line)used to know when to insert breaks
     pub line_width: usize,
+}
+
+impl Clone for TextOptions {
+    fn clone(&self) -> Self {
+        TextOptions {
+            font_family: self.font_family.clone(),
+            font_size: self.font_size,
+            text_color: self.text_color.clone(),
+            line_width: self.line_width,
+        }
+    }
 }
 
 impl TextOptions {
@@ -236,6 +303,15 @@ pub struct VerticalStack {
     pub entity: u64,
     //List of entity ids
     pub elements: Vec<EntityID>,
+}
+
+impl Clone for VerticalStack {
+    fn clone(&self) -> Self {
+        VerticalStack {
+            entity: self.entity,
+            elements: self.elements.clone(),
+        }
+    }
 }
 
 impl Entity for VerticalStack {
@@ -259,6 +335,15 @@ pub struct HorizontalStack {
     pub elements: Vec<EntityID>,
 }
 
+impl Clone for HorizontalStack {
+    fn clone(&self) -> Self {
+        HorizontalStack {
+            entity: self.entity,
+            elements: self.elements.clone(),
+        }
+    }
+}
+
 impl Entity for HorizontalStack {
     fn get_id(&self) -> EntityID {
         self.entity
@@ -279,6 +364,18 @@ pub struct ShapeLine {
     pub end: (f64, f64),
     pub line_options: LineOptions,
 }
+
+impl Clone for ShapeLine {
+    fn clone(&self) -> Self {
+        ShapeLine {
+            entity: self.entity,
+            start: self.start,
+            end: self.end,
+            line_options: self.line_options.clone(),
+        }
+    }
+}
+
 impl ShapeLine {
     pub fn new(line_id: u64, options: LineOptions) -> ShapeLine {
         ShapeLine {
@@ -311,6 +408,15 @@ pub struct LineOptions {
     pub stroke_width: f64,
 }
 
+impl Clone for LineOptions {
+    fn clone(&self) -> Self {
+        LineOptions {
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+        }
+    }
+}
+
 impl LineOptions {
     pub fn new() -> LineOptions {
         LineOptions {
@@ -325,6 +431,17 @@ pub struct ShapeArrow {
     pub start: (f64, f64),
     pub end: (f64, f64),
     pub arrow_options: ArrowOptions,
+}
+
+impl Clone for ShapeArrow {
+    fn clone(&self) -> Self {
+        ShapeArrow {
+            entity: self.entity,
+            start: self.start,
+            end: self.end,
+            arrow_options: self.arrow_options.clone(),
+        }
+    }
 }
 
 impl Entity for ShapeArrow {
@@ -348,6 +465,16 @@ pub struct ArrowOptions {
     pub arrow_size: f64,
 }
 
+impl Clone for ArrowOptions {
+    fn clone(&self) -> Self {
+        ArrowOptions {
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            arrow_size: self.arrow_size,
+        }
+    }
+}
+
 impl ArrowOptions {
     pub fn new() -> ArrowOptions {
         ArrowOptions {
@@ -363,6 +490,17 @@ pub struct ShapeEllipse {
     pub center: (f64, f64),
     pub radius: (f64, f64),
     pub ellipse_options: EllipseOptions,
+}
+
+impl Clone for ShapeEllipse {
+    fn clone(&self) -> Self {
+        ShapeEllipse {
+            entity: self.entity,
+            center: self.center,
+            radius: self.radius,
+            ellipse_options: self.ellipse_options.clone(),
+        }
+    }
 }
 
 impl ShapeEllipse {
@@ -397,6 +535,16 @@ pub struct EllipseOptions {
     pub stroke_width: f64,
 }
 
+impl Clone for EllipseOptions {
+    fn clone(&self) -> Self {
+        EllipseOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+        }
+    }
+}
+
 impl EllipseOptions {
     pub fn new() -> EllipseOptions {
         EllipseOptions {
@@ -412,6 +560,16 @@ pub struct ShapeImage {
     //base64 encoded image
     pub image: String,
     pub preferred_size: (f64, f64),
+}
+
+impl Clone for ShapeImage {
+    fn clone(&self) -> Self {
+        ShapeImage {
+            entity: self.entity,
+            image: self.image.clone(),
+            preferred_size: self.preferred_size,
+        }
+    }
 }
 
 impl Entity for ShapeImage {
@@ -439,6 +597,16 @@ pub struct Table {
     pub entity: EntityID,
     pub cols: usize, 
     pub cells: Vec<EntityID>
+}
+
+impl Clone for Table {
+    fn clone(&self) -> Self {
+        Table {
+            entity: self.entity,
+            cols: self.cols,
+            cells: self.cells.clone(),
+        }
+    }
 }
 
 impl Entity for Table {

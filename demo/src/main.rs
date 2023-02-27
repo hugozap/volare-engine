@@ -8,14 +8,12 @@ use svg_renderer::*;
 //import layout
 use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, BoxOptions};
 //import io modules to write to file
-use std::{fs::File, cell::RefCell};
+use std::{fs::File, cell::RefCell, rc::Rc};
 use measure_text::measure_text;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
-    let session_ref = RefCell::new(Session::new());
-
-    let mut session = session_ref.borrow_mut();
+    let mut session = Session::new();
     let textOptions = TextOptions {
         font_family: "Arial".to_string(),
         font_size: 12.0,
@@ -35,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut group = session.new_group(vec![box1]);
 
     // Calculate layout
-    layout_tree_node(&session_ref, &group);
+    layout_tree_node(&mut session, &group);
 
     //create writer to file ~/temp/svg-render-test.svg
     //get path for ~/temp
@@ -44,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut path = temp_dir.clone();
     path.push("svg-render-test.svg");
     let mut file = File::create(path).unwrap();
-    render(&session_ref, &group, &mut file);
+    render(&session, &group, &mut file);
     
     //print file contents to console stdout
     let mut path = temp_dir.clone();

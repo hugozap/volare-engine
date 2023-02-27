@@ -1,8 +1,12 @@
 /* Layout calculation for each type of entity */
 
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
+use std::rc::Rc;
 
-use crate::{Session, ShapeBox, ShapeGroup, ShapeLine, ShapeText, ShapeEllipse, ShapeArrow, ShapeImage, VerticalStack, HorizontalStack, Table, EntityID, session::DiagramTreeNode, EntityType};
+use crate::{
+    session::DiagramTreeNode, EntityID, EntityType, HorizontalStack, Session, ShapeArrow, ShapeBox,
+    ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack,
+};
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
@@ -16,10 +20,7 @@ pub fn layout_box(session: &mut Session, shape_box: &ShapeBox) {
     //print element dimensions
     println!(
         "Box: {}, {}, {}, {}",
-        shape_box.entity,
-        wrapped_elem_size.0,
-        wrapped_elem_size.1,
-        shape_box.box_options.padding
+        shape_box.entity, wrapped_elem_size.0, wrapped_elem_size.1, shape_box.box_options.padding
     );
     //set the box dimensions
     session.set_size(
@@ -56,34 +57,31 @@ pub fn layout_group(session: &mut Session, shape_group: &ShapeGroup) {
     session.set_size(shape_group.entity, width, height);
 }
 
-pub fn layout_text(session_ref: &RefCell<Session>, shape_text: &ShapeText) {
+pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
     // let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
     // session.set_size(shape_text.entity, w, h);
     /* for each line in lines, get the size and use it to position the next */
-    let mut y = 0.0;
-    let mut session = session_ref.borrow_mut();
-    let mut max_line_width = 0f64;
-    for line in shape_text.lines.iter() {
-        let line_size = session.measure_text.unwrap()(&line.text, &shape_text.text_options);
-        if line_size.0 > max_line_width {
-            max_line_width = line_size.0;
+    {
+        let mut y = 0.0;
+        let mut max_line_width = 0f64;
+        for line in shape_text.lines.iter() {
+            let line_size = session.measure_text.unwrap()(&line.text, &shape_text.text_options);
+            if line_size.0 > max_line_width {
+                max_line_width = line_size.0;
+            }
+            session.set_position(line.entity, 0.0, y);
+            session.set_size(line.entity, line_size.0, line_size.1);
+            y += line_size.1;
         }
-        session.set_position(line.entity, 0.0, y);
-        session.set_size(line.entity, line_size.0, line_size.1);
-        y += line_size.1;
+        //set the size of the text element
+        session.set_size(shape_text.entity, max_line_width, y);
     }
-    //set the size of the text element
-    session.set_size(shape_text.entity, max_line_width, y);
-
 }
-
-
 
 /**
  * Updates the size of the line entity based on the start and end points
  */
-pub fn layout_line(session_ref: &RefCell<Session>, shape_line: &ShapeLine) {
-    let mut session = session_ref.borrow_mut();
+pub fn layout_line(session: &mut Session, shape_line: &ShapeLine) {
     let start = shape_line.start;
     let end = shape_line.end;
     //the line x is the minimum of the start and end x
@@ -102,8 +100,7 @@ pub fn layout_line(session_ref: &RefCell<Session>, shape_line: &ShapeLine) {
 /**
  * Updates the size of the arrow entity based on the start and end points
  */
-pub fn layout_arrow(session_ref: &RefCell<Session>, shape_arrow: &ShapeArrow) {
-    let mut session = session_ref.borrow_mut();
+pub fn layout_arrow(session: &mut Session, shape_arrow: &ShapeArrow) {
     let start = shape_arrow.start;
     let end = shape_arrow.end;
     //the line x is the minimum of the start and end x
@@ -124,8 +121,7 @@ pub fn layout_arrow(session_ref: &RefCell<Session>, shape_arrow: &ShapeArrow) {
  * radius.0 is the horizontal radius and radius.1 is the vertical radius
  * The position of the ellipse is the top left corner of the bounding box
  */
-pub fn layout_ellipse(session_ref: &RefCell<Session>, shape_ellipse: &ShapeEllipse) {
-    let mut session = session_ref.borrow_mut();
+pub fn layout_ellipse(session: &mut Session, shape_ellipse: &ShapeEllipse) {
     let w = shape_ellipse.radius.0 * 2.0;
     let h = shape_ellipse.radius.1 * 2.0;
     session.set_size(shape_ellipse.entity, w, h);
@@ -134,18 +130,19 @@ pub fn layout_ellipse(session_ref: &RefCell<Session>, shape_ellipse: &ShapeEllip
 /**
  * Sets the image entity size to the preferred size
  */
-pub fn layout_image(session_ref: &RefCell<Session>, shape_image: &ShapeImage) {
-    let mut session = session_ref.borrow_mut();
-    session.set_size(shape_image.entity, shape_image.preferred_size.0, shape_image.preferred_size.1);
-
+pub fn layout_image(session: &mut Session, shape_image: &ShapeImage) {
+    session.set_size(
+        shape_image.entity,
+        shape_image.preferred_size.0,
+        shape_image.preferred_size.1,
+    );
 }
 
 /**
  * Updates the position of the elements in the vertical stack
  * and the size of the vertical stack
  */
-pub fn layout_vertical_stack(session_ref: &RefCell<Session>, vertical_stack: &VerticalStack) {
-    let mut session = session_ref.borrow_mut();
+pub fn layout_vertical_stack(session: &mut Session, vertical_stack: &VerticalStack) {
     let mut y = 0.0;
     let mut width = 0.0;
     for elem in vertical_stack.elements.iter() {
@@ -157,11 +154,9 @@ pub fn layout_vertical_stack(session_ref: &RefCell<Session>, vertical_stack: &Ve
         }
     }
     session.set_size(vertical_stack.entity, width, y);
-
 }
 
-pub fn layout_horizontal_stack(session: &RefCell<Session>, horizontal_stack: &HorizontalStack) {
-    let mut session = session.borrow_mut();
+pub fn layout_horizontal_stack(session: &mut Session, horizontal_stack: &HorizontalStack) {
     let mut x = 0.0;
     let mut height = 0.0;
     for elem in horizontal_stack.elements.iter() {
@@ -173,7 +168,6 @@ pub fn layout_horizontal_stack(session: &RefCell<Session>, horizontal_stack: &Ho
         }
     }
     session.set_size(horizontal_stack.entity, x, height);
-
 }
 
 /**
@@ -184,8 +178,7 @@ pub fn layout_horizontal_stack(session: &RefCell<Session>, horizontal_stack: &Ho
  * - Cols to the right of each other
  * - The sizes of the internal elements should be previously computed for this to work
  */
-pub fn layout_table(session: &RefCell<Session>, table: &Table) {
-    let mut session = session.borrow_mut();
+pub fn layout_table(session: &mut Session, table: &Table) {
     //we need to group elements by row and column, calculate their
     //natural sizes and then update their rows and columns
     let mut rows: Vec<Vec<EntityID>> = Vec::new();
@@ -208,7 +201,7 @@ pub fn layout_table(session: &RefCell<Session>, table: &Table) {
         }
         rows[row].push(*elem);
         cols[col].push(*elem);
-        
+
         //update the row and col sizes
         let elem_size = session.get_size(*elem);
         if elem_size.0 > col_widths[col] {
@@ -239,87 +232,86 @@ pub fn layout_table(session: &RefCell<Session>, table: &Table) {
     let mut height = 0.0;
 
     for w in col_widths.iter() {
-        width += w; 
+        width += w;
     }
 
     for h in row_heights.iter() {
-        height += h; 
+        height += h;
     }
 
     session.set_size(table.entity, width, height);
-
-    
 }
-  
+
+//Calculate the layout for a tree of elements
+pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) {
 
 
-    //Calculate the layout for a tree of elements
-    pub fn layout_tree_node(session_ref: &RefCell<Session>, root: &DiagramTreeNode) {
-        //start with the bottom elements
-        for child in &root.children {
-            layout_tree_node(session_ref, child);
-        }
-
-        
-        
-        //Once the children are laid out, we can layout the current element
-        //use methods in the layout module
-        match root.entity_type {
-            EntityType::TextShape => {        
-                let session = session_ref.borrow();
-                //get the Shape text entity
-                let text = session.get_text(root.index);
-                layout_text(session_ref, text);
-            }
-            EntityType::LineShape => {
-                let session = session_ref.borrow();
-                //get the Shape line entity
-                let line = session.get_line(root.index);
-                layout_line(session_ref, line);
-            }
-            EntityType::ArrowShape => {
-                let session = session_ref.borrow();
-                //get the Shape arrow entity
-                let arrow = session.get_arrow(root.index);
-                layout_arrow(session_ref, arrow);
-            }
-            EntityType::EllipseShape => {
-                let session = session_ref.borrow();
-                //get the Shape ellipse entity
-                let ellipse = session.get_ellipse(root.index);
-                layout_ellipse(session_ref, ellipse);
-            }
-            EntityType::ImageShape => {
-                let session = session_ref.borrow();
-                //get the Shape image entity
-                let image = session.get_image(root.index);
-                layout_image(session_ref, image);
-            }
-            EntityType::VerticalStackShape => {
-                let session = session_ref.borrow();
-                //get the VerticalStack entity
-                let vertical_stack = session.get_vertical_stack(root.index);
-                layout_vertical_stack(session_ref, vertical_stack);
-            }
-
-            EntityType::HorizontalStackShape => {
-                let session = session_ref.borrow();
-                //get the HorizontalStack entity
-                let horizontal_stack = session.get_horizontal_stack(root.index);
-                layout_horizontal_stack(session_ref, horizontal_stack);
-            }
-
-            EntityType::TableShape => {
-                let session = session_ref.borrow();
-                //get the Table entity
-                let table = session.get_table(root.index);
-                layout_table(session_ref, table);
-            }
-            
-            _ => {
-                panic!("Unknown entity type");
-            }
-        }
-
+    //start with the bottom elements
+    for child in &root.children {
+        println!("Layout child: {:?}", child);
+        layout_tree_node(session, child);
     }
 
+    //Once the children are laid out, we can layout the current element
+    //use methods in the layout module
+    match root.entity_type {
+        EntityType::TextShape => {
+            {
+    
+                //get the Shape text entity
+                let text = session.get_text(root.index).clone();
+                layout_text(session, &text);
+            }
+        }
+        EntityType::BoxShape => {
+            //get the Shape box entity
+            let box_shape = session.get_box(root.index).clone();
+            layout_box(session, &box_shape);
+        }
+        EntityType::LineShape => {
+            //get the Shape line entity
+            let line = session.get_line(root.index).clone();
+            layout_line(session, &line);
+        }
+        EntityType::ArrowShape => {
+            //get the Shape arrow entity
+            let arrow = session.get_arrow(root.index).clone();
+            layout_arrow(session, &arrow);
+        }
+        EntityType::EllipseShape => {
+            //get the Shape ellipse entity
+            let ellipse = session.get_ellipse(root.index).clone();
+            layout_ellipse(session, &ellipse);
+        }
+        EntityType::ImageShape => {
+            //get the Shape image entity
+            let image = session.get_image(root.index).clone();
+            layout_image(session, &image);
+        }
+        EntityType::VerticalStackShape => {
+            //get the VerticalStack entity
+            let vertical_stack = session.get_vertical_stack(root.index).clone();
+            layout_vertical_stack(session, &vertical_stack);
+        }
+
+        EntityType::HorizontalStackShape => {
+            //get the HorizontalStack entity
+            let horizontal_stack = session.get_horizontal_stack(root.index).clone();
+            layout_horizontal_stack(session, &horizontal_stack);
+        }
+
+        EntityType::TableShape => {
+            //get the Table entity
+            let table = session.get_table(root.index).clone();
+            layout_table(session, &table);
+        }
+
+        EntityType::GroupShape => {
+            //get the Group entity
+            let group = session.get_group(root.index).clone();
+            layout_group(session, &group);
+        }
+        //if not recognized, show the name of it in the panic
+        _ => panic!("Unknown entity type: {:?}", root.entity_type),
+    }
+}

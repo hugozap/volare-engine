@@ -17,6 +17,5 @@ pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
         .unwrap_or(0.0);
     let height = v_metrics.ascent - v_metrics.descent;
     println!("{}: {}x{}", text, width, height);
-    panic!();
     (width.into(), height.into())
 }
