@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::{
     session::DiagramTreeNode, EntityID, EntityType, HorizontalStack, Session, ShapeArrow, ShapeBox,
-    ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack,
+    ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack,TextOptions, BoxOptions
 };
 
 /* The box layout includes the padding and the dimensions
@@ -14,8 +14,10 @@ The wrapped element position and size should be updated before calling this func
 The wrapped element position is relative to the box position.
 */
 pub fn layout_box(session: &mut Session, shape_box: &ShapeBox) {
+    println!("Box: {:?}", shape_box);
     //get the wrapped element dimensions
-    let wrapped_elem_size = session.get_position(shape_box.wrapped_entity);
+    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity);
+    println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
 
     //print element dimensions
     println!(
@@ -62,6 +64,7 @@ pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
     // session.set_size(shape_text.entity, w, h);
     /* for each line in lines, get the size and use it to position the next */
     {
+        println!("Text: {:?}", shape_text);
         let mut y = 0.0;
         let mut max_line_width = 0f64;
         for line in shape_text.lines.iter() {
@@ -73,7 +76,10 @@ pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
             session.set_size(line.entity, line_size.0, line_size.1);
             y += line_size.1;
         }
+
+        println!("max_line_width: {}", max_line_width);
         //set the size of the text element
+        println!("Setting size to text entity: {} - {} {}", shape_text.entity, max_line_width, y);
         session.set_size(shape_text.entity, max_line_width, y);
     }
 }
@@ -242,14 +248,26 @@ pub fn layout_table(session: &mut Session, table: &Table) {
     session.set_size(table.entity, width, height);
 }
 
-//Calculate the layout for a tree of elements
-pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) {
 
+pub struct BoundingBox {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+//Calculate the layout for a tree of elements
+pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) -> BoundingBox {
 
     //start with the bottom elements
     for child in &root.children {
         println!("Layout child: {:?}", child);
         layout_tree_node(session, child);
+        //print size and position of the child
+        let child_id = session.get_entity_id(child.entity_type, child.index);
+        let child_size = session.get_size(child_id);
+        let child_pos = session.get_position(child_id);
+        println!("Child size: {:?}", child_size);
+        println!("Child pos: {:?}", child_pos);
     }
 
     //Once the children are laid out, we can layout the current element
@@ -314,4 +332,64 @@ pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) {
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
     }
+
+    //Return the bounding box for the root element
+    let entity_id = session.get_entity_id(root.entity_type, root.index);
+    let size = session.get_size(entity_id);
+    let position = session.get_position(entity_id);
+    BoundingBox {
+        x: position.0,
+        y: position.1,
+        width: size.0,
+        height: size.1,
+    }
+}
+
+
+//Test that a box with a text inside is correctly laid out
+#[test]
+fn test_layout_box_with_text() {
+    let mut session = Session::new();
+    session.set_measure_text_fn(|_, _| (10.0, 10.0));
+    let text = session.new_text("hello", TextOptions{
+        font_size: 20.0,
+        line_width: 200,
+        ..Default::default()
+    });
+    let box_options = BoxOptions{
+        padding: 10.0,
+        ..Default::default()
+    };
+    let box_shape = session.new_box(text.clone(), box_options.clone() );
+
+    //print box options
+    println!("--box options: {:?}", box_options);
+
+
+    //layout the box
+    layout_tree_node(&mut session, &box_shape);
+
+    let text_id = session.get_entity_id(EntityType::TextShape, text.index);
+    let box_id = session.get_entity_id(EntityType::BoxShape, box_shape.index);
+
+    let text_position = session.get_position(text_id);
+    let text_size = session.get_size(text_id);
+
+    let box_position = session.get_position(box_id);
+    let box_size = session.get_size(box_id);
+    //assert equal positions
+
+
+    // assert the box size is greater than the text size
+    println!("box size: {:?}", box_size);
+    println!("text size: {:?}", text_size);
+        // and the text size should not be zero
+        assert!(text_size.0 > 0.0);
+    assert_eq!(box_size.0, 30.0);
+    assert!(box_size.1 > text_size.1);
+
+
+
+
+
 }

@@ -24,7 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut text = session.new_text("Hello World", textOptions);
     let box1 = session.new_box(text, BoxOptions{
-        border_radius: 5.0,
+        border_radius: 1.0,
+        fill_color: "white".to_string(),
         ..Default::default()
     });
 

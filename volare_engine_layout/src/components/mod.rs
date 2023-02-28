@@ -85,6 +85,7 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
 /**
  * Boxes show a rectangle around the wrapped entity
  */
+#[derive(Debug)]
 pub struct ShapeBox {
     pub entity: EntityID,
     //Each box wraps another entity
@@ -126,7 +127,7 @@ impl ShapeBox {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BoxOptions {
     pub fill_color: String,
     pub stroke_color: String,
@@ -242,6 +243,9 @@ impl Clone for ShapeText {
 impl ShapeText{
     pub fn new(entity: EntityID, text: &str, text_options: TextOptions) -> ShapeText {
         //wrap the text to generate the lines we'll position.
+        //print options
+        println!("text_options.line_width: {}", text_options.line_width);
+        println!("text_options.font_size: {}", text_options.font_size);
         let lines = textwrap::wrap(&text, text_options.line_width);
 
         ShapeText {
