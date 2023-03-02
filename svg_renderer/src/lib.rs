@@ -182,15 +182,15 @@ fn render_text(session: &Session, svg: &mut String, entity_id: u64, node: &Diagr
     //render lines
     for line in text_shape.lines.iter() {
         let pos = session.get_position(line.entity);
-        let transformStr = format!("translate({} {})", pos.0, pos.1);
-        svg.push_str(&format!(r#"<tspan x="0" dy="{}" fill="{}" font-size="{}" font-family="{}" >"#,
+        let transform = format!("translate({} {})", pos.0, pos.1);
+        svg.push_str(&format!(r#"<tspan x="0" dy="{}" transform="{}" fill="{}" font-size="{}" font-family="{}" >"#,
         text_shape.text_options.font_size, 
+        transform,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family));
         svg.push_str(&line.text.as_str());
         svg.push_str("</tspan>");
-    
     }
     svg.push_str("</text>");
     svg.push_str("</g>");

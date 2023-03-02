@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     session.set_measure_text_fn(measure_text);
 
-    let mut text = session.new_text("Hello World", textOptions);
+    let mut text = session.new_text("Hello World\nthis is a multiline\ndemo!\nlet's add another line here!!", textOptions);
     let box1 = session.new_box(text, BoxOptions{
         border_radius: 1.0,
         fill_color: "white".to_string(),
