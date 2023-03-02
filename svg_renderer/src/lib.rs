@@ -22,7 +22,7 @@ pub fn render<W: Write>(
     ));
 
     svg.push_str(&format!(
-        r#"<svg viewBox="{} {} {} {}">"#,
+        r#"<svg width="{}" height="{}" viewBox="{} {} {} {}">"#,root_size.0, root_size.1,
         root_pos.0, root_pos.1, root_size.0, root_size.1
     ));
 
@@ -171,18 +171,28 @@ fn render_text(session: &Session, svg: &mut String, entity_id: u64, node: &Diagr
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    //render lines
-    for line in text_shape.lines.iter() {
-        let pos = session.get_position(line.entity);
-        svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}" font-family="{}" >"#,
+
+    //render parent text
+    svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}" font-family="{}" >"#,
         pos.1,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family));
+   
+    //render lines
+    for line in text_shape.lines.iter() {
+        let pos = session.get_position(line.entity);
+        let transformStr = format!("translate({} {})", pos.0, pos.1);
+        svg.push_str(&format!(r#"<tspan x="0" dy="{}" fill="{}" font-size="{}" font-family="{}" >"#,
+        text_shape.text_options.font_size, 
+        text_shape.text_options.text_color,
+        text_shape.text_options.font_size,
+        text_shape.text_options.font_family));
         svg.push_str(&line.text.as_str());
-        svg.push_str("</text>");
+        svg.push_str("</tspan>");
     
     }
+    svg.push_str("</text>");
     svg.push_str("</g>");
 }
 
