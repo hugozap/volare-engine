@@ -594,7 +594,8 @@ impl Entity for ShapeImage {
 pub struct TableOptions {
     pub fill_color: String,
     pub border_color: String,
-    pub border_width: usize
+    pub border_width: usize,
+    pub cell_padding: usize,
 }
 
 //defaults
@@ -603,7 +604,8 @@ impl Default for TableOptions {
         TableOptions {
             fill_color: String::from("white"),
             border_color: String::from("black"),
-            border_width: 1
+            border_width: 1,
+            cell_padding: 5,
         }
     }
 }
@@ -613,7 +615,8 @@ impl Clone for TableOptions {
         TableOptions {
             fill_color: self.fill_color.clone(),
             border_color: self.border_color.clone(),
-            border_width: self.border_width
+            border_width: self.border_width,
+            cell_padding: self.cell_padding,
         }
     }
 }

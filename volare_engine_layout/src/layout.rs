@@ -211,12 +211,16 @@ pub fn layout_table(session: &mut Session, table: &Table) {
         //update the row and col sizes
         let elem_size = session.get_size(*elem);
         if elem_size.0 > col_widths[col] {
-            col_widths[col] = elem_size.0;
+            col_widths[col] = elem_size.0 + table.table_options.cell_padding as f64*2.0;
         }
         if elem_size.1 > row_heights[row] {
-            row_heights[row] = elem_size.1;
+            row_heights[row] = elem_size.1 + table.table_options.cell_padding as f64*2.0;
         }
     }
+
+    //print row heights and col widths
+    println!("row heights: {:?}", row_heights);
+    println!("col widths: {:?}", col_widths);
 
     //we already have each row and col and their sizes.
     //Now we have to update the position of each element
@@ -227,7 +231,7 @@ pub fn layout_table(session: &mut Session, table: &Table) {
     for (i, col) in cols.iter().enumerate() {
         let mut y = 0.0;
         for elem in col.iter() {
-            session.set_position(*elem, x, y);
+            session.set_position(*elem, x + table.table_options.cell_padding as f64, y + table.table_options.cell_padding as f64);
             y += row_heights[i];
         }
         x += col_widths[i];
@@ -244,6 +248,9 @@ pub fn layout_table(session: &mut Session, table: &Table) {
     for h in row_heights.iter() {
         height += h;
     }
+    
+    //print the size of the table
+    println!("Table size: {:?}", (width, height));
 
     session.set_size(table.entity, width, height);
 }
