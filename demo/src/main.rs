@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = Session::new();
     let textOptions = TextOptions {
-        font_family: "Arial".to_string(),
+        font_family: "Roboto".to_string(),
         font_size: 12.0,
         line_width: 100,
         text_color: "black".to_string(),

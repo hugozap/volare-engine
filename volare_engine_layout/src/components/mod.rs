@@ -295,7 +295,7 @@ impl Clone for TextOptions {
 impl TextOptions {
     pub fn new() -> TextOptions {
         TextOptions {
-            font_family: String::from("Arial"),
+            font_family: String::from("Roboto"),
             font_size: 12.0,
             text_color: String::from("black"),
             line_width: 20,
