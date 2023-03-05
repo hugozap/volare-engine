@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 volare_engine_layout = { path = "../volare_engine_layout" }
 
+# Define a script to run this
+[[bin]]
+name = "svg_renderer"
+path = "src/main.rs"

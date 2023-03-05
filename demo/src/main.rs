@@ -6,7 +6,7 @@ pub mod measure_text;
 //import svg_renderer
 use svg_renderer::*;
 //import layout
-use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, BoxOptions};
+use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, BoxOptions, TableOptions};
 //import io modules to write to file
 use std::{fs::File, cell::RefCell, rc::Rc};
 use measure_text::measure_text;
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     session.set_measure_text_fn(measure_text);
 
-    let mut text = session.new_text("Hello World\nthis is a multiline\ndemo!\nlet's add another line here!!", textOptions);
+    let mut text = session.new_text("Hello World\nthis is a multiline\ndemo!\nlet's add another line here!!", textOptions.clone());
     let box1 = session.new_box(text, BoxOptions{
         border_radius: 1.0,
         fill_color: "white".to_string(),
@@ -33,8 +33,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut group = session.new_group(vec![box1]);
 
+    //Create a list of 10 texts
+    let mut texts = Vec::new();
+    for i in 0..10 {
+        let text = session.new_text(&format!("Text hey {}", i), textOptions.clone());
+        texts.push(text);
+    }
+    //Create a table for the texts with 2 columns
+    let table = session.new_table(texts, 2, TableOptions::default());
+
     // Calculate layout
-    layout_tree_node(&mut session, &group);
+    layout_tree_node(&mut session, &table);
 
     //create writer to file ~/temp/svg-render-test.svg
     //get path for ~/temp
@@ -43,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut path = temp_dir.clone();
     path.push("svg-render-test.svg");
     let mut file = File::create(path).unwrap();
-    render(&session, &group, &mut file);
+    render(&session, &table, &mut file);
     
     //print file contents to console stdout
     let mut path = temp_dir.clone();

@@ -66,6 +66,10 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &Session) -> String {
         EntityType::EllipseShape => {
             render_ellipse(session, &mut svg, entity_id, node);
         }
+        //table
+        EntityType::TableShape => {
+            render_table(session, &mut svg, entity_id, node);
+        }
         _ => {
             svg.push_str("");
         }
@@ -135,6 +139,20 @@ fn render_group(session: &Session, svg: &mut String, entity_id: u64,  node: &Dia
     ));
     for child in node.children.iter() {
         print!("render_node recursive");
+        svg.push_str(render_node(child, session).as_str());
+    }
+    svg.push_str("</g>");
+}
+
+fn render_table(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let table_shape = session.get_table(node.index);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    for child in node.children.iter() {
         svg.push_str(render_node(child, session).as_str());
     }
     svg.push_str("</g>");

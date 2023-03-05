@@ -246,6 +246,29 @@ impl Session {
         
         node
     }  
+
+    pub fn new_table(&mut self, cells: Vec<DiagramTreeNode>,cols: usize,   options: TableOptions) -> DiagramTreeNode {
+        let table_index = self.tables.len();
+        //get the entity id of the cells
+        let mut cell_ids = Vec::new();
+        for cell in &cells {
+            let entity_id = self.get_entity_id(cell.entity_type, cell.index);
+            cell_ids.push(entity_id);
+        }
+        let table_id = self.new_entity(EntityType::TableShape);
+        let table =  Table::new(table_id, cell_ids, cols, options);
+        self.tables.push(table);
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::TableShape,
+            index: table_index,
+            children: Vec::new(),
+        };
+        for child in cells {
+            node.add_child(child)
+        }
+        node
+
+    }
 }
 
 // element list accessors
