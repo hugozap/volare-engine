@@ -605,7 +605,7 @@ impl Default for TableOptions {
             fill_color: String::from("white"),
             border_color: String::from("black"),
             border_width: 1,
-            cell_padding: 5,
+            cell_padding: 20,
         }
     }
 }

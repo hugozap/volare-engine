@@ -148,9 +148,19 @@ fn render_table(session: &Session, svg: &mut String, entity_id: u64, node: &Diag
     let size = session.get_size(entity_id);
     let table_shape = session.get_table(node.index);
     let pos = session.get_position(entity_id);
+
+
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
+    ));
+     //render container rect element
+    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" />"#,
+        size.0, 
+        size.1, 
+        table_shape.table_options.fill_color,
+        table_shape.table_options.border_color,
+        table_shape.table_options.border_width
     ));
     for child in node.children.iter() {
         svg.push_str(render_node(child, session).as_str());
@@ -190,9 +200,9 @@ fn render_text(session: &Session, svg: &mut String, entity_id: u64, node: &Diagr
         pos.0, pos.1
     ));
 
-    //render parent text
+    //render parent text container
     svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}" font-family="{}" >"#,
-        pos.1,
+        0,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family));

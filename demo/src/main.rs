@@ -6,7 +6,7 @@ pub mod measure_text;
 //import svg_renderer
 use svg_renderer::*;
 //import layout
-use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, BoxOptions, TableOptions};
+use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, BoxOptions, TableOptions, session::DiagramTreeNode};
 //import io modules to write to file
 use std::{fs::File, cell::RefCell, rc::Rc};
 use measure_text::measure_text;
@@ -36,11 +36,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create a list of 10 texts
     let mut texts = Vec::new();
     for i in 0..10 {
-        let text = session.new_text(&format!("Text hey {}", i), textOptions.clone());
+        let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), textOptions.clone());
         texts.push(text);
+        texts.push(get_test_table(&mut session));
     }
+    texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
-    let table = session.new_table(texts, 2, TableOptions::default());
+    let table = session.new_table(texts, 5, TableOptions::default());
 
     // Calculate layout
     layout_tree_node(&mut session, &table);
@@ -62,4 +64,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("SVG file written to: {}", path.to_str().unwrap());
 
     Ok(())
+}
+
+//function that returns a sample table with 10 elements and 3 columns
+
+fn get_test_table(session: &mut Session) -> DiagramTreeNode {
+    let textOptions = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 12.0,
+        line_width: 100,
+        text_color: "black".to_string(),
+    };
+    //Create a list of 10 texts
+    let mut texts = Vec::new();
+    for i in 0..10 {
+        let text = session.new_text(&format!("Text hey {} \nthis is a multiline text", i), textOptions.clone());
+        texts.push(text);
+    }
+    //Create a table for the texts with 2 columns
+    let table = session.new_table(texts, 3, TableOptions::default());
+    table
 }
