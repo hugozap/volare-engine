@@ -68,12 +68,14 @@ pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
         let mut y = 0.0;
         let mut max_line_width = 0f64;
         for line in shape_text.lines.iter() {
-            let line_size = session.measure_text.unwrap()(&line.text, &shape_text.text_options);
+            println!("Line: {:?}", line);
+            let  textLine = session.get_text_line(*line);
+            let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
             if line_size.0 > max_line_width {
                 max_line_width = line_size.0;
             }
-            session.set_position(line.entity, 0.0, y);
-            session.set_size(line.entity, line_size.0, line_size.1);
+            session.set_position(*line, 0.0, y);
+            session.set_size(*line, line_size.0, line_size.1);
             y += line_size.1;
         }
 

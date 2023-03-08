@@ -208,7 +208,8 @@ fn render_text(session: &Session, svg: &mut String, entity_id: EntityID, node: &
         text_shape.text_options.font_family));
    
     //render lines
-    for line in text_shape.lines.iter() {
+    for line_id in text_shape.lines.iter() {
+        let line = session.get_text_line(*line_id);
         let pos = session.get_position(line.entity);
         let transform = format!("translate({} {})", pos.0, pos.1);
         svg.push_str(&format!(r#"<tspan x="0" dy="{}" transform="{}" fill="{}" font-size="{}" font-family="{}" >"#,

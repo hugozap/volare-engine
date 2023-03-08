@@ -268,7 +268,7 @@ pub struct ShapeText {
     pub entity: EntityID,
     pub text: String,
     pub text_options: TextOptions,
-    pub lines: Vec<TextLine>,
+    pub lines: Vec<EntityID>,
 }
 
 impl Clone for ShapeText {
@@ -283,23 +283,18 @@ impl Clone for ShapeText {
 }
 
 
-
-impl ShapeText{
-    pub fn new(entity: EntityID, text: &str, text_options: TextOptions) -> ShapeText {
-        //wrap the text to generate the lines we'll position.
-        //print options
-        println!("text_options.line_width: {}", text_options.line_width);
-        println!("text_options.font_size: {}", text_options.font_size);
-        let lines = textwrap::wrap(&text, text_options.line_width);
-
+impl ShapeText {
+    pub fn new(entity: EntityID, text: &str, text_options: TextOptions, lines: &[EntityID]) -> ShapeText {
         ShapeText {
             entity,
             text: text.to_string(),
             text_options,
-            lines: lines.iter().map(|line| TextLine { entity: 0, text: line.to_string() }).collect(),
+            lines: lines.to_vec(),
         }
     }
 }
+
+
 
 impl Entity for ShapeText {
     fn get_id(&self) -> EntityID {

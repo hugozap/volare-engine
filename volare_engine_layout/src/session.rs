@@ -186,7 +186,19 @@ impl Session {
     // ```
     pub fn new_text(&mut self, text: &str, options: TextOptions) -> DiagramTreeNode {
         let text_id = self.new_entity(EntityType::TextShape);
-        let text = ShapeText::new(text_id, text, options);
+        //create the lines
+        let text_lines = textwrap::wrap(&text, options.line_width);
+        let lines:Vec<EntityID> = text_lines.iter().map(|line| {
+            let line_id = self.new_entity(EntityType::TextLine);
+            let text_line = TextLine{
+                entity: line_id,
+                text: line.to_string(),
+            };
+            self.textlines.insert(line_id, text_line);
+            line_id
+        }).collect();
+
+        let text = ShapeText::new(text_id, text, options, &lines);
         self.texts.insert(text_id, text);
         DiagramTreeNode::new(EntityType::TextShape, text_id)
     }
@@ -195,6 +207,7 @@ impl Session {
         let line_id = self.new_entity(EntityType::LineShape);
         let line = ShapeLine::new(line_id, options);
         self.lines.insert(line_id, line);
+        println!("Creating new line with id {}", line_id);
         DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
@@ -277,6 +290,10 @@ impl Session {
     pub fn get_line(&self, id: EntityID) -> &ShapeLine {
         &self.lines[&id]
     }
+
+    pub fn get_text_line(&self, id: EntityID) -> &TextLine {
+        &self.textlines[&id]
+    }
     
     pub fn get_arrow(&self, id: EntityID) -> &ShapeArrow {
         &self.arrows[&id]
@@ -300,7 +317,7 @@ impl Session {
 //test
 #[cfg(test)]
 mod tests {
-    use crate::{get_entity_type_from_id, get_entity_index_from_id};
+    use crate::{get_entity_type_from_id,};
 
     use super::*;
 
