@@ -1,13 +1,57 @@
 
 use std::any::Any;
 //new type EntityID that is a u64
-pub type EntityID = u64;
+pub type EntityID = usize;
 
 pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_type(&self) -> EntityType;
     //as_any
     fn as_any(&self) -> &dyn Any;
+}
+
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
+}
+
+//impl clone
+impl Clone for Point {
+    fn clone(&self) -> Self {
+        Point {
+            x: self.x,
+            y: self.y,
+        }
+    }
+}
+
+//impl new
+impl Point {
+    pub fn new(x: f64, y: f64) -> Self {
+        Point { x, y }
+    }
+}
+
+pub struct Size {
+    pub w: f64,
+    pub h: f64,
+}
+
+//impl clone
+impl Clone for Size {
+    fn clone(&self) -> Self {
+        Size {
+            w: self.w,
+            h: self.h,
+        }
+    }
+}
+
+//impl new
+impl Size {
+    pub fn new(w: f64, h: f64) -> Self {
+        Size { w, h }
+    }
 }
 
 //default implementation of Entity
@@ -89,7 +133,7 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
 pub struct ShapeBox {
     pub entity: EntityID,
     //Each box wraps another entity
-    pub wrapped_entity: u64,
+    pub wrapped_entity: EntityID,
     pub box_options: BoxOptions,
 }
 
@@ -163,7 +207,7 @@ impl BoxOptions {
 /* A group of entities */
 pub struct ShapeGroup {
     pub entity: EntityID,
-    pub elements: Vec<u64>,
+    pub elements: Vec<EntityID>,
 }
 
 impl Clone for ShapeGroup {
@@ -304,7 +348,7 @@ impl TextOptions {
 }
 
 pub struct VerticalStack {
-    pub entity: u64,
+    pub entity: EntityID,
     //List of entity ids
     pub elements: Vec<EntityID>,
 }
@@ -334,7 +378,7 @@ impl Entity for VerticalStack {
     
 
 pub struct HorizontalStack {
-    pub entity: u64,
+    pub entity: EntityID,
     //List of entity ids
     pub elements: Vec<EntityID>,
 }
@@ -381,7 +425,7 @@ impl Clone for ShapeLine {
 }
 
 impl ShapeLine {
-    pub fn new(line_id: u64, options: LineOptions) -> ShapeLine {
+    pub fn new(line_id: EntityID, options: LineOptions) -> ShapeLine {
         ShapeLine {
             entity: line_id,
             start: (0.0, 0.0),
@@ -490,7 +534,7 @@ impl ArrowOptions {
 }
 
 pub struct ShapeEllipse {
-    pub entity: u64,
+    pub entity: EntityID,
     pub center: (f64, f64),
     pub radius: (f64, f64),
     pub ellipse_options: EllipseOptions,
@@ -508,7 +552,7 @@ impl Clone for ShapeEllipse {
 }
 
 impl ShapeEllipse {
-    pub fn new(entity: u64, center: (f64, f64), radius: (f64, f64), ellipse_options: EllipseOptions) -> ShapeEllipse {
+    pub fn new(entity: EntityID, center: (f64, f64), radius: (f64, f64), ellipse_options: EllipseOptions) -> ShapeEllipse {
         ShapeEllipse {
             entity,
             center,
@@ -560,7 +604,7 @@ impl EllipseOptions {
 }
 
 pub struct ShapeImage {
-    pub entity: u64,
+    pub entity: EntityID,
     //base64 encoded image
     pub image: String,
     pub preferred_size: (f64, f64),

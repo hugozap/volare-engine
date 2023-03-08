@@ -35,12 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create a list of 10 texts
     let mut texts = Vec::new();
-    for i in 0..10 {
+    for i in 0..1 {
         let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), textOptions.clone());
         texts.push(text);
-        texts.push(get_test_table(&mut session));
+        //texts.push(get_test_table(&mut session));
     }
-    texts.push(get_test_table(&mut session));
+    //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let table = session.new_table(texts, 5, TableOptions::default());
 
