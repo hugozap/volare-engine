@@ -14,12 +14,8 @@ use std::collections::HashMap;
  */
 //use TextOptions
 use crate::{components::*};
-//wrap library features in a struct
-use crate::layout;
 
-
-
-pub struct Session {
+pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (f64, f64)>,
     pub entities: Vec<EntityID>,
     pub positions: HashMap<EntityID, Point>,
@@ -75,9 +71,9 @@ pub struct Session {
  * We have a type enum with all the types
 */
 
-impl Session {
-    pub fn new() -> Session {
-        Session {
+impl DiagramBuilder {
+    pub fn new() -> DiagramBuilder {
+        DiagramBuilder {
             entity_id_counter: 0,
             measure_text: Some(|_text, _text_options| {
                 (0.0,0.0)
@@ -264,7 +260,7 @@ impl Session {
 }
 
 // element list accessors
-impl Session {
+impl DiagramBuilder {
     pub fn get_text(&self, id: EntityID) -> &ShapeText {
         &self.texts[&id]
     }
@@ -321,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_session() {
-        let mut session = Session::new();
+        let mut session = DiagramBuilder::new();
         
         
         session.set_measure_text_fn(|text, text_options| {

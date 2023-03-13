@@ -1,5 +1,5 @@
 use std::io::Write;
-use volare_engine_layout::session::DiagramTreeNode;
+use volare_engine_layout::diagram_builder::DiagramTreeNode;
 use volare_engine_layout::*;
 //use error
 use std::io::Error;
@@ -7,7 +7,7 @@ use std::io::Error;
 // Entry point for the SVG renderer
 // The renderer will write the SVG to the output stream
 pub fn render<W: Write>(
-    session: &Session,
+    session: &DiagramBuilder,
     diagram_node: &DiagramTreeNode,
     stream: &mut W,
 ) -> Result<(), Error> {
@@ -33,7 +33,7 @@ pub fn render<W: Write>(
 }
 
 // Render a node and its children
-fn render_node<'a>(node: &DiagramTreeNode, session: &Session) -> String {
+fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
     let mut svg = String::new();
 
     let entity_id = node.entity_id;
@@ -76,7 +76,7 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &Session) -> String {
     svg
 }
 
-fn render_line(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let line_shape = session.get_line(node.entity_id);
     let pos = session.get_position(entity_id);
@@ -91,7 +91,7 @@ fn render_line(session: &Session, svg: &mut String, entity_id: EntityID, node: &
      line_shape.line_options.stroke_width));
     svg.push_str("</g>");
 }
-fn render_arrow(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_arrow(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let arrow_shape = session.get_arrow(node.entity_id);
     let pos = session.get_position(entity_id);
@@ -108,7 +108,7 @@ fn render_arrow(session: &Session, svg: &mut String, entity_id: EntityID, node: 
     svg.push_str("</g>");
 }
 
-fn render_ellipse(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_ellipse(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let ellipse_shape = session.get_ellipse(node.entity_id);
     let pos = session.get_position(entity_id);
@@ -128,7 +128,7 @@ fn render_ellipse(session: &Session, svg: &mut String, entity_id: EntityID, node
 }
 
 
-fn render_group(session: &Session, svg: &mut String, entity_id: EntityID,  node: &DiagramTreeNode ) {
+fn render_group(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,  node: &DiagramTreeNode ) {
   
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
@@ -142,7 +142,7 @@ fn render_group(session: &Session, svg: &mut String, entity_id: EntityID,  node:
     svg.push_str("</g>");
 }
 
-fn render_table(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_table(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let table_shape = session.get_table(node.entity_id);
     let pos = session.get_position(entity_id);
@@ -167,7 +167,7 @@ fn render_table(session: &Session, svg: &mut String, entity_id: EntityID, node: 
 }
 
 
-fn render_box(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let box_shape = session.get_box(node.entity_id);
     let pos = session.get_position(entity_id);
@@ -191,7 +191,7 @@ fn render_box(session: &Session, svg: &mut String, entity_id: EntityID, node: &D
     svg.push_str("</g>");
 }
 
-fn render_text(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let text_shape = session.get_text(node.entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
@@ -224,7 +224,7 @@ fn render_text(session: &Session, svg: &mut String, entity_id: EntityID, node: &
     svg.push_str("</g>");
 }
 
-fn render_vertical_stack(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_vertical_stack(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -238,7 +238,7 @@ fn render_vertical_stack(session: &Session, svg: &mut String, entity_id: EntityI
     svg.push_str("</g>");
 }
 
-fn render_horizontal_stack(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+fn render_horizontal_stack(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -256,7 +256,7 @@ fn render_horizontal_stack(session: &Session, svg: &mut String, entity_id: Entit
 //test that groups are rendered correctly
 #[test]
 fn test_render_group() {
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     let group = session.new_group(Vec::new());
     let node = render_node(&group, &session);
     assert_eq!(node, r#"<g transform="translate(0 0)" ></g>"#);
@@ -265,7 +265,7 @@ fn test_render_group() {
 //test that BoxShape with wrapped group is rendered correctly
 #[test]
 fn test_render_box_with_group() {
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     let group = session.new_group(Vec::new());
     let box_ = session.new_box(group, BoxOptions{
         fill_color: "white".to_string(),
@@ -288,7 +288,7 @@ fn test_render_line() {
         stroke_color: "black".to_string(),
         stroke_width: 1.0,
     };
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     let line = session.new_line(options);
     
     let node = render_node(&line, &session);
@@ -306,7 +306,7 @@ fn test_render_ellipse() {
         stroke_color: "black".to_string(),
         stroke_width: 1.0,
     };
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     let ellipse = session.new_elipse((0.0, 0.0), (0.0, 0.0), options);
     
     let node = render_node(&ellipse, &session);
@@ -318,7 +318,7 @@ fn test_render_ellipse() {
 
 #[test]
 fn test_render_box_rounded_corners_with_group() {
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     let group = session.new_group(Vec::new());
     let box_ = session.new_box(group, BoxOptions{
         fill_color: "white".to_string(),

@@ -2,7 +2,7 @@
 
 
 use crate::{
-    session::DiagramTreeNode, EntityID, EntityType, HorizontalStack, Session, ShapeArrow, ShapeBox,
+    diagram_builder::DiagramTreeNode, EntityID, EntityType, HorizontalStack, DiagramBuilder, ShapeArrow, ShapeBox,
     ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack
 };
 
@@ -11,7 +11,7 @@ of the wrapped element
 The wrapped element position and size should be updated before calling this function.
 The wrapped element position is relative to the box position.
 */
-pub fn layout_box(session: &mut Session, shape_box: &ShapeBox) {
+pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
     //get the wrapped element dimensions
     let wrapped_elem_size = session.get_size(shape_box.wrapped_entity);
@@ -41,7 +41,7 @@ pub fn layout_box(session: &mut Session, shape_box: &ShapeBox) {
  * Group elements must be positioned before calling this function.
  * (Doesn't update the position of the elements)
  */
-pub fn layout_group(session: &mut Session, shape_group: &ShapeGroup) {
+pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
     //update group dimensions
     let mut width = 0.0;
     let mut height = 0.0;
@@ -57,7 +57,7 @@ pub fn layout_group(session: &mut Session, shape_group: &ShapeGroup) {
     session.set_size(shape_group.entity, width, height);
 }
 
-pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
+pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
     // let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
     // session.set_size(shape_text.entity, w, h);
     /* for each line in lines, get the size and use it to position the next */
@@ -87,7 +87,7 @@ pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
 /**
  * Updates the size of the line entity based on the start and end points
  */
-pub fn layout_line(session: &mut Session, shape_line: &ShapeLine) {
+pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
     let start = shape_line.start;
     let end = shape_line.end;
     //the line x is the minimum of the start and end x
@@ -106,7 +106,7 @@ pub fn layout_line(session: &mut Session, shape_line: &ShapeLine) {
 /**
  * Updates the size of the arrow entity based on the start and end points
  */
-pub fn layout_arrow(session: &mut Session, shape_arrow: &ShapeArrow) {
+pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
     let start = shape_arrow.start;
     let end = shape_arrow.end;
     //the line x is the minimum of the start and end x
@@ -127,7 +127,7 @@ pub fn layout_arrow(session: &mut Session, shape_arrow: &ShapeArrow) {
  * radius.0 is the horizontal radius and radius.1 is the vertical radius
  * The position of the ellipse is the top left corner of the bounding box
  */
-pub fn layout_ellipse(session: &mut Session, shape_ellipse: &ShapeEllipse) {
+pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
     let w = shape_ellipse.radius.0 * 2.0;
     let h = shape_ellipse.radius.1 * 2.0;
     session.set_size(shape_ellipse.entity, w, h);
@@ -136,7 +136,7 @@ pub fn layout_ellipse(session: &mut Session, shape_ellipse: &ShapeEllipse) {
 /**
  * Sets the image entity size to the preferred size
  */
-pub fn layout_image(session: &mut Session, shape_image: &ShapeImage) {
+pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
     session.set_size(
         shape_image.entity,
         shape_image.preferred_size.0,
@@ -148,7 +148,7 @@ pub fn layout_image(session: &mut Session, shape_image: &ShapeImage) {
  * Updates the position of the elements in the vertical stack
  * and the size of the vertical stack
  */
-pub fn layout_vertical_stack(session: &mut Session, vertical_stack: &VerticalStack) {
+pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &VerticalStack) {
     let mut y = 0.0;
     let mut width = 0.0;
     for elem in vertical_stack.elements.iter() {
@@ -162,7 +162,7 @@ pub fn layout_vertical_stack(session: &mut Session, vertical_stack: &VerticalSta
     session.set_size(vertical_stack.entity, width, y);
 }
 
-pub fn layout_horizontal_stack(session: &mut Session, horizontal_stack: &HorizontalStack) {
+pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
     let mut x = 0.0;
     let mut height = 0.0;
     for elem in horizontal_stack.elements.iter() {
@@ -184,7 +184,7 @@ pub fn layout_horizontal_stack(session: &mut Session, horizontal_stack: &Horizon
  * - Cols to the right of each other
  * - The sizes of the internal elements should be previously computed for this to work
  */
-pub fn layout_table(session: &mut Session, table: &Table) {
+pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     //we need to group elements by row and column, calculate their
     //natural sizes and then update their rows and columns
     let mut rows: Vec<Vec<EntityID>> = Vec::new();
@@ -263,7 +263,7 @@ pub struct BoundingBox {
     height: f64,
 }
 //Calculate the layout for a tree of elements
-pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) -> BoundingBox {
+pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
 
     //start with the bottom elements
     for child in &root.children {
@@ -352,10 +352,13 @@ pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) -> Boundi
 }
 
 
+//import textoptions defined in src/components/mod.rs
+use crate::components::TextOptions;
+use crate::components::BoxOptions;
 //Test that a box with a text inside is correctly laid out
 #[test]
 fn test_layout_box_with_text() {
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     session.set_measure_text_fn(|_, _| (10.0, 10.0));
     let text = session.new_text("hello", TextOptions{
         font_size: 20.0,

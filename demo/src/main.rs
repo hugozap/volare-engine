@@ -6,14 +6,14 @@ pub mod measure_text;
 //import svg_renderer
 use svg_renderer::*;
 //import layout
-use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, TableOptions, session::DiagramTreeNode};
+use volare_engine_layout::{layout::layout_tree_node, DiagramBuilder, TextOptions, TableOptions, diagram_builder::DiagramTreeNode};
 //import io modules to write to file
 use std::{fs::File};
 use measure_text::measure_text;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
-    let mut session = Session::new();
+    let mut session = DiagramBuilder::new();
     let text_options = TextOptions {
         font_family: "Roboto".to_string(),
         font_size: 12.0,
@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 //function that returns a sample table with 10 elements and 3 columns
 
-fn get_test_table(session: &mut Session) -> DiagramTreeNode {
+fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     let text_options = TextOptions {
         font_family: "Roboto".to_string(),
         font_size: 12.0,
