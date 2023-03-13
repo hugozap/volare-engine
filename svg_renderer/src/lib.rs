@@ -12,9 +12,8 @@ pub fn render<W: Write>(
     stream: &mut W,
 ) -> Result<(), Error> {
     let mut svg = String::new();
-    let entity_id = session.get_entity_id(diagram_node.entity_type, diagram_node.index);
-    let root_size = session.get_size(entity_id);
-    let root_pos = session.get_position(entity_id);
+    let root_size = session.get_size(diagram_node.entity_id);
+    let root_pos = session.get_position(diagram_node.entity_id);
 
     svg.push_str(&format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
@@ -37,7 +36,7 @@ pub fn render<W: Write>(
 fn render_node<'a>(node: &DiagramTreeNode, session: &Session) -> String {
     let mut svg = String::new();
 
-    let entity_id = session.get_entity_id(node.entity_type, node.index);
+    let entity_id = node.entity_id;
     
 
     match node.entity_type {
@@ -77,9 +76,9 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &Session) -> String {
     svg
 }
 
-fn render_line(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_line(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
-    let line_shape = session.get_line(node.index);
+    let line_shape = session.get_line(node.entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -92,9 +91,9 @@ fn render_line(session: &Session, svg: &mut String, entity_id: u64, node: &Diagr
      line_shape.line_options.stroke_width));
     svg.push_str("</g>");
 }
-fn render_arrow(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_arrow(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
-    let arrow_shape = session.get_arrow(node.index);
+    let arrow_shape = session.get_arrow(node.entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -109,9 +108,9 @@ fn render_arrow(session: &Session, svg: &mut String, entity_id: u64, node: &Diag
     svg.push_str("</g>");
 }
 
-fn render_ellipse(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_ellipse(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
-    let ellipse_shape = session.get_ellipse(node.index);
+    let ellipse_shape = session.get_ellipse(node.entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -129,7 +128,7 @@ fn render_ellipse(session: &Session, svg: &mut String, entity_id: u64, node: &Di
 }
 
 
-fn render_group(session: &Session, svg: &mut String, entity_id: u64,  node: &DiagramTreeNode ) {
+fn render_group(session: &Session, svg: &mut String, entity_id: EntityID,  node: &DiagramTreeNode ) {
   
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
@@ -143,9 +142,9 @@ fn render_group(session: &Session, svg: &mut String, entity_id: u64,  node: &Dia
     svg.push_str("</g>");
 }
 
-fn render_table(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_table(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
-    let table_shape = session.get_table(node.index);
+    let table_shape = session.get_table(node.entity_id);
     let pos = session.get_position(entity_id);
 
 
@@ -168,9 +167,9 @@ fn render_table(session: &Session, svg: &mut String, entity_id: u64, node: &Diag
 }
 
 
-fn render_box(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_box(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
-    let box_shape = session.get_box(node.index);
+    let box_shape = session.get_box(node.entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -188,11 +187,12 @@ fn render_box(session: &Session, svg: &mut String, entity_id: u64, node: &Diagra
     for child in node.children.iter() {
         svg.push_str(render_node(child, session).as_str())
     }
+
     svg.push_str("</g>");
 }
 
-fn render_text(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
-    let text_shape = session.get_text(node.index);
+fn render_text(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let text_shape = session.get_text(node.entity_id);
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -207,7 +207,8 @@ fn render_text(session: &Session, svg: &mut String, entity_id: u64, node: &Diagr
         text_shape.text_options.font_family));
    
     //render lines
-    for line in text_shape.lines.iter() {
+    for line_id in text_shape.lines.iter() {
+        let line = session.get_text_line(*line_id);
         let pos = session.get_position(line.entity);
         let transform = format!("translate({} {})", pos.0, pos.1);
         svg.push_str(&format!(r#"<tspan x="0" dy="{}" transform="{}" fill="{}" font-size="{}" font-family="{}" >"#,
@@ -223,7 +224,7 @@ fn render_text(session: &Session, svg: &mut String, entity_id: u64, node: &Diagr
     svg.push_str("</g>");
 }
 
-fn render_vertical_stack(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_vertical_stack(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -237,7 +238,7 @@ fn render_vertical_stack(session: &Session, svg: &mut String, entity_id: u64, no
     svg.push_str("</g>");
 }
 
-fn render_horizontal_stack(session: &Session, svg: &mut String, entity_id: u64, node: &DiagramTreeNode) {
+fn render_horizontal_stack(session: &Session, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,

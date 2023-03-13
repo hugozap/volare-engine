@@ -66,12 +66,14 @@ pub fn layout_text(session: &mut Session, shape_text: &ShapeText) {
         let mut y = 0.0;
         let mut max_line_width = 0f64;
         for line in shape_text.lines.iter() {
-            let line_size = session.measure_text.unwrap()(&line.text, &shape_text.text_options);
+            println!("Line: {:?}", line);
+            let  textLine = session.get_text_line(*line);
+            let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
             if line_size.0 > max_line_width {
                 max_line_width = line_size.0;
             }
-            session.set_position(line.entity, 0.0, y);
-            session.set_size(line.entity, line_size.0, line_size.1);
+            session.set_position(*line, 0.0, y);
+            session.set_size(*line, line_size.0, line_size.1);
             y += line_size.1;
         }
 
@@ -228,9 +230,9 @@ pub fn layout_table(session: &mut Session, table: &Table) {
     let mut x = 0.0;
     for (i, col) in cols.iter().enumerate() {
         let mut y = 0.0;
-        for elem in col.iter() {
+        for (j,elem) in col.iter().enumerate() {
             session.set_position(*elem, x + table.table_options.cell_padding as f64, y + table.table_options.cell_padding as f64);
-            y += row_heights[i];
+            y += row_heights[j];
         }
         x += col_widths[i];
     }
@@ -268,9 +270,9 @@ pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) -> Boundi
         println!("Layout child: {:?}", child);
         layout_tree_node(session, child);
         //print size and position of the child
-        let child_id = session.get_entity_id(child.entity_type, child.index);
-        let child_size = session.get_size(child_id);
-        let child_pos = session.get_position(child_id);
+       
+        let child_size = session.get_size(child.entity_id);
+        let child_pos = session.get_position(child.entity_id);
         println!("Child size: {:?}", child_size);
         println!("Child pos: {:?}", child_pos);
     }
@@ -282,56 +284,56 @@ pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) -> Boundi
             {
     
                 //get the Shape text entity
-                let text = session.get_text(root.index).clone();
+                let text = session.get_text(root.entity_id).clone();
                 layout_text(session, &text);
             }
         }
         EntityType::BoxShape => {
             //get the Shape box entity
-            let box_shape = session.get_box(root.index).clone();
+            let box_shape = session.get_box(root.entity_id).clone();
             layout_box(session, &box_shape);
         }
         EntityType::LineShape => {
             //get the Shape line entity
-            let line = session.get_line(root.index).clone();
+            let line = session.get_line(root.entity_id).clone();
             layout_line(session, &line);
         }
         EntityType::ArrowShape => {
             //get the Shape arrow entity
-            let arrow = session.get_arrow(root.index).clone();
+            let arrow = session.get_arrow(root.entity_id).clone();
             layout_arrow(session, &arrow);
         }
         EntityType::EllipseShape => {
             //get the Shape ellipse entity
-            let ellipse = session.get_ellipse(root.index).clone();
+            let ellipse = session.get_ellipse(root.entity_id).clone();
             layout_ellipse(session, &ellipse);
         }
         EntityType::ImageShape => {
             //get the Shape image entity
-            let image = session.get_image(root.index).clone();
+            let image = session.get_image(root.entity_id).clone();
             layout_image(session, &image);
         }
         EntityType::VerticalStackShape => {
             //get the VerticalStack entity
-            let vertical_stack = session.get_vertical_stack(root.index).clone();
+            let vertical_stack = session.get_vertical_stack(root.entity_id).clone();
             layout_vertical_stack(session, &vertical_stack);
         }
 
         EntityType::HorizontalStackShape => {
             //get the HorizontalStack entity
-            let horizontal_stack = session.get_horizontal_stack(root.index).clone();
+            let horizontal_stack = session.get_horizontal_stack(root.entity_id).clone();
             layout_horizontal_stack(session, &horizontal_stack);
         }
 
         EntityType::TableShape => {
             //get the Table entity
-            let table = session.get_table(root.index).clone();
+            let table = session.get_table(root.entity_id).clone();
             layout_table(session, &table);
         }
 
         EntityType::GroupShape => {
             //get the Group entity
-            let group = session.get_group(root.index).clone();
+            let group = session.get_group(root.entity_id).clone();
             layout_group(session, &group);
         }
         //if not recognized, show the name of it in the panic
@@ -339,9 +341,8 @@ pub fn layout_tree_node(session: &mut Session, root: &DiagramTreeNode) -> Boundi
     }
 
     //Return the bounding box for the root element
-    let entity_id = session.get_entity_id(root.entity_type, root.index);
-    let size = session.get_size(entity_id);
-    let position = session.get_position(entity_id);
+    let size = session.get_size(root.entity_id);
+    let position = session.get_position(root.entity_id);
     BoundingBox {
         x: position.0,
         y: position.1,
@@ -374,14 +375,12 @@ fn test_layout_box_with_text() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_id = session.get_entity_id(EntityType::TextShape, text.index);
-    let box_id = session.get_entity_id(EntityType::BoxShape, box_shape.index);
 
-    let text_position = session.get_position(text_id);
-    let text_size = session.get_size(text_id);
+    let text_position = session.get_position(text.entity_id);
+    let text_size = session.get_size(text.entity_id);
 
-    let box_position = session.get_position(box_id);
-    let box_size = session.get_size(box_id);
+    let box_position = session.get_position(box_shape.entity_id);
+    let box_size = session.get_size(box_shape.entity_id);
     //assert equal positions
 
 
@@ -389,7 +388,7 @@ fn test_layout_box_with_text() {
     println!("box size: {:?}", box_size);
     println!("text size: {:?}", text_size);
         // and the text size should not be zero
-        assert!(text_size.0 > 0.0);
+    assert!(text_size.0 > 0.0);
     assert_eq!(box_size.0, 30.0);
     assert!(box_size.1 > text_size.1);
 

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 
 /**
  * This object encapsulates diagram creation logic in a user friendly API
@@ -12,28 +13,32 @@
  *
  */
 //use TextOptions
-use crate::{components::*, get_entity_index_from_id};
+use crate::{components::*};
+//wrap library features in a struct
+use crate::layout;
 
-const MAX_ENTITIES: usize = 1000;
+
+
 pub struct Session {
     pub measure_text: Option<fn(&str, &TextOptions) -> (f64, f64)>,
-    pub entities: [EntityID; MAX_ENTITIES],
-    pub positions: [f64; MAX_ENTITIES * 2],
-    pub sizes: [f64; MAX_ENTITIES * 2],
+    pub entities: Vec<EntityID>,
+    pub positions: HashMap<EntityID, Point>,
+    pub sizes: HashMap<EntityID, Size>,
+    entity_id_counter: usize,
 
 
     // Components
-    boxes: Vec<ShapeBox>,
-    groups: Vec<ShapeGroup>,
-    texts: Vec<ShapeText>,
-    textlines: Vec<TextLine>,
-    horizontal_stacks: Vec<HorizontalStack>,
-    vertical_stacks: Vec<VerticalStack>,
-    ellipses: Vec<ShapeEllipse>,
-    lines: Vec<ShapeLine>,
-    arrows: Vec<ShapeArrow>,
-    tables: Vec<Table>,
-    images: Vec<ShapeImage>,
+    boxes: HashMap<EntityID, ShapeBox>,
+    groups: HashMap<EntityID, ShapeGroup>,
+    texts: HashMap<EntityID, ShapeText>,
+    textlines: HashMap<EntityID, TextLine>,
+    horizontal_stacks: HashMap<EntityID, HorizontalStack>,
+    vertical_stacks: HashMap<EntityID, VerticalStack>,
+    ellipses: HashMap<EntityID, ShapeEllipse>,
+    lines: HashMap<EntityID, ShapeLine>,
+    arrows: HashMap<EntityID, ShapeArrow>,
+    tables: HashMap<EntityID, Table>,
+    images: HashMap<EntityID, ShapeImage>,
     
 }
 
@@ -44,15 +49,15 @@ pub struct Session {
 
     pub entity_type: EntityType,
     // Index of the entity in the corresponding vector
-    pub index: usize,
+    pub entity_id: EntityID,
     pub children: Vec<Box<DiagramTreeNode>>,
  }
 
  impl DiagramTreeNode {
-    fn new(entity_type: EntityType, index: usize) -> DiagramTreeNode {
+    fn new(entity_type: EntityType, id: EntityID) -> DiagramTreeNode {
         DiagramTreeNode {
             entity_type,
-            index,
+            entity_id: id,
             children: Vec::new(),
         }
     }
@@ -73,23 +78,25 @@ pub struct Session {
 impl Session {
     pub fn new() -> Session {
         Session {
+            entity_id_counter: 0,
             measure_text: Some(|_text, _text_options| {
                 (0.0,0.0)
             }),
-            entities: [0; MAX_ENTITIES],
-            positions: [0.0; MAX_ENTITIES * 2],
-            sizes: [0.0; MAX_ENTITIES * 2],
-             boxes: Vec::new(),
-            groups: Vec::new(),
-            texts: Vec::new(),
-            textlines: Vec::new(),
-            horizontal_stacks: Vec::new(),
-            vertical_stacks: Vec::new(),
-            ellipses: Vec::new(),
-            lines: Vec::new(),
-            arrows: Vec::new(),
-            tables: Vec::new(),
-            images: Vec::new(),
+            entities: Vec::new() ,
+            positions: HashMap::new(),
+            sizes: HashMap::new(),
+            boxes: HashMap::new(),
+            groups: HashMap::new(),
+            texts: HashMap::new(),
+            textlines: HashMap::new(),
+            horizontal_stacks: HashMap::new(),
+            vertical_stacks: HashMap::new(),
+            ellipses: HashMap::new(),
+            lines: HashMap::new(),
+            arrows: HashMap::new(),
+            tables: HashMap::new(),
+            images: HashMap::new(),
+
        }
     }
 
@@ -99,16 +106,20 @@ impl Session {
      * in the same index. So they are fast to access
      */
     pub fn new_entity(&mut self, entity_type: EntityType) -> EntityID {
-        let index = self.entities.iter().position(|&x| x == 0).unwrap();
-        let id = ((entity_type as u64) << 32) | (index as u64);
-        self.entities[index] = id;
+        self.entity_id_counter += 1;
+        let id = self.entity_id_counter;
+        println!("Creating new entity with id {}", id);
+        self.entities.push(id);
+        self.positions.insert(id, Point::new(0.0, 0.0));
+        self.sizes.insert(id, Size::new(0.0, 0.0));
         id
     }
 
     pub fn clear_cache(&mut self) {
-        self.entities = [0; MAX_ENTITIES];
-        self.positions = [0.0; MAX_ENTITIES * 2];
-        self.sizes = [0.0; MAX_ENTITIES * 2];
+        //clear entities vector
+        self.entities = Vec::new();
+        self.positions = HashMap::new();
+        self.sizes = HashMap::new();
     }
 
     //set the measure_text function
@@ -122,62 +133,42 @@ impl Session {
 
     //get the position of an entity
     pub fn get_position(&self, entity_id: EntityID) -> (f64, f64) {
-        let index = get_entity_index_from_id(entity_id);
-        (self.positions[index * 2], self.positions[index * 2 + 1])
+        let pos = self.positions.get(&entity_id).unwrap();
+        (pos.x, pos.y)
     }
 
     pub fn set_position(&mut self, entity_id: EntityID, x: f64, y: f64) {
-        let index = get_entity_index_from_id(entity_id);
-        self.positions[index * 2] = x;
-        self.positions[index * 2 + 1] = y;
+        println!("Setting position of entity {} to ({}, {})", entity_id, x, y);
+        let pos = self.positions.get_mut(&entity_id).unwrap();
+        pos.x = x;
+        pos.y = y;
     }
 
     //get the size of an entity
     pub fn get_size(&self, entity_id: EntityID) -> (f64, f64) {
-        let index = get_entity_index_from_id(entity_id);
-        (self.sizes[index * 2], self.sizes[index * 2 + 1])
+        let size = self.sizes.get(&entity_id).unwrap();
+        (size.w, size.h)
     }
 
     pub fn set_size(&mut self, entity_id: EntityID, width: f64, height: f64) {
-        let index = get_entity_index_from_id(entity_id);
-        self.sizes[index * 2] = width;
-        self.sizes[index * 2 + 1] = height;
+        let size = self.sizes.get_mut(&entity_id).unwrap();
+        size.w = width;
+        size.h = height;
     }
 
-
-    // Returns the entityID given the entity type and the index
-    pub fn get_entity_id(&self, entity_type: EntityType, index: usize) -> EntityID {
-        match entity_type {
-            EntityType::GroupShape => self.groups[index].get_id(),
-            EntityType::TextShape => self.texts[index].get_id(),
-            EntityType::HorizontalStackShape => self.horizontal_stacks[index].get_id(),
-            EntityType::VerticalStackShape => self.vertical_stacks[index].get_id(),
-            EntityType::EllipseShape => self.ellipses[index].get_id(),
-            EntityType::LineShape => self.lines[index].get_id(),
-            EntityType::ArrowShape => self.arrows[index].get_id(),
-            EntityType::TableShape => self.tables[index].get_id(),
-            EntityType::ImageShape => self.images[index].get_id(),
-            EntityType::BoxShape => self.boxes[index].get_id(),
-            EntityType::TextLine =>  self.textlines[index].get_id(),
-        }
-    }
-  
 
     // This methods are used to build the diagram tree
     // TODO: review the architecture of this
 
     // Wraps an element in a box
     pub fn new_box(&mut self, child: DiagramTreeNode,options: BoxOptions) -> DiagramTreeNode {
-        let box_index = self.boxes.len();
         let box_id = self.new_entity(EntityType::BoxShape);
-        // we need to get the wrapped entity id
-        
        
-        let sbox = ShapeBox::new(box_id, self.get_entity_id(child.entity_type, child.index ), options);
-        self.boxes.push(sbox);
+        let sbox = ShapeBox::new(box_id, child.entity_id, options);
+        self.boxes.insert(box_id, sbox);
         let mut node = DiagramTreeNode {
             entity_type: EntityType::BoxShape,
-            index: box_index,
+            entity_id: box_id,
             children: Vec::new(),
         };
         node.children.push(Box::new(child.clone()));
@@ -192,32 +183,41 @@ impl Session {
     // let text = session.new_text("Hello World", TextOptions::new());
     // ```
     pub fn new_text(&mut self, text: &str, options: TextOptions) -> DiagramTreeNode {
-        let text_index = self.texts.len();
         let text_id = self.new_entity(EntityType::TextShape);
-        let text = ShapeText::new(text_id, text, options);
-        self.texts.push(text);
-        DiagramTreeNode::new(EntityType::TextShape, text_index)
+        //create the lines
+        let text_lines = textwrap::wrap(&text, options.line_width);
+        let lines:Vec<EntityID> = text_lines.iter().map(|line| {
+            let line_id = self.new_entity(EntityType::TextLine);
+            let text_line = TextLine{
+                entity: line_id,
+                text: line.to_string(),
+            };
+            self.textlines.insert(line_id, text_line);
+            line_id
+        }).collect();
+
+        let text = ShapeText::new(text_id, text, options, &lines);
+        self.texts.insert(text_id, text);
+        DiagramTreeNode::new(EntityType::TextShape, text_id)
     }
 
     pub fn new_line(&mut self, options: LineOptions) -> DiagramTreeNode {
-        let line_index = self.lines.len();
         let line_id = self.new_entity(EntityType::LineShape);
         let line = ShapeLine::new(line_id, options);
-        self.lines.push(line);
-        DiagramTreeNode::new(EntityType::LineShape, line_index)
+        self.lines.insert(line_id, line);
+        println!("Creating new line with id {}", line_id);
+        DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
     pub fn new_elipse(&mut self,center: (f64,f64) , radius: (f64,f64),  options: EllipseOptions) -> DiagramTreeNode {
-        let ellipse_index = self.ellipses.len();
         let ellipse_id = self.new_entity(EntityType::EllipseShape);
         let ellipse = ShapeEllipse::new(ellipse_id, center, radius, options);
-        self.ellipses.push(ellipse);
-        DiagramTreeNode::new(EntityType::EllipseShape, ellipse_index)
+        self.ellipses.insert(ellipse_id, ellipse);
+        DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id)
     }
 
     // Creates a new Group.
     pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
-        let group_index = self.groups.len();
         let group_id = self.new_entity(EntityType::GroupShape);
         let mut sgroup = ShapeGroup{
          entity: group_id,
@@ -225,38 +225,34 @@ impl Session {
         };
          let mut node = DiagramTreeNode {
             entity_type: EntityType::GroupShape,
-            index: group_index,
+            entity_id: group_id,
             children: Vec::new(),
         };
  
      
         //set children
         for child in children {
-            let entity_id = self.get_entity_id(child.entity_type, child.index);
-            sgroup.elements.push(entity_id);
+            sgroup.elements.push(child.entity_id);
             node.add_child(child)
         }
 
-        self.groups.push(sgroup);
+        self.groups.insert(group_id, sgroup);
 
         
         node
     }  
 
     pub fn new_table(&mut self, cells: Vec<DiagramTreeNode>,cols: usize,   options: TableOptions) -> DiagramTreeNode {
-        let table_index = self.tables.len();
-        //get the entity id of the cells
         let mut cell_ids = Vec::new();
         for cell in &cells {
-            let entity_id = self.get_entity_id(cell.entity_type, cell.index);
-            cell_ids.push(entity_id);
+            cell_ids.push(cell.entity_id);
         }
         let table_id = self.new_entity(EntityType::TableShape);
         let table =  Table::new(table_id, cell_ids, cols, options);
-        self.tables.push(table);
+        self.tables.insert(table_id, table);
         let mut node = DiagramTreeNode {
             entity_type: EntityType::TableShape,
-            index: table_index,
+            entity_id: table_id,
             children: Vec::new(),
         };
         for child in cells {
@@ -269,52 +265,57 @@ impl Session {
 
 // element list accessors
 impl Session {
-    pub fn get_text(&self, index: usize) -> &ShapeText {
-        &self.texts[index]
+    pub fn get_text(&self, id: EntityID) -> &ShapeText {
+        &self.texts[&id]
+    }
+    
+    pub fn get_group(&self, id: EntityID) -> &ShapeGroup {
+        &self.groups[&id]
+    }
+    
+    pub fn get_horizontal_stack(&self, id: EntityID) -> &HorizontalStack {
+        &self.horizontal_stacks[&id]
+    }
+    
+    pub fn get_vertical_stack(&self, id: EntityID) -> &VerticalStack {
+        &self.vertical_stacks[&id]
+    }
+    
+    pub fn get_ellipse(&self, id: EntityID) -> &ShapeEllipse {
+        &self.ellipses[&id]
+    }
+    
+    pub fn get_line(&self, id: EntityID) -> &ShapeLine {
+        &self.lines[&id]
     }
 
-    pub fn get_group(&self, index: usize) -> &ShapeGroup {
-        &self.groups[index]
+    pub fn get_text_line(&self, id: EntityID) -> &TextLine {
+        &self.textlines[&id]
     }
-
-    pub fn get_horizontal_stack(&self, index: usize) -> &HorizontalStack {
-        &self.horizontal_stacks[index]
+    
+    pub fn get_arrow(&self, id: EntityID) -> &ShapeArrow {
+        &self.arrows[&id]
     }
-
-    pub fn get_vertical_stack(&self, index: usize) -> &VerticalStack {
-        &self.vertical_stacks[index]
+    
+    pub fn get_table(&self, id: EntityID) -> &Table {
+        &self.tables[&id]
     }
-
-    pub fn get_ellipse(&self, index: usize) -> &ShapeEllipse {
-        &self.ellipses[index]
+    
+    pub fn get_image(&self, id: EntityID) -> &ShapeImage {
+        &self.images[&id]
     }
-
-    pub fn get_line(&self, index: usize) -> &ShapeLine {
-        &self.lines[index]
+    
+    pub fn get_box(&self, id: EntityID) -> &ShapeBox {
+        &self.boxes[&id]
     }
-
-    pub fn get_arrow(&self, index: usize) -> &ShapeArrow {
-        &self.arrows[index]
-    }
-
-    pub fn get_table(&self, index: usize) -> &Table {
-        &self.tables[index]
-    }
-
-    pub fn get_image(&self, index: usize) -> &ShapeImage {
-        &self.images[index]
-    }
-
-    pub fn get_box(&self, index: usize) -> &ShapeBox {
-        &self.boxes[index]
-    }
+     
 }
 
 
 //test
 #[cfg(test)]
 mod tests {
-    use crate::{get_entity_type_from_id, get_entity_index_from_id};
+    use crate::{get_entity_type_from_id,};
 
     use super::*;
 
@@ -340,17 +341,5 @@ mod tests {
         );
         assert_eq!(w, 60.0);
         assert_eq!(h, 12.0);
-    }
-
-    //Test entities
-    #[test]
-    fn test_session_entities() {
-        let mut session = Session::new();
-        let id = session.new_entity(EntityType::GroupShape);
-        //the id has 32 bits for the index and 32 bits for the type
-        let index = get_entity_index_from_id(id);
-        assert_eq!(index, 0);
-        let entity_type = get_entity_type_from_id(id);
-        assert_eq!(entity_type, EntityType::GroupShape);
     }
 }

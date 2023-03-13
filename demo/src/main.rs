@@ -27,9 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), text_options.clone());
         texts.push(text);
-        texts.push(get_test_table(&mut session));
+        //texts.push(get_test_table(&mut session));
     }
-    texts.push(get_test_table(&mut session));
+    //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let table = session.new_table(texts, 5, TableOptions::default());
 
