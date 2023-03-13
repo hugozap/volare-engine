@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /**
  * This object encapsulates diagram creation logic in a user friendly API
@@ -15,8 +13,6 @@ use std::rc::Rc;
  */
 //use TextOptions
 use crate::{components::*, get_entity_index_from_id};
-//wrap library features in a struct
-use crate::layout;
 
 const MAX_ENTITIES: usize = 1000;
 pub struct Session {

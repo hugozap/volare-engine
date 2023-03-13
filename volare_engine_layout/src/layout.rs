@@ -1,11 +1,9 @@
 /* Layout calculation for each type of entity */
 
-use std::cell::{RefCell, RefMut};
-use std::rc::Rc;
 
 use crate::{
     session::DiagramTreeNode, EntityID, EntityType, HorizontalStack, Session, ShapeArrow, ShapeBox,
-    ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack,TextOptions, BoxOptions
+    ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack
 };
 
 /* The box layout includes the padding and the dimensions

@@ -6,15 +6,15 @@ pub mod measure_text;
 //import svg_renderer
 use svg_renderer::*;
 //import layout
-use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, BoxOptions, TableOptions, session::DiagramTreeNode};
+use volare_engine_layout::{layout::layout_tree_node, Session, TextOptions, TableOptions, session::DiagramTreeNode};
 //import io modules to write to file
-use std::{fs::File, cell::RefCell, rc::Rc};
+use std::{fs::File};
 use measure_text::measure_text;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = Session::new();
-    let textOptions = TextOptions {
+    let text_options = TextOptions {
         font_family: "Roboto".to_string(),
         font_size: 12.0,
         line_width: 100,
@@ -22,21 +22,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     session.set_measure_text_fn(measure_text);
 
-    let mut text = session.new_text("Hello World\nthis is a multiline\ndemo!\nlet's add another line here!!", textOptions.clone());
-    let box1 = session.new_box(text, BoxOptions{
-        border_radius: 1.0,
-        fill_color: "white".to_string(),
-        ..Default::default()
-    });
-
-    //get box
-
-    let mut group = session.new_group(vec![box1]);
-
     //Create a list of 10 texts
     let mut texts = Vec::new();
     for i in 0..10 {
-        let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), textOptions.clone());
+        let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), text_options.clone());
         texts.push(text);
         texts.push(get_test_table(&mut session));
     }
@@ -54,7 +43,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut path = temp_dir.clone();
     path.push("svg-render-test.svg");
     let mut file = File::create(path).unwrap();
-    render(&session, &table, &mut file);
+    let res = render(&session, &table, &mut file);
+    if res.is_err() {
+        println!("Error: {}", res.err().unwrap());
+        //exit with error code 1
+        std::process::exit(1);
+    }
     
     //print file contents to console stdout
     let mut path = temp_dir.clone();
@@ -69,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 //function that returns a sample table with 10 elements and 3 columns
 
 fn get_test_table(session: &mut Session) -> DiagramTreeNode {
-    let textOptions = TextOptions {
+    let text_options = TextOptions {
         font_family: "Roboto".to_string(),
         font_size: 12.0,
         line_width: 100,
@@ -78,7 +72,7 @@ fn get_test_table(session: &mut Session) -> DiagramTreeNode {
     //Create a list of 10 texts
     let mut texts = Vec::new();
     for i in 0..10 {
-        let text = session.new_text(&format!("Text hey {} \nthis is a multiline text", i), textOptions.clone());
+        let text = session.new_text(&format!("Text hey {} \nthis is a multiline text", i), text_options.clone());
         texts.push(text);
     }
     //Create a table for the texts with 2 columns

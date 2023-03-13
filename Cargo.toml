@@ -1,7 +1,11 @@
 [workspace]
 
 members = [
-    "./demo",
     "./volare_engine_layout",
-    "./svg_renderer"
+    "./svg_renderer",
+    "./demo"
 ]
+
+# build command that builds all members
+[build]
+command = "cargo build --all"

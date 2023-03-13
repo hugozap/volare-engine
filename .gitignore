@@ -3,3 +3,4 @@ target/*
 .rustc_info.json
 target/debug/**
 target/debug
+**/.DS_Store
