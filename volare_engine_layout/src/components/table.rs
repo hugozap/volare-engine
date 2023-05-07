@@ -11,7 +11,8 @@ pub struct Table {
     pub entity: EntityID,
     pub cols: usize, 
     pub cells: Vec<EntityID>,
-    pub lines: Vec<EntityID>,
+    pub col_lines: Vec<EntityID>,
+    pub row_lines: Vec<EntityID>,
     pub table_options: TableOptions,
 }
 
@@ -24,7 +25,8 @@ impl Clone for Table {
             entity: self.entity,
             cols: self.cols,
             cells: self.cells.clone(),
-            lines: self.lines.clone(),
+            col_lines: self.col_lines.clone(),
+            row_lines: self.row_lines.clone(),
             table_options: self.table_options.clone(),
         }
     }
@@ -32,12 +34,13 @@ impl Clone for Table {
 
 //constructor that receives only the table options
 impl Table {
-    pub fn new(entity: EntityID,cells: Vec<EntityID>,  cols: usize, table_options: TableOptions) -> Table {
+    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, table_options: TableOptions) -> Table {
         Table {
             entity,
             cols,
             cells,
-            lines: Vec::new(),
+            col_lines,
+            row_lines ,
             table_options,
         }
     }

@@ -243,8 +243,27 @@ impl DiagramBuilder {
         for cell in &cells {
             cell_ids.push(cell.entity_id);
         }
+        //create entities for the col and row lines
+        let mut col_lines = Vec::new();
+        for i in 0..cols {
+            let line_id = self.new_entity(EntityType::LineShape);
+            let line = ShapeLine::new(line_id, LineOptions::new());
+            self.lines.insert(line_id, line);
+            col_lines.push(line_id);
+
+        }
+        let num_rows = cells.len() / cols;
+        let mut row_lines = Vec::new();
+        for i in 0..num_rows {
+            let line_id = self.new_entity(EntityType::LineShape);
+            let line = ShapeLine::new(line_id, LineOptions::new());
+            self.lines.insert(line_id, line);
+            row_lines.push(line_id);
+        }
+
         let table_id = self.new_entity(EntityType::TableShape);
-        let table =  Table::new(table_id, cell_ids, cols, options);
+        let table =  Table::new(table_id, cell_ids, col_lines.clone(), row_lines.clone(), cols, options);
+
         self.tables.insert(table_id, table);
         let mut node = DiagramTreeNode {
             entity_type: EntityType::TableShape,
@@ -254,6 +273,14 @@ impl DiagramBuilder {
         for child in cells {
             node.add_child(child)
         }
+        //add the lines
+        for line in col_lines {
+            node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
+        }
+        for line in row_lines {
+            node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
+        }
+   
         node
 
     }

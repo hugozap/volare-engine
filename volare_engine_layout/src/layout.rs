@@ -192,6 +192,10 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     let mut row_heights: Vec<f64> = Vec::new();
     let mut col_widths: Vec<f64> = Vec::new();
 
+     // Add variables to store line positions
+     let mut horizontal_line_positions: Vec<f64> = Vec::new();
+     let mut vertical_line_positions: Vec<f64> = Vec::new();
+
     //initialize rows and cols
     for (i, elem) in table.cells.iter().enumerate() {
         let row = i / table.cols;
@@ -233,9 +237,27 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         for (j,elem) in col.iter().enumerate() {
             session.set_position(*elem, x + table.table_options.cell_padding as f64, y + table.table_options.cell_padding as f64);
             y += row_heights[j];
+            
         }
+
+        x += col_widths[i];   
+    }
+
+    //Update the position of the horizontal lines
+    let mut y = 0.0;
+    for (i, row) in rows.iter().enumerate() {
+        horizontal_line_positions.push(y);
+        y += row_heights[i];
+    }
+
+    //Update the position of the vertical lines
+    let mut x = 0.0;
+    for (i, col) in cols.iter().enumerate() {
+        vertical_line_positions.push(x);
         x += col_widths[i];
     }
+
+ 
 
     //update the size of the table
     let mut width = 0.0;
@@ -253,6 +275,26 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     println!("Table size: {:?}", (width, height));
 
     session.set_size(table.entity, width, height);
+
+       //We need to update the position of the horizontal lines and their size
+       for (i, line) in table.row_lines.iter().enumerate() {
+        //get the size of the line (should be 0,0 by default)
+        let line_size = session.get_size(*line);
+        //set the y position of the horizontal line, x will be 0
+        session.set_position(*line, 0.0, horizontal_line_positions[i]);
+        //update the size, we only need to update the height and leave the width as it is (0 by default)
+        session.set_size(*line, width, line_size.1);
+    }
+
+    for (i, line) in table.col_lines.iter().enumerate() {
+        //get the size of the line (should be 0,0 by default)
+        let line_size = session.get_size(*line);
+        //set the x position of the vertical line, y will be 0
+        session.set_position(*line, vertical_line_positions[i], 0.0);
+        //update the size, we only need to update the width and leave the height as it is (0 by default)
+        session.set_size(*line, line_size.0, height);
+    }
+
 }
 
 
