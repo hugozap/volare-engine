@@ -6,7 +6,7 @@ pub mod measure_text;
 //import svg_renderer
 use svg_renderer::*;
 //import layout
-use volare_engine_layout::{layout::layout_tree_node, DiagramBuilder, TextOptions, TableOptions, diagram_builder::DiagramTreeNode};
+use volare_engine_layout::{layout::layout_tree_node, DiagramBuilder, TextOptions, TableOptions, diagram_builder::DiagramTreeNode, EllipseOptions};
 //import io modules to write to file
 use std::{fs::File};
 use measure_text::measure_text;
@@ -23,15 +23,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     session.set_measure_text_fn(measure_text);
 
     //Create a list of 10 texts
-    let mut texts = Vec::new();
+    let mut table_items = Vec::new();
     for i in 0..10 {
         let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), text_options.clone());
-        texts.push(text);
+        table_items.push(text);
         //texts.push(get_test_table(&mut session));
     }
+    //Add a couple of ellipses
+    let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
+       fill_color: "red".to_string(),
+       stroke_color: "black".to_string(),
+       stroke_width: 1.0,
+    });
+    
+    table_items.push(ellipse);
+    
+    //Now add 10 ellipses
+    for i in 0..10 {
+        let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
+            fill_color: "red".to_string(),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+         });
+        table_items.push(ellipse);
+    }
+
+    //create a paragraph of lorem ipsum
+    let lorem_ipsum = br#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla euismod, nunc eget aliquam ultricies, nunc nisl ultricies nunc, vitae aliquam nisl nisl vitae nisl. Nul
+    sdfasdfadsfadsfasdfasdfasdfasdfasdfasd asdf asdjf; asdkfja k;sldjfalsjd fjas;kdlfjlasdfj; asdjf; asdfasdfasdlkfj;alksdjfajsdfkasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf asdjf asdfjajsd fasdjfkajsdfasd
+    asdfasdfasdflkja;ksdf asdf a"#;
+
+    //create text shape
+    let text = session.new_text(std::str::from_utf8(lorem_ipsum).unwrap(), text_options.clone());
+    table_items.push(text);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
-    let table = session.new_table(texts, 5, TableOptions::default());
+    let table = session.new_table(table_items, 5, TableOptions::default());
 
     // Calculate layout
     layout_tree_node(&mut session, &table);

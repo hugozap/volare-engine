@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /**
- * This object encapsulates diagram creation logic in a user friendly API
+ * This object encapsulates diagram creation logic.
  * Usage:
  *```rust 
  * let builder = DiagramBuilder::new();
@@ -254,7 +254,7 @@ impl DiagramBuilder {
         }
         let num_rows = cells.len() / cols;
         let mut row_lines = Vec::new();
-        for i in 0..num_rows {
+        for i in 0..num_rows+1 {
             let line_id = self.new_entity(EntityType::LineShape);
             let line = ShapeLine::new(line_id, LineOptions::new());
             self.lines.insert(line_id, line);
