@@ -181,6 +181,7 @@ dependencies = [
 name = "demo"
 version = "0.1.0"
 dependencies = [
+ "image_renderer",
  "resvg",
  "rusttype",
  "svg_renderer",

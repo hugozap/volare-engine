@@ -5,6 +5,9 @@ pub mod measure_text;
 
 //import svg_renderer
 use svg_renderer::*;
+use volare_engine_layout::renderer_base::Renderer;
+use image_renderer::PNGRenderer;
+
 //import layout
 use volare_engine_layout::{layout::layout_tree_node, DiagramBuilder, TextOptions, TableOptions, diagram_builder::DiagramTreeNode, EllipseOptions};
 //import io modules to write to file
@@ -68,9 +71,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     let mut path = temp_dir.clone();
-    path.push("svg-render-test.svg");
+    //path.push("svg-render-test.svg");
+    path.push("svg-render-test.png");
+    let image_renderer = PNGRenderer{};
     let mut file = File::create(path).unwrap();
-    let res = render(&session, &table, &mut file);
+    let res = image_renderer.render(&session, &table, &mut file);
+    //let res = render(&session, &table, &mut file);
     if res.is_err() {
         println!("Error: {}", res.err().unwrap());
         //exit with error code 1
@@ -79,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     //print file contents to console stdout
     let mut path = temp_dir.clone();
-    path.push("svg-render-test.svg");
+    path.push("svg-render-test.png");
     //let contents = std::fs::read_to_string(path).unwrap();
     //print path name to stdout
     println!("SVG file written to: {}", path.to_str().unwrap());
