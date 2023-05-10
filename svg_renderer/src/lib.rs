@@ -4,13 +4,16 @@ use volare_engine_layout::*;
 //use error
 use std::io::Error;
 
-// Entry point for the SVG renderer
-// The renderer will write the SVG to the output stream
-pub fn render<W: Write>(
+pub struct SVGRenderer;
+
+impl<W: Write> Renderer<W> for SVGRenderer {
+    
+ fn render(
+    &self,
     session: &DiagramBuilder,
     diagram_node: &DiagramTreeNode,
     stream: &mut W,
-) -> Result<(), Error> {
+) -> Result<(), RendererError> {
     let mut svg = String::new();
     let root_size = session.get_size(diagram_node.entity_id);
     let root_pos = session.get_position(diagram_node.entity_id);
@@ -28,9 +31,12 @@ pub fn render<W: Write>(
     //close svg tag
     svg.push_str("</svg>");
     svg.push_str("\n");
-    stream.write_all(svg.as_bytes())?;
+    stream.write_all(svg.as_bytes()).map_err(|e| RendererError::new(&e.to_string()));
     Ok(())
 }
+}
+
+
 
 // Render a node and its children
 fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {

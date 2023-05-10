@@ -4,7 +4,7 @@
 pub mod measure_text;
 
 //import svg_renderer
-use svg_renderer::*;
+use svg_renderer::SVGRenderer;
 use volare_engine_layout::renderer_base::Renderer;
 use image_renderer::PNGRenderer;
 
@@ -72,8 +72,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create path for ~/temp/svg-render-test.svg
     let mut path = temp_dir.clone();
     //path.push("svg-render-test.svg");
-    path.push("svg-render-test.png");
-    let image_renderer = PNGRenderer{};
+    path.push("svg-render-test.svg");
+    let image_renderer = SVGRenderer{};
     let mut file = File::create(path).unwrap();
     let res = image_renderer.render(&session, &table, &mut file);
     //let res = render(&session, &table, &mut file);
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     //print file contents to console stdout
     let mut path = temp_dir.clone();
-    path.push("svg-render-test.png");
+    path.push("svg-render-test.svg");
     //let contents = std::fs::read_to_string(path).unwrap();
     //print path name to stdout
     println!("SVG file written to: {}", path.to_str().unwrap());
