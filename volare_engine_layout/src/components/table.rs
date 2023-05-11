@@ -2,6 +2,15 @@
 //use EntityID
 use crate::components::*;
 
+
+pub struct TableOptions {
+    pub fill_color: String,
+    pub header_fill_color: String,
+    pub border_color: String,
+    pub border_width: usize,
+    pub cell_padding: usize,
+}
+
 /* A table contains a list of rows, each row has a cell 
 * which is a group that contains other elements.
 
@@ -13,6 +22,7 @@ pub struct Table {
     pub cells: Vec<EntityID>,
     pub col_lines: Vec<EntityID>,
     pub row_lines: Vec<EntityID>,
+    pub header_rect: EntityID,
     pub table_options: TableOptions,
 }
 
@@ -28,19 +38,21 @@ impl Clone for Table {
             col_lines: self.col_lines.clone(),
             row_lines: self.row_lines.clone(),
             table_options: self.table_options.clone(),
+            header_rect: self.header_rect,
         }
     }
 }
 
 //constructor that receives only the table options
 impl Table {
-    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, table_options: TableOptions) -> Table {
+    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, header_rect: EntityID, table_options: TableOptions) -> Table {
         Table {
             entity,
             cols,
             cells,
             col_lines,
             row_lines ,
+            header_rect, 
             table_options,
         }
     }
@@ -61,12 +73,7 @@ impl Entity for Table {
 }
 
 
-pub struct TableOptions {
-    pub fill_color: String,
-    pub border_color: String,
-    pub border_width: usize,
-    pub cell_padding: usize,
-}
+
 
 //defaults
 impl Default for TableOptions {
@@ -74,6 +81,7 @@ impl Default for TableOptions {
         TableOptions {
             fill_color: String::from("white"),
             border_color: String::from("black"),
+            header_fill_color: String::from("lightgray"),
             border_width: 1,
             cell_padding: 20,
         }
@@ -84,6 +92,7 @@ impl Clone for TableOptions {
     fn clone(&self) -> Self {
         TableOptions {
             fill_color: self.fill_color.clone(),
+            header_fill_color: self.header_fill_color.clone(),
             border_color: self.border_color.clone(),
             border_width: self.border_width,
             cell_padding: self.cell_padding,

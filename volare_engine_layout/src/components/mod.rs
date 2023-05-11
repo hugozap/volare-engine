@@ -64,6 +64,10 @@ impl Size {
 //default implementation of Entity
 impl dyn Entity {
 
+    pub fn as_rect(&self) -> Option<&ShapeRect> {
+        self.as_any().downcast_ref::<ShapeRect>()
+    }
+
     pub fn as_group(&self) -> Option<&ShapeGroup> {
         self.as_any().downcast_ref::<ShapeGroup>()
     }
@@ -104,6 +108,7 @@ impl dyn Entity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityType {
     BoxShape,
+    RectShape,
     TextShape,
     LineShape,
     ArrowShape,
@@ -210,6 +215,79 @@ impl BoxOptions {
         }
     }
 }
+
+
+
+/* A group of entities */
+
+//RectOptions
+#[derive(Default, Debug)]
+pub struct RectOptions {
+    pub fill_color: String,
+    pub stroke_color: String,
+    pub stroke_width: f64,
+    pub border_radius: f64,
+}
+
+impl Clone for RectOptions {
+    fn clone(&self) -> Self {
+        RectOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            border_radius: self.border_radius,
+        }
+    }
+}
+
+impl RectOptions {
+    pub fn new() -> RectOptions {
+        RectOptions {
+            fill_color: String::from("white"),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        }
+    }
+}
+
+pub struct ShapeRect {
+    pub entity: EntityID,
+    pub rect_options: RectOptions,
+}
+
+impl ShapeRect {
+    pub fn new(entity: EntityID, rect_options: RectOptions) -> ShapeRect {
+        ShapeRect {
+            entity,
+            rect_options,
+        }
+    }
+}
+
+impl Clone for ShapeRect {
+    fn clone(&self) -> Self {
+        ShapeRect {
+            entity: self.entity,
+            rect_options: self.rect_options.clone(),
+        }
+    }
+}
+
+impl Entity for ShapeRect {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::RectShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 
 /* A group of entities */
 pub struct ShapeGroup {
@@ -605,6 +683,8 @@ impl EllipseOptions {
     }
 }
 
+
+
 pub struct ShapeImage {
     pub entity: EntityID,
     //base64 encoded image
@@ -635,4 +715,14 @@ impl Entity for ShapeImage {
         self
     }
 
+}
+
+impl ShapeImage {
+    pub fn new(entity: EntityID, image: String, preferred_size: (f64, f64)) -> ShapeImage {
+        ShapeImage {
+            entity,
+            image,
+            preferred_size,
+        }
+    }
 }

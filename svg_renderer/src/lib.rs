@@ -74,12 +74,33 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
         EntityType::TableShape => {
             render_table(session, &mut svg, entity_id, node);
         }
+        //Image
+        EntityType::ImageShape => {
+            render_image(session, &mut svg, entity_id, node);
+        }
         _ => {
             svg.push_str("");
         }
     }
 
     svg
+}
+
+fn render_image(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let image_shape = session.get_image(node.entity_id);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    //Render base64 image
+    //Note: the base64 should start with data:image/png;base64,
+    svg.push_str(&format!(r#"<image x="0" y="0" width="{}" height="{}" xlink:href="{}" />"#,
+     size.0, 
+     size.1, 
+     image_shape.image));
+    svg.push_str("</g>");
 }
 
 fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
@@ -152,6 +173,8 @@ fn render_table(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,
     let size = session.get_size(entity_id);
     let table_shape = session.get_table(node.entity_id);
     let pos = session.get_position(entity_id);
+    
+    let header_size = session.get_size(table_shape.header_rect);
 
 
     svg.push_str(&format!(
@@ -166,6 +189,16 @@ fn render_table(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,
         table_shape.table_options.border_color,
         table_shape.table_options.border_width
     ));
+
+    //render header element
+    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" />"#,
+        header_size.0, 
+        header_size.1, 
+        table_shape.table_options.header_fill_color,
+        table_shape.table_options.border_color,
+        table_shape.table_options.border_width
+    ));
+
     for child in node.children.iter() {
         svg.push_str(render_node(child, session).as_str());
     }

@@ -59,6 +59,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create text shape
     let text = session.new_text(std::str::from_utf8(lorem_ipsum).unwrap(), text_options.clone());
     table_items.push(text);
+    
+    //Add sample image
+    let sampleImage = session.new_image(&getSampleImage(), (200.0, 600.0));
+    table_items.push(sampleImage);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let table = session.new_table(table_items, 5, TableOptions::default());
@@ -93,6 +97,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn getSampleImage() -> String{
+    //load from assets/sample-image.base64 included in the crate
+    let image_base64 = include_str!("../assets/sample-image.base64");
+    image_base64.to_string()
+}
+
 //function that returns a sample table with 10 elements and 3 columns
 
 fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
@@ -108,7 +118,12 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
         let text = session.new_text(&format!("Text hey {} \nthis is a multiline text", i), text_options.clone());
         texts.push(text);
     }
+    //create a table options object with all defaults except the header color
+    let table_options = TableOptions {
+        header_fill_color: "red".to_string(),
+        ..Default::default()
+    };
     //Create a table for the texts with 2 columns
-    let table = session.new_table(texts, 3, TableOptions::default());
+    let table = session.new_table(texts, 3, table_options);
     table
 }

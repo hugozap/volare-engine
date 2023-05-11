@@ -3,17 +3,17 @@ use std::collections::HashMap;
 /**
  * This object encapsulates diagram creation logic.
  * Usage:
- *```rust 
+ *```rust
  * let builder = DiagramBuilder::new();
  * let group = builder.new_group(
  *   builder.new_box(builder.new_text("Hello World!"), BoxOptions{fill_color: "white".to_string(), stroke_color: "black".to_string(), stroke_width: 1.0, padding: 10.0, round_corners: false, border_radius: 0.0}),
  * );
- * 
+ *
  *
  *
  */
 //use TextOptions
-use crate::{components::*};
+use crate::components::*;
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (f64, f64)>,
@@ -22,9 +22,9 @@ pub struct DiagramBuilder {
     pub sizes: HashMap<EntityID, Size>,
     entity_id_counter: usize,
 
-
     // Components
     boxes: HashMap<EntityID, ShapeBox>,
+    rectangles: HashMap<EntityID, ShapeRect>,
     groups: HashMap<EntityID, ShapeGroup>,
     texts: HashMap<EntityID, ShapeText>,
     textlines: HashMap<EntityID, TextLine>,
@@ -35,21 +35,19 @@ pub struct DiagramBuilder {
     arrows: HashMap<EntityID, ShapeArrow>,
     tables: HashMap<EntityID, Table>,
     images: HashMap<EntityID, ShapeImage>,
-    
 }
 
 // Stores the type of entity and the index of the entity in the corresponding vector
 // Used when building the diagram tree.
 #[derive(Debug, Clone)]
- pub struct DiagramTreeNode{
-
+pub struct DiagramTreeNode {
     pub entity_type: EntityType,
     // Index of the entity in the corresponding vector
     pub entity_id: EntityID,
     pub children: Vec<Box<DiagramTreeNode>>,
- }
+}
 
- impl DiagramTreeNode {
+impl DiagramTreeNode {
     fn new(entity_type: EntityType, id: EntityID) -> DiagramTreeNode {
         DiagramTreeNode {
             entity_type,
@@ -61,7 +59,7 @@ pub struct DiagramBuilder {
     fn add_child(&mut self, child: DiagramTreeNode) {
         self.children.push(Box::new(child));
     }
- }
+}
 
 /* New architecture (data driven)
  * We have an array of entities, each entity is an id
@@ -75,13 +73,12 @@ impl DiagramBuilder {
     pub fn new() -> DiagramBuilder {
         DiagramBuilder {
             entity_id_counter: 0,
-            measure_text: Some(|_text, _text_options| {
-                (0.0,0.0)
-            }),
-            entities: Vec::new() ,
+            measure_text: Some(|_text, _text_options| (0.0, 0.0)),
+            entities: Vec::new(),
             positions: HashMap::new(),
             sizes: HashMap::new(),
             boxes: HashMap::new(),
+            rectangles: HashMap::new(),
             groups: HashMap::new(),
             texts: HashMap::new(),
             textlines: HashMap::new(),
@@ -92,8 +89,7 @@ impl DiagramBuilder {
             arrows: HashMap::new(),
             tables: HashMap::new(),
             images: HashMap::new(),
-
-       }
+        }
     }
 
     /* Create a new entity of a given type
@@ -122,10 +118,7 @@ impl DiagramBuilder {
     pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (f64, f64)) {
         println!("Setting measure text function");
         self.measure_text = Option::Some(measure_text);
-
     }
-
-    
 
     //get the position of an entity
     pub fn get_position(&self, entity_id: EntityID) -> (f64, f64) {
@@ -152,14 +145,17 @@ impl DiagramBuilder {
         size.h = height;
     }
 
-
-    // This methods are used to build the diagram tree
-    // TODO: review the architecture of this
+    /**
+     * Architecture note:
+     * the new_element methods should only create the necessary elements
+     * without calculating the position and size.
+     * That will be done in the layout layer.
+     */
 
     // Wraps an element in a box
-    pub fn new_box(&mut self, child: DiagramTreeNode,options: BoxOptions) -> DiagramTreeNode {
+    pub fn new_box(&mut self, child: DiagramTreeNode, options: BoxOptions) -> DiagramTreeNode {
         let box_id = self.new_entity(EntityType::BoxShape);
-       
+
         let sbox = ShapeBox::new(box_id, child.entity_id, options);
         self.boxes.insert(box_id, sbox);
         let mut node = DiagramTreeNode {
@@ -171,7 +167,6 @@ impl DiagramBuilder {
         node
     }
 
-
     // Creates a new Text element
     // text: the text to display
     // options: the options for the text
@@ -182,15 +177,18 @@ impl DiagramBuilder {
         let text_id = self.new_entity(EntityType::TextShape);
         //create the lines
         let text_lines = textwrap::wrap(&text, options.line_width);
-        let lines:Vec<EntityID> = text_lines.iter().map(|line| {
-            let line_id = self.new_entity(EntityType::TextLine);
-            let text_line = TextLine{
-                entity: line_id,
-                text: line.to_string(),
-            };
-            self.textlines.insert(line_id, text_line);
-            line_id
-        }).collect();
+        let lines: Vec<EntityID> = text_lines
+            .iter()
+            .map(|line| {
+                let line_id = self.new_entity(EntityType::TextLine);
+                let text_line = TextLine {
+                    entity: line_id,
+                    text: line.to_string(),
+                };
+                self.textlines.insert(line_id, text_line);
+                line_id
+            })
+            .collect();
 
         let text = ShapeText::new(text_id, text, options, &lines);
         self.texts.insert(text_id, text);
@@ -205,27 +203,38 @@ impl DiagramBuilder {
         DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
-    pub fn new_elipse(&mut self,center: (f64,f64) , radius: (f64,f64),  options: EllipseOptions) -> DiagramTreeNode {
+    pub fn new_elipse(
+        &mut self,
+        center: (f64, f64),
+        radius: (f64, f64),
+        options: EllipseOptions,
+    ) -> DiagramTreeNode {
         let ellipse_id = self.new_entity(EntityType::EllipseShape);
         let ellipse = ShapeEllipse::new(ellipse_id, center, radius, options);
         self.ellipses.insert(ellipse_id, ellipse);
         DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id)
     }
 
+    pub fn new_image(&mut self, image_data: &str, preferred_size:(f64, f64)) -> DiagramTreeNode {
+        let image_id = self.new_entity(EntityType::ImageShape);
+        let image = ShapeImage::new(image_id, image_data.to_string(), preferred_size);
+        self.images.insert(image_id, image);
+        DiagramTreeNode::new(EntityType::ImageShape, image_id)
+    }
+
     // Creates a new Group.
     pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
         let group_id = self.new_entity(EntityType::GroupShape);
-        let mut sgroup = ShapeGroup{
-         entity: group_id,
-         elements: Vec::new(),   
+        let mut sgroup = ShapeGroup {
+            entity: group_id,
+            elements: Vec::new(),
         };
-         let mut node = DiagramTreeNode {
+        let mut node = DiagramTreeNode {
             entity_type: EntityType::GroupShape,
             entity_id: group_id,
             children: Vec::new(),
         };
- 
-     
+
         //set children
         for child in children {
             sgroup.elements.push(child.entity_id);
@@ -234,11 +243,15 @@ impl DiagramBuilder {
 
         self.groups.insert(group_id, sgroup);
 
-        
         node
-    }  
+    }
 
-    pub fn new_table(&mut self, cells: Vec<DiagramTreeNode>,cols: usize,   options: TableOptions) -> DiagramTreeNode {
+    pub fn new_table(
+        &mut self,
+        cells: Vec<DiagramTreeNode>,
+        cols: usize,
+        options: TableOptions,
+    ) -> DiagramTreeNode {
         let mut cell_ids = Vec::new();
         for cell in &cells {
             cell_ids.push(cell.entity_id);
@@ -250,19 +263,36 @@ impl DiagramBuilder {
             let line = ShapeLine::new(line_id, LineOptions::new());
             self.lines.insert(line_id, line);
             col_lines.push(line_id);
-
         }
         let num_rows = cells.len() / cols;
         let mut row_lines = Vec::new();
-        for i in 0..num_rows+1 {
+        for i in 0..num_rows + 1 {
             let line_id = self.new_entity(EntityType::LineShape);
             let line = ShapeLine::new(line_id, LineOptions::new());
             self.lines.insert(line_id, line);
             row_lines.push(line_id);
         }
 
+        //Add a rectangle for the header row
+        let header_id = self.new_entity(EntityType::BoxShape);
+        let rect_options = RectOptions{
+            fill_color:"red".to_string(),
+            ..Default::default()
+        };
+        let header_rect = ShapeRect::new(header_id, rect_options);
+        self.rectangles.insert(header_id, header_rect);
+
+
         let table_id = self.new_entity(EntityType::TableShape);
-        let table =  Table::new(table_id, cell_ids, col_lines.clone(), row_lines.clone(), cols, options);
+        let table = Table::new(
+            table_id,
+            cell_ids,
+            col_lines.clone(),
+            row_lines.clone(),
+            cols,
+            header_id,
+            options.clone(),
+        );
 
         self.tables.insert(table_id, table);
         let mut node = DiagramTreeNode {
@@ -273,6 +303,7 @@ impl DiagramBuilder {
         for child in cells {
             node.add_child(child)
         }
+
         //add the lines
         for line in col_lines {
             node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
@@ -280,9 +311,9 @@ impl DiagramBuilder {
         for line in row_lines {
             node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
         }
-   
-        node
+        node.add_child(DiagramTreeNode::new(EntityType::RectShape, header_id));
 
+        node
     }
 }
 
@@ -291,23 +322,23 @@ impl DiagramBuilder {
     pub fn get_text(&self, id: EntityID) -> &ShapeText {
         &self.texts[&id]
     }
-    
+
     pub fn get_group(&self, id: EntityID) -> &ShapeGroup {
         &self.groups[&id]
     }
-    
+
     pub fn get_horizontal_stack(&self, id: EntityID) -> &HorizontalStack {
         &self.horizontal_stacks[&id]
     }
-    
+
     pub fn get_vertical_stack(&self, id: EntityID) -> &VerticalStack {
         &self.vertical_stacks[&id]
     }
-    
+
     pub fn get_ellipse(&self, id: EntityID) -> &ShapeEllipse {
         &self.ellipses[&id]
     }
-    
+
     pub fn get_line(&self, id: EntityID) -> &ShapeLine {
         &self.lines[&id]
     }
@@ -315,45 +346,39 @@ impl DiagramBuilder {
     pub fn get_text_line(&self, id: EntityID) -> &TextLine {
         &self.textlines[&id]
     }
-    
+
     pub fn get_arrow(&self, id: EntityID) -> &ShapeArrow {
         &self.arrows[&id]
     }
-    
+
     pub fn get_table(&self, id: EntityID) -> &Table {
         &self.tables[&id]
     }
-    
+
     pub fn get_image(&self, id: EntityID) -> &ShapeImage {
         &self.images[&id]
     }
-    
+
     pub fn get_box(&self, id: EntityID) -> &ShapeBox {
         &self.boxes[&id]
     }
-     
 }
-
 
 //test
 #[cfg(test)]
 mod tests {
-    use crate::{get_entity_type_from_id,};
+    use crate::get_entity_type_from_id;
 
     use super::*;
 
     #[test]
     fn test_session() {
         let mut session = DiagramBuilder::new();
-        
-        
-        session.set_measure_text_fn(|text, text_options| {
-            let textW:f64 = text.len() as f64 * text_options.font_size as f64;
 
-            (
-                textW,
-                text_options.font_size.into(),
-            )
+        session.set_measure_text_fn(|text, text_options| {
+            let textW: f64 = text.len() as f64 * text_options.font_size as f64;
+
+            (textW, text_options.font_size.into())
         });
         let (w, h) = session.measure_text.unwrap()(
             "hello",

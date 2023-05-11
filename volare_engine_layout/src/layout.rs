@@ -1,9 +1,9 @@
 /* Layout calculation for each type of entity */
 
-
 use crate::{
-    diagram_builder::DiagramTreeNode, EntityID, EntityType, HorizontalStack, DiagramBuilder, ShapeArrow, ShapeBox,
-    ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table, VerticalStack
+    diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, HorizontalStack,
+    ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table,
+    VerticalStack,
 };
 
 /* The box layout includes the padding and the dimensions
@@ -36,6 +36,8 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     );
 }
 
+
+
 /**
  * Update the group size based on the size of the elements.
  * Group elements must be positioned before calling this function.
@@ -67,7 +69,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         let mut max_line_width = 0f64;
         for line in shape_text.lines.iter() {
             println!("Line: {:?}", line);
-            let  textLine = session.get_text_line(*line);
+            let textLine = session.get_text_line(*line);
             let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
             if line_size.0 > max_line_width {
                 max_line_width = line_size.0;
@@ -79,7 +81,10 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
 
         println!("max_line_width: {}", max_line_width);
         //set the size of the text element
-        println!("Setting size to text entity: {} - {} {}", shape_text.entity, max_line_width, y);
+        println!(
+            "Setting size to text entity: {} - {} {}",
+            shape_text.entity, max_line_width, y
+        );
         session.set_size(shape_text.entity, max_line_width, y);
     }
 }
@@ -192,9 +197,9 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     let mut row_heights: Vec<f64> = Vec::new();
     let mut col_widths: Vec<f64> = Vec::new();
 
-     // Add variables to store line positions
-     let mut horizontal_line_positions: Vec<f64> = Vec::new();
-     let mut vertical_line_positions: Vec<f64> = Vec::new();
+    // Add variables to store line positions
+    let mut horizontal_line_positions: Vec<f64> = Vec::new();
+    let mut vertical_line_positions: Vec<f64> = Vec::new();
 
     //initialize rows and cols
     for (i, elem) in table.cells.iter().enumerate() {
@@ -215,10 +220,10 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         //update the row and col sizes
         let elem_size = session.get_size(*elem);
         if elem_size.0 > col_widths[col] {
-            col_widths[col] = elem_size.0 + table.table_options.cell_padding as f64*2.0;
+            col_widths[col] = elem_size.0 + table.table_options.cell_padding as f64 * 2.0;
         }
         if elem_size.1 > row_heights[row] {
-            row_heights[row] = elem_size.1 + table.table_options.cell_padding as f64*2.0;
+            row_heights[row] = elem_size.1 + table.table_options.cell_padding as f64 * 2.0;
         }
     }
 
@@ -234,13 +239,16 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     let mut x = 0.0;
     for (i, col) in cols.iter().enumerate() {
         let mut y = 0.0;
-        for (j,elem) in col.iter().enumerate() {
-            session.set_position(*elem, x + table.table_options.cell_padding as f64, y + table.table_options.cell_padding as f64);
+        for (j, elem) in col.iter().enumerate() {
+            session.set_position(
+                *elem,
+                x + table.table_options.cell_padding as f64,
+                y + table.table_options.cell_padding as f64,
+            );
             y += row_heights[j];
-            
         }
 
-        x += col_widths[i];   
+        x += col_widths[i];
     }
 
     //Update the position of the horizontal lines
@@ -257,8 +265,6 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         x += col_widths[i];
     }
 
- 
-
     //update the size of the table
     let mut width = 0.0;
     let mut height = 0.0;
@@ -270,14 +276,17 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     for h in row_heights.iter() {
         height += h;
     }
-    
+
+    //Update the size of the table header rect
+    session.set_size(table.header_rect, width, row_heights[0]);
+
     //print the size of the table
     println!("Table size: {:?}", (width, height));
 
     session.set_size(table.entity, width, height);
 
-       //We need to update the position of the horizontal lines and their size
-       for (i, line) in table.row_lines.iter().enumerate() {
+    //We need to update the position of the horizontal lines and their size
+    for (i, line) in table.row_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
         let line_size = session.get_size(*line);
         //set the y position of the horizontal line, x will be 0
@@ -294,9 +303,7 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         //update the size, we only need to update the width and leave the height as it is (0 by default)
         session.set_size(*line, line_size.0, height);
     }
-
 }
-
 
 pub struct BoundingBox {
     x: f64,
@@ -306,13 +313,12 @@ pub struct BoundingBox {
 }
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
-
     //start with the bottom elements
     for child in &root.children {
         println!("Layout child: {:?}", child);
         layout_tree_node(session, child);
         //print size and position of the child
-       
+
         let child_size = session.get_size(child.entity_id);
         let child_pos = session.get_position(child.entity_id);
         println!("Child size: {:?}", child_size);
@@ -324,7 +330,6 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     match root.entity_type {
         EntityType::TextShape => {
             {
-    
                 //get the Shape text entity
                 let text = session.get_text(root.entity_id).clone();
                 layout_text(session, &text);
@@ -335,6 +340,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             let box_shape = session.get_box(root.entity_id).clone();
             layout_box(session, &box_shape);
         }
+
+        EntityType::RectShape => {
+            //Do nothing, the rect is already laid out
+        }
+        
         EntityType::LineShape => {
             //get the Shape line entity
             let line = session.get_line(root.entity_id).clone();
@@ -393,33 +403,33 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     }
 }
 
-
 //import textoptions defined in src/components/mod.rs
-use crate::components::TextOptions;
 use crate::components::BoxOptions;
+use crate::components::TextOptions;
 //Test that a box with a text inside is correctly laid out
 #[test]
 fn test_layout_box_with_text() {
     let mut session = DiagramBuilder::new();
     session.set_measure_text_fn(|_, _| (10.0, 10.0));
-    let text = session.new_text("hello", TextOptions{
-        font_size: 20.0,
-        line_width: 200,
-        ..Default::default()
-    });
-    let box_options = BoxOptions{
+    let text = session.new_text(
+        "hello",
+        TextOptions {
+            font_size: 20.0,
+            line_width: 200,
+            ..Default::default()
+        },
+    );
+    let box_options = BoxOptions {
         padding: 10.0,
         ..Default::default()
     };
-    let box_shape = session.new_box(text.clone(), box_options.clone() );
+    let box_shape = session.new_box(text.clone(), box_options.clone());
 
     //print box options
     println!("--box options: {:?}", box_options);
 
-
     //layout the box
     layout_tree_node(&mut session, &box_shape);
-
 
     let text_position = session.get_position(text.entity_id);
     let text_size = session.get_size(text.entity_id);
@@ -428,17 +438,11 @@ fn test_layout_box_with_text() {
     let box_size = session.get_size(box_shape.entity_id);
     //assert equal positions
 
-
     // assert the box size is greater than the text size
     println!("box size: {:?}", box_size);
     println!("text size: {:?}", text_size);
-        // and the text size should not be zero
+    // and the text size should not be zero
     assert!(text_size.0 > 0.0);
     assert_eq!(box_size.0, 30.0);
     assert!(box_size.1 > text_size.1);
-
-
-
-
-
 }
