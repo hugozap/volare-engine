@@ -1,6 +1,7 @@
 
 pub mod table;
 
+use core::fmt;
 use std::any::Any;
 
 pub use crate::components::table::*;
@@ -183,9 +184,118 @@ impl ShapeBox {
     }
 }
 
+#[derive(Debug)]
+pub enum GradientStop {
+    ColorStop { offset: f64, color: String },
+    OpacityStop { offset: f64, opacity: f64 },
+}
+
+#[derive(Debug)]
+pub struct LinearGradient {
+    pub x1: f64,
+    pub y1: f64,
+    pub x2: f64,
+    pub y2: f64,
+    pub stops: Vec<GradientStop>,
+}
+
+impl LinearGradient {
+    pub fn new(x1: f64, y1: f64, x2: f64, y2: f64, stops: Vec<GradientStop>) -> Self {
+        LinearGradient {
+            x1,
+            y1,
+            x2,
+            y2,
+            stops,
+        }
+    }
+}
+
+impl Clone for GradientStop {
+    fn clone(&self) -> Self {
+        match self {
+            GradientStop::ColorStop { offset, color } => GradientStop::ColorStop {
+                offset: *offset,
+                color: color.clone(),
+            },
+            GradientStop::OpacityStop { offset, opacity } => GradientStop::OpacityStop {
+                offset: *offset,
+                opacity: *opacity,
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RadialGradient {
+    pub cx: f64,
+    pub cy: f64,
+    pub r: f64,
+    pub stops: Vec<GradientStop>,
+}
+
+impl Clone for RadialGradient {
+    fn clone(&self) -> Self {
+        RadialGradient {
+            cx: self.cx,
+            cy: self.cy,
+            r: self.r,
+            stops: self.stops.clone(),
+        }
+    }
+}
+
+impl Clone for LinearGradient {
+    fn clone(&self) -> Self {
+        LinearGradient {
+            x1: self.x1,
+            y1: self.y1,
+            x2: self.x2,
+            y2: self.y2,
+            stops: self.stops.clone(),
+        }
+    }
+}
+
+
+
+#[derive(Debug)]
+pub enum Fill {
+    Color(String),
+    LinearGradient(LinearGradient),
+    RadialGradient(RadialGradient),
+}
+
+impl Clone for Fill {
+    fn clone(&self) -> Self {
+        match self {
+            Fill::Color(color) => Fill::Color(color.clone()),
+            Fill::LinearGradient(gradient) => Fill::LinearGradient(gradient.clone()),
+            Fill::RadialGradient(gradient) => Fill::RadialGradient(gradient.clone()),
+        }
+    }
+}
+//default trait for fill
+impl Default for Fill {
+    fn default() -> Self {
+        Fill::Color(String::from("white"))
+    }
+}
+
+//display for fill
+impl fmt::Display for Fill {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Fill::Color(color) => write!(f, "{}", color),
+            Fill::LinearGradient(gradient) => write!(f, "{:?}", gradient),
+            Fill::RadialGradient(gradient) => write!(f, "{:?}", gradient),
+        }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct BoxOptions {
-    pub fill_color: String,
+    pub fill_color: Fill,
     pub stroke_color: String,
     pub stroke_width: f64,
     pub padding: f64,
@@ -200,6 +310,7 @@ impl Clone for BoxOptions {
             stroke_width: self.stroke_width,
             padding: self.padding,
             border_radius: self.border_radius,
+
         }
     }
 }
@@ -207,7 +318,7 @@ impl Clone for BoxOptions {
 impl BoxOptions {
     pub fn new() -> BoxOptions {
         BoxOptions {
-            fill_color: String::from("white"),
+            fill_color: Fill::Color(String::from("white")),
             stroke_color: String::from("black"),
             stroke_width: 1.0,
             padding: 10.0,

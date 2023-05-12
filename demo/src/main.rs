@@ -5,7 +5,7 @@ pub mod measure_text;
 
 //import svg_renderer
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::renderer_base::Renderer;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop};
 use image_renderer::PNGRenderer;
 
 //import layout
@@ -38,6 +38,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
        stroke_color: "black".to_string(),
        stroke_width: 1.0,
     });
+
+    //Create an ellipse and wrap it with a box
+    let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
+        fill_color: "red".to_string(),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+     });
+
+   
     
     table_items.push(ellipse);
     
@@ -105,6 +114,7 @@ fn getSampleImage() -> String{
 
 //function that returns a sample table with 10 elements and 3 columns
 
+/// .
 fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     let text_options = TextOptions {
         font_family: "Roboto".to_string(),

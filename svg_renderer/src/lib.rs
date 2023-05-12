@@ -307,7 +307,7 @@ fn test_render_box_with_group() {
     let mut session = DiagramBuilder::new();
     let group = session.new_group(Vec::new());
     let box_ = session.new_box(group, BoxOptions{
-        fill_color: "white".to_string(),
+        fill_color:Fill::Color("white".to_string()),
         stroke_color: "black".to_string(),
         stroke_width: 1.0,
         padding: 0.0,
@@ -360,7 +360,7 @@ fn test_render_box_rounded_corners_with_group() {
     let mut session = DiagramBuilder::new();
     let group = session.new_group(Vec::new());
     let box_ = session.new_box(group, BoxOptions{
-        fill_color: "white".to_string(),
+        fill_color: Fill::Color("white".to_string()),
         stroke_color: "black".to_string(),
         stroke_width: 1.0,
         padding: 0.0,
