@@ -214,14 +214,36 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
-     size.0, 
-     size.1, 
-     box_shape.box_options.fill_color,
-     box_shape.box_options.stroke_color,
-     box_shape.box_options.stroke_width,
-     box_shape.box_options.border_radius,
-     box_shape.box_options.border_radius));
+    
+    // svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+    //  size.0, 
+    //  size.1, 
+    //  box_shape.box_options.fill_color,
+    //  box_shape.box_options.stroke_color,
+    //  box_shape.box_options.stroke_width,
+    //  box_shape.box_options.border_radius,
+    //  box_shape.box_options.border_radius));
+
+    match &box_shape.box_options.fill_color {
+        Fill::Color(color) => {
+            svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+            size.0, 
+            size.1, 
+            color,
+            box_shape.box_options.stroke_color,
+            box_shape.box_options.stroke_width,
+            box_shape.box_options.border_radius,
+            box_shape.box_options.border_radius));
+        }
+        ,
+        Fill::LinearGradient(_linearGrad) => {
+            todo!()
+        },
+        Fill::RadialGradient(_) => todo!(),
+    }
+
+
+
     //Paint the inner node
     for child in node.children.iter() {
         svg.push_str(render_node(child, session).as_str())
@@ -229,6 +251,9 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
 
     svg.push_str("</g>");
 }
+
+//Same as box but with support for fill gradients
+
 
 fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let text_shape = session.get_text(node.entity_id);
