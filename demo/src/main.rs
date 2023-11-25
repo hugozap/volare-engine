@@ -25,8 +25,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     session.set_measure_text_fn(measure_text);
 
+    //Create a table with 10 ellipses
+    let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
+    for i in 0..10 {
+        let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
+            fill_color: "red".to_string(),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+         });
+        table_items_ellipses.push(ellipse);
+    }
+    let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
+
     //Create a list of 10 texts
     let mut table_items = Vec::new();
+    table_items.push(tableEllipses);
     for i in 0..10 {
         let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), text_options.clone());
         table_items.push(text);
@@ -71,10 +84,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     //Add sample image
     let sampleImage = session.new_image(&getSampleImage(), (200.0, 600.0));
-    table_items.push(sampleImage);
+   // table_items.push(sampleImage);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
-    let table = session.new_table(table_items, 5, TableOptions::default());
+    let mut toptions = TableOptions::default();
+    toptions.cell_padding = 5;
+    let table = session.new_table(table_items, 5,toptions );
 
     // Calculate layout
     layout_tree_node(&mut session, &table);

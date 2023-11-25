@@ -289,19 +289,23 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     for (i, line) in table.row_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
         let line_size = session.get_size(*line);
-        //set the y position of the horizontal line, x will be 0
-        session.set_position(*line, 0.0, horizontal_line_positions[i]);
-        //update the size, we only need to update the height and leave the width as it is (0 by default)
-        session.set_size(*line, width, line_size.1);
+        if i < horizontal_line_positions.len() {
+            //set the y position of the horizontal line, x will be 0
+            session.set_position(*line, 0.0, horizontal_line_positions[i]);
+            //update the size, we only need to update the height and leave the width as it is (0 by default)
+            session.set_size(*line, width, line_size.1);
+        }
     }
 
     for (i, line) in table.col_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
         let line_size = session.get_size(*line);
-        //set the x position of the vertical line, y will be 0
-        session.set_position(*line, vertical_line_positions[i], 0.0);
-        //update the size, we only need to update the width and leave the height as it is (0 by default)
-        session.set_size(*line, line_size.0, height);
+        if i < vertical_line_positions.len() {
+            //set the x position of the vertical line, y will be 0
+            session.set_position(*line, vertical_line_positions[i], 0.0);
+            //update the size, we only need to update the width and leave the height as it is (0 by default)
+            session.set_size(*line, line_size.0, height);
+        }
     }
 }
 
