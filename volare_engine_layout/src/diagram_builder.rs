@@ -35,6 +35,7 @@ pub struct DiagramBuilder {
     arrows: HashMap<EntityID, ShapeArrow>,
     tables: HashMap<EntityID, Table>,
     images: HashMap<EntityID, ShapeImage>,
+    polylines: HashMap<EntityID, PolyLine>,
 }
 
 // Stores the type of entity and the index of the entity in the corresponding vector
@@ -89,6 +90,7 @@ impl DiagramBuilder {
             arrows: HashMap::new(),
             tables: HashMap::new(),
             images: HashMap::new(),
+            polylines: HashMap::new(),
         }
     }
 
@@ -315,6 +317,13 @@ impl DiagramBuilder {
 
         node
     }
+
+    pub fn new_polyline(&mut self, points: Vec<(f64, f64)>, options: LineOptions) -> DiagramTreeNode {
+        let polyline_id = self.new_entity(EntityType::PolyLine);
+        let polyline = PolyLine::new(polyline_id, points, options);
+        self.polylines.insert(polyline_id, polyline);
+        DiagramTreeNode::new(EntityType::PolyLine, polyline_id)
+    }
 }
 
 // element list accessors
@@ -361,6 +370,10 @@ impl DiagramBuilder {
 
     pub fn get_box(&self, id: EntityID) -> &ShapeBox {
         &self.boxes[&id]
+    }
+
+    pub fn get_polyline(&self, id: EntityID) -> &PolyLine {
+        &self.polylines[&id]
     }
 }
 

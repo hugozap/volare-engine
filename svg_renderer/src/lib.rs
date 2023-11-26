@@ -78,13 +78,38 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
         EntityType::ImageShape => {
             render_image(session, &mut svg, entity_id, node);
         }
-        _ => {
-            svg.push_str("");
+        
+        EntityType:: PolyLine => {
+            render_polyline(session, &mut svg, entity_id, node);
         }
+
+        _ => {}
+        
     }
 
     svg
 }
+fn render_polyline(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let polyline_shape = session.get_polyline(node.entity_id);
+    let pos = session.get_position(entity_id);
+
+    // Convert points to a space-separated string
+    let points_str = polyline_shape.points.iter()
+        .map(|&(x, y)| format!("{},{}", x, y))
+        .collect::<Vec<_>>().join(" ");
+
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<polyline points="{}" stroke="{}" stroke-width="{}" fill="none" />"#,
+        points_str,
+        polyline_shape.line_options.stroke_color,
+        polyline_shape.line_options.stroke_width));
+    svg.push_str("</g>");
+}
+
 
 fn render_image(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);

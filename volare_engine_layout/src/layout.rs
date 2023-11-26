@@ -3,7 +3,7 @@
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, HorizontalStack,
     ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table,
-    VerticalStack,
+    VerticalStack,PolyLine,
 };
 
 /* The box layout includes the padding and the dimensions
@@ -309,6 +309,30 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     }
 }
 
+pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
+    let mut x = 0.0;
+    let mut y = 0.0;
+    let mut width = 0.0;
+    let mut height = 0.0;
+    for (i, point) in polyline.points.iter().enumerate() {
+        if i == 0 {
+            x = point.0;
+            y = point.1;
+        } else {
+            if point.0 < x {
+                width += x - point.0;
+                x = point.0;
+            }
+            if point.1 < y {
+                height += y - point.1;
+                y = point.1;
+            }
+        }
+    }
+    session.set_size(polyline.entity, width, height);
+}
+
+
 pub struct BoundingBox {
     x: f64,
     y: f64,
@@ -391,6 +415,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             //get the Group entity
             let group = session.get_group(root.entity_id).clone();
             layout_group(session, &group);
+        }
+
+        EntityType::PolyLine => {
+            let polyline = session.get_polyline(root.entity_id).clone();
+            layout_polyline(session, &polyline);
         }
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),

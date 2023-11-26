@@ -120,6 +120,7 @@ pub enum EntityType {
     HorizontalStackShape,
     TableShape,
     TextLine,
+    PolyLine
 }
 
 pub fn get_entity_type(entity_id: EntityID) -> EntityType {
@@ -134,6 +135,8 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
         7 => EntityType::VerticalStackShape,
         8 => EntityType::HorizontalStackShape,
         9 => EntityType::TableShape,
+        10 => EntityType::TextLine,
+        11 => EntityType::PolyLine,
         _ => panic!("Invalid entity type"),
     }
 }
@@ -661,6 +664,46 @@ impl LineOptions {
         LineOptions {
             stroke_color: String::from("black"),
             stroke_width: 1.0,
+        }
+    }
+}
+
+pub struct PolyLine {
+    pub entity: EntityID,
+    pub points: Vec<(f64, f64)>,
+    pub line_options: LineOptions,
+}
+
+impl PolyLine {
+    pub fn new(entity: EntityID, points: Vec<(f64, f64)>, line_options: LineOptions) -> PolyLine {
+        PolyLine {
+            entity,
+            points,
+            line_options,
+        }
+    }
+}
+
+impl Entity for PolyLine {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::PolyLine
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Clone for PolyLine {
+    fn clone(&self) -> Self {
+        PolyLine {
+            entity: self.entity,
+            points: self.points.clone(),
+            line_options: self.line_options.clone(),
         }
     }
 }

@@ -1,18 +1,20 @@
 // Create an SVG file with all supported elements
 
-
 pub mod measure_text;
 
 //import svg_renderer
-use svg_renderer::SVGRenderer;
-use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop};
 use image_renderer::PNGRenderer;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
 
 //import layout
-use volare_engine_layout::{layout::layout_tree_node, DiagramBuilder, TextOptions, TableOptions, diagram_builder::DiagramTreeNode, EllipseOptions};
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
+    TableOptions, TextOptions,
+};
 //import io modules to write to file
-use std::{fs::File};
 use measure_text::measure_text;
+use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
@@ -25,14 +27,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     session.set_measure_text_fn(measure_text);
 
+    //Create a polyline for a star
+    let mut points = Vec::new();
+    // Outer vertex
+    points.push((10.0, 0.0));
+    // Inner vertex
+    points.push((16.0, 16.0));
+    // Outer vertex
+    points.push((0.0, 6.0));
+    // Inner vertex
+    points.push((20.0, 6.0));
+    // Outer vertex
+    points.push((4.0, 16.0));
+    // Closing the shape by returning to the first point
+    points.push((10.0, 0.0));
+
+    let polyline = session.new_polyline(
+        points,
+        LineOptions {
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+        },
+    );
+
     //Create a table with 10 ellipses
     let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
     for i in 0..10 {
-        let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
-            fill_color: "red".to_string(),
-            stroke_color: "black".to_string(),
-            stroke_width: 1.0,
-         });
+        let ellipse = session.new_elipse(
+            (0.0, 0.0),
+            (10.0, 10.0),
+            EllipseOptions {
+                fill_color: "red".to_string(),
+                stroke_color: "black".to_string(),
+                stroke_width: 1.0,
+            },
+        );
         table_items_ellipses.push(ellipse);
     }
     let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
@@ -40,36 +69,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create a list of 10 texts
     let mut table_items = Vec::new();
     table_items.push(tableEllipses);
+    table_items.push(polyline);
     for i in 0..10 {
-        let text = session.new_text(&format!("Text hey ☣ {} \nthis is a multiline text", i), text_options.clone());
+        let text = session.new_text(
+            &format!("Text hey ☣ {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
         table_items.push(text);
         //texts.push(get_test_table(&mut session));
     }
     //Add a couple of ellipses
-    let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
-       fill_color: "red".to_string(),
-       stroke_color: "black".to_string(),
-       stroke_width: 1.0,
-    });
-
-    //Create an ellipse and wrap it with a box
-    let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
-        fill_color: "red".to_string(),
-        stroke_color: "black".to_string(),
-        stroke_width: 1.0,
-     });
-
-   
-    
-    table_items.push(ellipse);
-    
-    //Now add 10 ellipses
-    for i in 0..10 {
-        let ellipse = session.new_elipse((0.0,0.0), (10.0,10.0), EllipseOptions{
+    let ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (10.0, 10.0),
+        EllipseOptions {
             fill_color: "red".to_string(),
             stroke_color: "black".to_string(),
             stroke_width: 1.0,
-         });
+        },
+    );
+
+    //Create an ellipse and wrap it with a box
+    let ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (10.0, 10.0),
+        EllipseOptions {
+            fill_color: "red".to_string(),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+        },
+    );
+
+    table_items.push(ellipse);
+
+    //Now add 10 ellipses
+    for i in 0..10 {
+        let ellipse = session.new_elipse(
+            (0.0, 0.0),
+            (10.0, 10.0),
+            EllipseOptions {
+                fill_color: "red".to_string(),
+                stroke_color: "black".to_string(),
+                stroke_width: 1.0,
+            },
+        );
         table_items.push(ellipse);
     }
 
@@ -79,17 +122,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     asdfasdfasdflkja;ksdf asdf a"#;
 
     //create text shape
-    let text = session.new_text(std::str::from_utf8(lorem_ipsum).unwrap(), text_options.clone());
+    let text = session.new_text(
+        std::str::from_utf8(lorem_ipsum).unwrap(),
+        text_options.clone(),
+    );
     table_items.push(text);
-    
+
     //Add sample image
     let sampleImage = session.new_image(&getSampleImage(), (200.0, 600.0));
-   // table_items.push(sampleImage);
+    // table_items.push(sampleImage);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
     toptions.cell_padding = 5;
-    let table = session.new_table(table_items, 5,toptions );
+    let table = session.new_table(table_items, 5, toptions);
 
     // Calculate layout
     layout_tree_node(&mut session, &table);
@@ -101,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut path = temp_dir.clone();
     //path.push("svg-render-test.svg");
     path.push("svg-render-test.svg");
-    let image_renderer = SVGRenderer{};
+    let image_renderer = SVGRenderer {};
     let mut file = File::create(path).unwrap();
     let res = image_renderer.render(&session, &table, &mut file);
     //let res = render(&session, &table, &mut file);
@@ -110,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         //exit with error code 1
         std::process::exit(1);
     }
-    
+
     //print file contents to console stdout
     let mut path = temp_dir.clone();
     path.push("svg-render-test.svg");
@@ -121,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn getSampleImage() -> String{
+fn getSampleImage() -> String {
     //load from assets/sample-image.base64 included in the crate
     let image_base64 = include_str!("../assets/sample-image.base64");
     image_base64.to_string()
@@ -140,7 +186,10 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     //Create a list of 10 texts
     let mut texts = Vec::new();
     for i in 0..10 {
-        let text = session.new_text(&format!("Text hey {} \nthis is a multiline text", i), text_options.clone());
+        let text = session.new_text(
+            &format!("Text hey {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
         texts.push(text);
     }
     //create a table options object with all defaults except the header color
