@@ -144,25 +144,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //get path for ~/temp
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
-    let mut path = temp_dir.clone();
-    //path.push("svg-render-test.svg");
-    path.push("svg-render-test.svg");
-    let image_renderer = SVGRenderer {};
-    let mut file = File::create(path).unwrap();
-    let res = image_renderer.render(&session, &table, &mut file);
-    //let res = render(&session, &table, &mut file);
-    if res.is_err() {
-        println!("Error: {}", res.err().unwrap());
-        //exit with error code 1
+    // Render SVG
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("svg-render-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path).unwrap();
+    let svg_res = svg_renderer.render(&session, &table, &mut svg_file);
+    if svg_res.is_err() {
+        println!("SVG Render Error: {}", svg_res.err().unwrap());
         std::process::exit(1);
     }
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
 
-    //print file contents to console stdout
-    let mut path = temp_dir.clone();
-    path.push("svg-render-test.svg");
-    //let contents = std::fs::read_to_string(path).unwrap();
-    //print path name to stdout
-    println!("SVG file written to: {}", path.to_str().unwrap());
+    // Render PNG
+    let mut png_path = temp_dir.clone();
+    png_path.push("png-render-test.png");
+    let png_renderer = PNGRenderer {};
+    let mut png_file = File::create(&png_path).unwrap();
+    let png_res = png_renderer.render(&session, &table, &mut png_file);
+    if png_res.is_err() {
+        println!("PNG Render Error: {}", png_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("PNG file written to: {}", png_path.to_str().unwrap());
 
     Ok(())
 }

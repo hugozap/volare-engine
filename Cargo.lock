@@ -306,6 +306,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "imageproc",
+ "rusttype",
  "volare_engine_layout",
 ]
 
