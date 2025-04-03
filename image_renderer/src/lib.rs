@@ -335,8 +335,8 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
     let dpi = 120.0; // Better quality without excessive scaling
     let dpi_scale_factor = dpi / 72.0;
     
-    // Use a slightly reduced scaling factor specifically for fonts to avoid spacing issues
-    let text_scaling = (scaling_factor * 0.85) as f32; 
+    // Ensure we use a scaling factor that matches the layout measurements
+    let text_scaling = (scaling_factor * 0.95) as f32; // Increased to 0.95 to match measurement DPI better
     let font_size = text_shape.text_options.font_size * dpi_scale_factor * text_scaling;
     let font_scale = Scale::uniform(font_size);
     
@@ -346,8 +346,11 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
         let line_pos = session.get_position(line.entity);
         
         // Convert to i32 for our draw functions with scaling
-        let line_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32;
-        let line_y = (pos.1 + line_pos.1 * scaling_factor).round() as i32;
+        // Add a small margin for visual spacing
+        let text_margin_horizontal = 4; // Small margin for visual spacing
+        let text_margin_vertical = 2;   // Small vertical margin for better spacing
+        let line_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32 + text_margin_horizontal;
+        let line_y = (pos.1 + line_pos.1 * scaling_factor).round() as i32 + text_margin_vertical;
         
         // Skip text if it would be drawn outside the image bounds
         if line_x < 0 || line_x >= imgbuf.width() as i32 || 
@@ -355,7 +358,16 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
             continue;
         }
         
-        // Draw high quality anti-aliased text
+        // Get the entity size that contains this text to use as the max width
+        // The table layout module should have already determined the optimal cell size
+        let containing_entity_size = session.get_size(node.entity_id);
+        
+        // Calculate the effective width available for text
+        // We don't need a large safety margin since we're not truncating
+        let max_text_width = (containing_entity_size.0 * scaling_factor).round() as i32 - 
+                             (text_margin_horizontal * 2);
+        
+        // Draw high quality anti-aliased text without truncation
         draw_high_quality_text(
             imgbuf,
             &line.text,
@@ -363,7 +375,8 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
             line_y,
             &font,
             font_scale,
-            text_color
+            text_color,
+            max_text_width
         );
     }
 }
@@ -376,18 +389,21 @@ fn draw_high_quality_text(
     y: i32,
     font: &Font,
     scale: Scale,
-    color: Rgba<u8>
+    color: Rgba<u8>,
+    _max_width: i32  // We keep this parameter for API compatibility but don't use it
 ) {
     // Calculate the vertical metrics once
     let v_metrics = font.v_metrics(scale);
     let offset_y = v_metrics.ascent;
-
+    
     // Layout the glyphs in the text with proper positioning
     let mut caret = rusttype::point(0.0, offset_y);
     let mut last_glyph_id = None;
+    let mut glyphs: Vec<rusttype::PositionedGlyph> = Vec::new();
     
     // Process each character for proper kerning and positioning
-    let glyphs: Vec<_> = text.chars().map(|c| {
+    for c in text.chars() {
+        // Create the glyph
         let base_glyph = font.glyph(c);
         
         // Apply kerning if we have a previous glyph
@@ -397,14 +413,17 @@ fn draw_high_quality_text(
         
         last_glyph_id = Some(base_glyph.id());
         
-        // Position the glyph
-        let glyph = base_glyph.scaled(scale).positioned(caret);
+        // Get the advance width before we consume the glyph with scaled()
+        let advance_width = base_glyph.scaled(scale).h_metrics().advance_width;
         
-        // Advance the caret
-        caret.x += glyph.unpositioned().h_metrics().advance_width;
+        // Position the glyph and add it to our collection
+        // We need to create the glyph again since scaled() consumes it
+        let positioned_glyph = font.glyph(c).scaled(scale).positioned(caret);
+        glyphs.push(positioned_glyph);
         
-        glyph
-    }).collect();
+        // Advance the caret using our saved advance_width
+        caret.x += advance_width;
+    }
 
     // Draw each glyph with anti-aliasing
     for glyph in &glyphs {
