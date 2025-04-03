@@ -96,7 +96,8 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             render_horizontal_stack(session, imgbuf, entity_id, node, abs_pos);
         }
         EntityType::TableShape => {
-            // Basic table support - just render it as a box for now
+            // Get table properties
+            let table_shape = session.get_table(entity_id);
             let size = session.get_size(entity_id);
             let width = size.0.ceil() as u32;
             let height = size.1.ceil() as u32;
@@ -105,8 +106,81 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             
             if x >= 0 && y >= 0 && width > 0 && height > 0 &&
                x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
+                // Draw table outer border with specified color
+                let border_color = parse_color(&table_shape.table_options.border_color);
+                let border_width = table_shape.table_options.border_width as u32;
+                
+                // Draw outer border (make it thicker for visibility)
                 let rect = Rect::at(x, y).of_size(width, height);
-                draw_hollow_rect_mut(imgbuf, rect, Rgba([0, 0, 0, 255]));
+                for i in 0..border_width {
+                    if i < border_width {
+                        let inner_rect = Rect::at(x + i as i32, y + i as i32)
+                            .of_size(width - 2 * i, height - 2 * i);
+                        draw_hollow_rect_mut(imgbuf, inner_rect, border_color);
+                    }
+                }
+                
+                // Draw header area
+                let header_rect = session.get_size(table_shape.header_rect);
+                let header_height = header_rect.1.ceil() as u32;
+                if header_height > 0 {
+                    // Get the exact header color from the options
+                    let header_fill_color = parse_color(&table_shape.table_options.header_fill_color);
+                    
+                    // Debug print the header color
+                    println!("Table header color: {}", table_shape.table_options.header_fill_color);
+                    
+                    // Fill the header area
+                    let header_rect = Rect::at(x, y).of_size(width, header_height);
+                    draw_filled_rect_mut(imgbuf, header_rect, header_fill_color);
+                    draw_hollow_rect_mut(imgbuf, header_rect, border_color);
+                }
+                
+                // Use the predefined grid lines from the table
+                // This uses the actual table_shape.col_lines and table_shape.row_lines
+                // instead of trying to infer them from child positions
+                
+                // Draw column lines (vertical dividers)
+                for col_line_id in &table_shape.col_lines {
+                    // Get the position of this column line
+                    let line_pos = session.get_position(*col_line_id);
+                    let line_size = session.get_size(*col_line_id);
+                    
+                    // Calculate the absolute x position
+                    let line_x = (abs_pos.0 + line_pos.0).round() as i32;
+                    
+                    // Only draw if the line is within the image bounds
+                    if line_x >= 0 && line_x < imgbuf.width() as i32 {
+                        // Draw a vertical line from top to bottom of table
+                        for i in 0..height {
+                            let y_pos = y + i as i32;
+                            if y_pos >= 0 && y_pos < imgbuf.height() as i32 {
+                                imgbuf.put_pixel(line_x as u32, y_pos as u32, border_color);
+                            }
+                        }
+                    }
+                }
+                
+                // Draw row lines (horizontal dividers)
+                for row_line_id in &table_shape.row_lines {
+                    // Get the position of this row line
+                    let line_pos = session.get_position(*row_line_id);
+                    let line_size = session.get_size(*row_line_id);
+                    
+                    // Calculate the absolute y position
+                    let line_y = (abs_pos.1 + line_pos.1).round() as i32;
+                    
+                    // Only draw if the line is within the image bounds
+                    if line_y >= 0 && line_y < imgbuf.height() as i32 {
+                        // Draw a horizontal line from left to right of table
+                        for i in 0..width {
+                            let x_pos = x + i as i32;
+                            if x_pos >= 0 && x_pos < imgbuf.width() as i32 {
+                                imgbuf.put_pixel(x_pos as u32, line_y as u32, border_color);
+                            }
+                        }
+                    }
+                }
                 
                 // Render children (cells)
                 for child in node.children.iter() {
@@ -115,7 +189,8 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             }
         }
         EntityType::EllipseShape => {
-            // Basic support - just render a box outline for ellipses
+            // Get ellipse properties
+            let ellipse_shape = session.get_ellipse(entity_id);
             let size = session.get_size(entity_id);
             let width = size.0.ceil() as u32;
             let height = size.1.ceil() as u32;
@@ -124,8 +199,57 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             
             if x >= 0 && y >= 0 && width > 0 && height > 0 &&
                x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
-                let rect = Rect::at(x, y).of_size(width, height);
-                draw_hollow_rect_mut(imgbuf, rect, Rgba([255, 0, 0, 255]));
+                // Get colors from the ellipse properties
+                let fill_color = parse_color(&ellipse_shape.ellipse_options.fill_color);
+                let stroke_color = parse_color(&ellipse_shape.ellipse_options.stroke_color);
+                
+                // Calculate center coordinates
+                let center_x = x + (width / 2) as i32;
+                let center_y = y + (height / 2) as i32;
+                let radius_x = (width / 2) as i32;
+                let radius_y = (height / 2) as i32;
+                
+                // Draw filled ellipse first, using floating point for more accurate ellipse equation
+                for py in y..y + height as i32 {
+                    if py < 0 || py >= imgbuf.height() as i32 {
+                        continue;  // Skip if outside vertical bounds
+                    }
+                    
+                    for px in x..x + width as i32 {
+                        if px < 0 || px >= imgbuf.width() as i32 {
+                            continue;  // Skip if outside horizontal bounds
+                        }
+                        
+                        // Calculate if this pixel is inside the ellipse using floating point
+                        // for higher precision: (x/a)² + (y/b)² <= 1
+                        let dx = (px - center_x) as f64;
+                        let dy = (py - center_y) as f64;
+                        let rx = radius_x as f64;
+                        let ry = radius_y as f64;
+                        
+                        let eq_value = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+                        
+                        if eq_value <= 1.0 {
+                            imgbuf.put_pixel(px as u32, py as u32, fill_color);
+                        }
+                    }
+                }
+                
+                // Draw the ellipse border with higher angle resolution for smoother appearance
+                for angle_deg in 0..720 {  // Use twice as many points for smoother outline
+                    let angle = angle_deg as f64 / 2.0;  // Convert to 0-360 range in half-degree steps
+                    let rad = angle * std::f64::consts::PI / 180.0;
+                    
+                    // Calculate border point position
+                    let border_x = center_x + (radius_x as f64 * rad.cos()) as i32;
+                    let border_y = center_y + (radius_y as f64 * rad.sin()) as i32;
+                    
+                    // Only draw if point is within image bounds
+                    if border_x >= 0 && border_x < imgbuf.width() as i32 && 
+                       border_y >= 0 && border_y < imgbuf.height() as i32 {
+                        imgbuf.put_pixel(border_x as u32, border_y as u32, stroke_color);
+                    }
+                }
             }
         }
         // For this initial implementation, we'll skip other shapes
@@ -263,14 +387,23 @@ fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _en
 
 // Helper function to convert color string to Rgba
 fn parse_color(color_str: &str) -> Rgba<u8> {
-    match color_str {
+    match color_str.to_lowercase().as_str() {
         "black" => Rgba([0, 0, 0, 255]),
         "white" => Rgba([255, 255, 255, 255]),
         "red" => Rgba([255, 0, 0, 255]),
         "green" => Rgba([0, 255, 0, 255]),
         "blue" => Rgba([0, 0, 255, 255]),
         "yellow" => Rgba([255, 255, 0, 255]),
+        "gray" | "grey" => Rgba([128, 128, 128, 255]),
+        "lightgray" | "lightgrey" | "light gray" | "light grey" => Rgba([200, 200, 200, 255]),
+        "darkgray" | "darkgrey" | "dark gray" | "dark grey" => Rgba([80, 80, 80, 255]),
+        "orange" => Rgba([255, 165, 0, 255]),
+        "purple" => Rgba([128, 0, 128, 255]),
+        "brown" => Rgba([165, 42, 42, 255]),
+        "cyan" => Rgba([0, 255, 255, 255]),
+        "magenta" | "pink" => Rgba([255, 0, 255, 255]),
         _ => {
+            println!("Parsing color: {}", color_str);
             // Handle hex color strings like "#RRGGBB" or "#RRGGBBAA"
             if color_str.starts_with('#') && (color_str.len() == 7 || color_str.len() == 9) {
                 let r = u8::from_str_radix(&color_str[1..3], 16).unwrap_or(0);
@@ -281,10 +414,12 @@ fn parse_color(color_str: &str) -> Rgba<u8> {
                 } else {
                     255
                 };
+                println!("Parsed hex color to RGBA: [{}, {}, {}, {}]", r, g, b, a);
                 Rgba([r, g, b, a])
             } else {
-                // Default to black if unrecognized color
-                Rgba([0, 0, 0, 255])
+                // Return a visible color for unknown colors - use pink to make it obvious
+                println!("WARNING: Unrecognized color '{}', defaulting to pink", color_str);
+                Rgba([255, 0, 255, 255])
             }
         }
     }
