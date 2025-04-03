@@ -3,6 +3,7 @@ use image::{Rgba, RgbaImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use rusttype::{Font, Scale};
+use bresenham::Bresenham;
 
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, 
@@ -29,9 +30,13 @@ impl<W: Write> Renderer<W> for PNGRenderer {
     ) -> Result<(), RendererError> {
         let root_size = session.get_size(diagram_node.entity_id);
         
-        // Ensure reasonable image dimensions
-        let width = (root_size.0.ceil() as u32).max(100);
-        let height = (root_size.1.ceil() as u32).max(100);
+        // Use a scaling factor for higher resolution output but don't scale too much
+        // 1.5 is a good balance between quality and maintaining layout proportions
+        let scaling_factor = 1.5; 
+        
+        // Calculate image dimensions with scaling
+        let width = ((root_size.0 * scaling_factor).ceil() as u32).max(200);
+        let height = ((root_size.1 * scaling_factor).ceil() as u32).max(200);
         
         // Debug output
         println!("Creating PNG image with dimensions: {}x{}", width, height);
@@ -50,8 +55,8 @@ impl<W: Write> Renderer<W> for PNGRenderer {
             imgbuf.put_pixel(width - 1, y, border_color);
         }
 
-        // Render the diagram to the image buffer
-        render_node(diagram_node, session, &mut imgbuf, (0.0, 0.0));
+        // Pass scaling factor to the render function
+        render_node(diagram_node, session, &mut imgbuf, (0.0, 0.0), scaling_factor);
 
         // Write the PNG image to the stream
         let encoder = image::png::PngEncoder::new(stream);
@@ -67,12 +72,15 @@ impl<W: Write> Renderer<W> for PNGRenderer {
 }
 
 // Render a node and its children
-fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut RgbaImage, parent_offset: (f64, f64)) {
+fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut RgbaImage, parent_offset: (f64, f64), scale: f64) {
     let entity_id = node.entity_id;
     let pos = session.get_position(entity_id);
     
-    // Calculate absolute position by adding parent offset
-    let abs_pos = (parent_offset.0 + pos.0, parent_offset.1 + pos.1);
+    // Calculate absolute position by adding parent offset, then apply scaling
+    let abs_pos = (
+        (parent_offset.0 + pos.0) * scale, 
+        (parent_offset.1 + pos.1) * scale
+    );
     
     // Debug output to track node positioning
     let size = session.get_size(entity_id);
@@ -81,26 +89,28 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
 
     match node.entity_type {
         EntityType::GroupShape => {
-            render_group(session, imgbuf, entity_id, node, abs_pos);
+            render_group(session, imgbuf, entity_id, node, abs_pos, scale);
         }
         EntityType::BoxShape => {
-            render_box(session, imgbuf, entity_id, node, abs_pos);
+            render_box(session, imgbuf, entity_id, node, abs_pos, scale);
         }
         EntityType::TextShape => {
-            render_text(session, imgbuf, entity_id, node, abs_pos);
+            render_text(session, imgbuf, entity_id, node, abs_pos, scale);
         }
         EntityType::VerticalStackShape => {
-            render_vertical_stack(session, imgbuf, entity_id, node, abs_pos);
+            render_vertical_stack(session, imgbuf, entity_id, node, abs_pos, scale);
         }
         EntityType::HorizontalStackShape => {
-            render_horizontal_stack(session, imgbuf, entity_id, node, abs_pos);
+            render_horizontal_stack(session, imgbuf, entity_id, node, abs_pos, scale);
         }
         EntityType::TableShape => {
             // Get table properties
             let table_shape = session.get_table(entity_id);
             let size = session.get_size(entity_id);
-            let width = size.0.ceil() as u32;
-            let height = size.1.ceil() as u32;
+            
+            // Apply scaling factor to dimensions
+            let width = (size.0 * scale).ceil() as u32;
+            let height = (size.1 * scale).ceil() as u32;
             let x = abs_pos.0.round() as i32;
             let y = abs_pos.1.round() as i32;
             
@@ -108,7 +118,7 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
                 // Draw table outer border with specified color
                 let border_color = parse_color(&table_shape.table_options.border_color);
-                let border_width = table_shape.table_options.border_width as u32;
+                let border_width = (table_shape.table_options.border_width as f64 * scale) as u32;
                 
                 // Draw outer border (make it thicker for visibility)
                 let rect = Rect::at(x, y).of_size(width, height);
@@ -122,7 +132,7 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                 
                 // Draw header area
                 let header_rect = session.get_size(table_shape.header_rect);
-                let header_height = header_rect.1.ceil() as u32;
+                let header_height = (header_rect.1 * scale).ceil() as u32;
                 if header_height > 0 {
                     // Get the exact header color from the options
                     let header_fill_color = parse_color(&table_shape.table_options.header_fill_color);
@@ -146,8 +156,8 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                     let line_pos = session.get_position(*col_line_id);
                     let line_size = session.get_size(*col_line_id);
                     
-                    // Calculate the absolute x position
-                    let line_x = (abs_pos.0 + line_pos.0).round() as i32;
+                    // Calculate the absolute x position with scaling
+                    let line_x = (abs_pos.0 + line_pos.0 * scale as f64).round() as i32;
                     
                     // Only draw if the line is within the image bounds
                     if line_x >= 0 && line_x < imgbuf.width() as i32 {
@@ -167,8 +177,8 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                     let line_pos = session.get_position(*row_line_id);
                     let line_size = session.get_size(*row_line_id);
                     
-                    // Calculate the absolute y position
-                    let line_y = (abs_pos.1 + line_pos.1).round() as i32;
+                    // Calculate the absolute y position with scaling
+                    let line_y = (abs_pos.1 + line_pos.1 * scale as f64).round() as i32;
                     
                     // Only draw if the line is within the image bounds
                     if line_y >= 0 && line_y < imgbuf.height() as i32 {
@@ -184,7 +194,7 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                 
                 // Render children (cells)
                 for child in node.children.iter() {
-                    render_node(child, session, imgbuf, abs_pos);
+                    render_node(child, session, imgbuf, abs_pos, scale);
                 }
             }
         }
@@ -192,8 +202,10 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             // Get ellipse properties
             let ellipse_shape = session.get_ellipse(entity_id);
             let size = session.get_size(entity_id);
-            let width = size.0.ceil() as u32;
-            let height = size.1.ceil() as u32;
+            
+            // Apply scaling factor to dimensions
+            let width = (size.0 * scale).ceil() as u32;
+            let height = (size.1 * scale).ceil() as u32;
             let x = abs_pos.0.round() as i32;
             let y = abs_pos.1.round() as i32;
             
@@ -235,21 +247,17 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                     }
                 }
                 
-                // Draw the ellipse border with higher angle resolution for smoother appearance
-                for angle_deg in 0..720 {  // Use twice as many points for smoother outline
-                    let angle = angle_deg as f64 / 2.0;  // Convert to 0-360 range in half-degree steps
-                    let rad = angle * std::f64::consts::PI / 180.0;
-                    
-                    // Calculate border point position
-                    let border_x = center_x + (radius_x as f64 * rad.cos()) as i32;
-                    let border_y = center_y + (radius_y as f64 * rad.sin()) as i32;
-                    
-                    // Only draw if point is within image bounds
-                    if border_x >= 0 && border_x < imgbuf.width() as i32 && 
-                       border_y >= 0 && border_y < imgbuf.height() as i32 {
-                        imgbuf.put_pixel(border_x as u32, border_y as u32, stroke_color);
-                    }
-                }
+                // Draw the ellipse border using a modified Bresenham algorithm for smoother outlines
+                // This implementation gives much higher quality anti-aliased edges
+                draw_anti_aliased_ellipse(
+                    imgbuf,
+                    center_x,
+                    center_y,
+                    radius_x,
+                    radius_y,
+                    stroke_color,
+                    (ellipse_shape.ellipse_options.stroke_width * scale as f64) as f32
+                );
             }
         }
         // For this initial implementation, we'll skip other shapes
@@ -257,21 +265,21 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
     }
 }
 
-fn render_group(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64)) {
+fn render_group(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
     for child in node.children.iter() {
-        render_node(child, session, imgbuf, pos);
+        render_node(child, session, imgbuf, pos, scale);
     }
 }
 
-fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64)) {
+fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
     let size = session.get_size(entity_id);
     let box_shape = session.get_box(node.entity_id);
     
-    // Convert to i32 for drawing functions
+    // Convert to i32 for drawing functions with scaling
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
-    let width = size.0.ceil() as u32;
-    let height = size.1.ceil() as u32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
     
     // Safety check to avoid drawing outside the image bounds
     if x < 0 || y < 0 || width == 0 || height == 0 || 
@@ -295,17 +303,26 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
         }
     }
     
-    // Draw border/stroke
+    // Draw border/stroke with scaled width
     let stroke_color = parse_color(&box_shape.box_options.stroke_color);
-    draw_hollow_rect_mut(imgbuf, rect, stroke_color);
+    let stroke_width = (box_shape.box_options.stroke_width * scale).ceil() as u32;
+    
+    // Draw border with proper thickness
+    for i in 0..stroke_width {
+        if i < stroke_width {
+            let inner_rect = Rect::at(x + i as i32, y + i as i32)
+                .of_size(width - 2 * i, height - 2 * i);
+            draw_hollow_rect_mut(imgbuf, inner_rect, stroke_color);
+        }
+    }
     
     // Render children inside the box
     for child in node.children.iter() {
-        render_node(child, session, imgbuf, pos);
+        render_node(child, session, imgbuf, pos, scale);
     }
 }
 
-fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64)) {
+fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scaling_factor: f64) {
     let text_shape = session.get_text(node.entity_id);
     let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
@@ -313,45 +330,112 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
     // Convert text color string to Rgba
     let text_color = parse_color(&text_shape.text_options.text_color);
     
-    // Web browsers use 96 dpi by default, but rusttype uses 72 dpi
-    let dpi = 96.0;
-    let scale_factor = dpi / 72.0;
-    let font_size = text_shape.text_options.font_size * scale_factor;
-    let scale = Scale::uniform(font_size);
+    // Calculate font scaling - be careful not to over-scale to maintain proper text layout
+    // We'll use a modest DPI increase for quality, but scale the font more conservatively
+    let dpi = 120.0; // Better quality without excessive scaling
+    let dpi_scale_factor = dpi / 72.0;
     
-    // Render each text line
+    // Use a slightly reduced scaling factor specifically for fonts to avoid spacing issues
+    let text_scaling = (scaling_factor * 0.85) as f32; 
+    let font_size = text_shape.text_options.font_size * dpi_scale_factor * text_scaling;
+    let font_scale = Scale::uniform(font_size);
+    
+    // Render each text line with custom anti-aliasing
     for line_id in text_shape.lines.iter() {
         let line = session.get_text_line(*line_id);
         let line_pos = session.get_position(line.entity);
         
-        // Convert to u32 for draw_text_mut
-        let line_x = (pos.0 + line_pos.0).round() as u32;
-        let line_y = (pos.1 + line_pos.1).round() as u32;
+        // Convert to i32 for our draw functions with scaling
+        let line_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32;
+        let line_y = (pos.1 + line_pos.1 * scaling_factor).round() as i32;
         
         // Skip text if it would be drawn outside the image bounds
-        if line_x >= imgbuf.width() || line_y >= imgbuf.height() {
+        if line_x < 0 || line_x >= imgbuf.width() as i32 || 
+           line_y < 0 || line_y >= imgbuf.height() as i32 {
             continue;
         }
         
-        draw_text_mut(
+        // Draw high quality anti-aliased text
+        draw_high_quality_text(
             imgbuf,
-            text_color,
+            &line.text,
             line_x,
             line_y,
-            scale,
             &font,
-            &line.text
+            font_scale,
+            text_color
         );
     }
 }
 
-fn render_vertical_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64)) {
+// Draw text with higher quality anti-aliasing
+fn draw_high_quality_text(
+    imgbuf: &mut RgbaImage,
+    text: &str,
+    x: i32,
+    y: i32,
+    font: &Font,
+    scale: Scale,
+    color: Rgba<u8>
+) {
+    // Calculate the vertical metrics once
+    let v_metrics = font.v_metrics(scale);
+    let offset_y = v_metrics.ascent;
+
+    // Layout the glyphs in the text with proper positioning
+    let mut caret = rusttype::point(0.0, offset_y);
+    let mut last_glyph_id = None;
+    
+    // Process each character for proper kerning and positioning
+    let glyphs: Vec<_> = text.chars().map(|c| {
+        let base_glyph = font.glyph(c);
+        
+        // Apply kerning if we have a previous glyph
+        if let Some(previous) = last_glyph_id {
+            caret.x += font.pair_kerning(scale, previous, base_glyph.id());
+        }
+        
+        last_glyph_id = Some(base_glyph.id());
+        
+        // Position the glyph
+        let glyph = base_glyph.scaled(scale).positioned(caret);
+        
+        // Advance the caret
+        caret.x += glyph.unpositioned().h_metrics().advance_width;
+        
+        glyph
+    }).collect();
+
+    // Draw each glyph with anti-aliasing
+    for glyph in &glyphs {
+        if let Some(bounding_box) = glyph.pixel_bounding_box() {
+            // Draw the glyph into the image
+            glyph.draw(|gx, gy, glyph_opacity| {
+                // Map to actual screen position
+                let px = x + bounding_box.min.x + gx as i32;
+                let py = y + bounding_box.min.y + gy as i32;
+                
+                // Only draw if inside image bounds
+                if px >= 0 && px < imgbuf.width() as i32 && py >= 0 && py < imgbuf.height() as i32 {
+                    // Create a color with adjusted alpha for anti-aliasing
+                    let alpha = (glyph_opacity * color[3] as f32) as u8;
+                    let antialiased_color = Rgba([color[0], color[1], color[2], alpha]);
+                    
+                    // Blend with existing pixels for smoother rendering
+                    blend_pixel(imgbuf, px, py, antialiased_color, glyph_opacity);
+                }
+            });
+        }
+    }
+}
+
+fn render_vertical_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
     // Draw a debug rectangle to show the stack bounds
     let size = session.get_size(_entity_id);
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
-    let width = size.0.ceil() as u32;
-    let height = size.1.ceil() as u32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
     
     if x >= 0 && y >= 0 && width > 0 && height > 0 &&
        x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
@@ -361,17 +445,17 @@ fn render_vertical_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _enti
     
     // Render children
     for child in node.children.iter() {
-        render_node(child, session, imgbuf, pos);
+        render_node(child, session, imgbuf, pos, scale);
     }
 }
 
-fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64)) {
+fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
     // Draw a debug rectangle to show the stack bounds
     let size = session.get_size(_entity_id);
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
-    let width = size.0.ceil() as u32;
-    let height = size.1.ceil() as u32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
     
     if x >= 0 && y >= 0 && width > 0 && height > 0 &&
        x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
@@ -381,7 +465,7 @@ fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _en
     
     // Render children
     for child in node.children.iter() {
-        render_node(child, session, imgbuf, pos);
+        render_node(child, session, imgbuf, pos, scale);
     }
 }
 
@@ -423,4 +507,140 @@ fn parse_color(color_str: &str) -> Rgba<u8> {
             }
         }
     }
+}
+
+// Create an anti-aliased version of a color with adjustable alpha
+fn blend_color(color: Rgba<u8>, intensity: f32) -> Rgba<u8> {
+    // Calculate new alpha based on the original alpha and the intensity factor
+    let alpha = (color[3] as f32 * intensity) as u8;
+    Rgba([color[0], color[1], color[2], alpha])
+}
+
+// Blend a pixel with existing content for smooth anti-aliasing
+fn blend_pixel(imgbuf: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>, alpha: f32) {
+    if x < 0 || x >= imgbuf.width() as i32 || y < 0 || y >= imgbuf.height() as i32 {
+        return;
+    }
+    
+    // Get the existing pixel color
+    let existing = imgbuf.get_pixel(x as u32, y as u32);
+    
+    // Alpha blending formula: new = alpha * src + (1 - alpha) * dst
+    let blend_alpha = alpha.max(0.0).min(1.0);
+    let inv_alpha = 1.0 - blend_alpha;
+    
+    let r = (color[0] as f32 * blend_alpha + existing[0] as f32 * inv_alpha) as u8;
+    let g = (color[1] as f32 * blend_alpha + existing[1] as f32 * inv_alpha) as u8;
+    let b = (color[2] as f32 * blend_alpha + existing[2] as f32 * inv_alpha) as u8;
+    
+    // Final alpha is combined alpha from both sources
+    let a = (color[3] as f32 * blend_alpha + existing[3] as f32 * inv_alpha) as u8;
+    
+    imgbuf.put_pixel(x as u32, y as u32, Rgba([r, g, b, a]));
+}
+
+// Draw a pixel with bounds checking
+fn safe_put_pixel(imgbuf: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>) {
+    if x >= 0 && x < imgbuf.width() as i32 && y >= 0 && y < imgbuf.height() as i32 {
+        imgbuf.put_pixel(x as u32, y as u32, color);
+    }
+}
+
+// Draw an anti-aliased line between two points with a given thickness
+fn draw_anti_aliased_line(
+    imgbuf: &mut RgbaImage,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
+    color: Rgba<u8>,
+    thickness: f32
+) {
+    // Use Bresenham's algorithm for the core line
+    // Convert i32 to isize for the Bresenham algorithm
+    let x0_isize = x0 as isize;
+    let y0_isize = y0 as isize;
+    let x1_isize = x1 as isize;
+    let y1_isize = y1 as isize;
+    
+    for (x_isize, y_isize) in Bresenham::new((x0_isize, y0_isize), (x1_isize, y1_isize)) {
+        // Convert back to i32 for our drawing functions
+        let x = x_isize as i32;
+        let y = y_isize as i32;
+        
+        // Draw a "thick" point at each position along the line
+        let radius = (thickness / 2.0).ceil() as i32;
+        for dx in -radius..=radius {
+            for dy in -radius..=radius {
+                let dist = ((dx * dx + dy * dy) as f32).sqrt();
+                // Calculate alpha based on distance from the line center
+                let alpha = if dist <= thickness / 2.0 {
+                    // Full opacity for inner pixels
+                    1.0
+                } else if dist <= thickness / 2.0 + 1.0 {
+                    // Fade out for anti-aliasing at the edge (smooth transition)
+                    1.0 - (dist - thickness / 2.0)
+                } else {
+                    // Outside the line's radius
+                    0.0
+                };
+                
+                // Only draw if there's some opacity
+                if alpha > 0.0 {
+                    // Use blend_pixel for smoother edges
+                    blend_pixel(imgbuf, x + dx, y + dy, color, alpha);
+                }
+            }
+        }
+    }
+}
+
+// Draw an anti-aliased ellipse with a given thickness
+fn draw_anti_aliased_ellipse(
+    imgbuf: &mut RgbaImage,
+    cx: i32,
+    cy: i32,
+    a: i32,
+    b: i32,
+    color: Rgba<u8>,
+    thickness: f32
+) {
+    // For very small ellipses, use a simple algorithm
+    if a <= 2 || b <= 2 {
+        for angle_deg in 0..360 {
+            let rad = angle_deg as f64 * std::f64::consts::PI / 180.0;
+            let x = cx + (a as f64 * rad.cos()).round() as i32;
+            let y = cy + (b as f64 * rad.sin()).round() as i32;
+            safe_put_pixel(imgbuf, x, y, color);
+        }
+        return;
+    }
+
+    // Improved ellipse drawing using line segments
+    // Using more segments for smoother appearance - scale with radius for higher quality
+    let num_segments = (a.max(b) * 8).max(120);
+    
+    // Calculate first point
+    let first_angle: f64 = 0.0;
+    let first_x = cx + (a as f64 * first_angle.cos()).round() as i32;
+    let first_y = cy + (b as f64 * first_angle.sin()).round() as i32;
+    
+    let mut prev_x = first_x;
+    let mut prev_y = first_y;
+    
+    // Draw segments connecting points along the ellipse
+    for i in 1..=num_segments {
+        let angle = 2.0 * std::f64::consts::PI * (i as f64 / num_segments as f64);
+        let x = cx + (a as f64 * angle.cos()).round() as i32;
+        let y = cy + (b as f64 * angle.sin()).round() as i32;
+        
+        // Draw anti-aliased line segment between consecutive points
+        draw_anti_aliased_line(imgbuf, prev_x, prev_y, x, y, color, thickness);
+        
+        prev_x = x;
+        prev_y = y;
+    }
+    
+    // Close the ellipse by connecting back to the first point
+    draw_anti_aliased_line(imgbuf, prev_x, prev_y, first_x, first_y, color, thickness);
 }
