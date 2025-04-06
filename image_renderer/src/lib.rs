@@ -329,9 +329,82 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
         }
     }
     
-    // Render children inside the box
+    // Render children inside the box, accounting for padding
     for child in node.children.iter() {
-        render_node(child, session, imgbuf, pos, scale);
+        let child_id = child.entity_id;
+        let child_pos = session.get_position(child_id);
+        
+        // Instead of trying to be clever about nested transforms, let's use the simplest
+        // and most direct approach: manually handle rendering the text here
+        
+        // Log child details
+        println!("Rendering box child: id={}, type={:?}, box_pos=({:.1},{:.1}), child_pos=({:.1},{:.1})",
+            child_id, child.entity_type, pos.0, pos.1, child_pos.0, child_pos.1);
+        
+        // Get absolute position for child relative to box
+        let abs_x = (pos.0 + child_pos.0 * scale).round() as i32;
+        let abs_y = (pos.1 + child_pos.1 * scale).round() as i32;
+        
+        // For text elements in boxes, we'll handle them specially
+        match child.entity_type {
+            EntityType::TextShape => {
+                // Get the text and render it directly
+                let text_shape = session.get_text(child_id);
+                let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
+                let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+                
+                // Convert text color string to RGBA
+                let text_color = parse_color(&text_shape.text_options.text_color);
+                println!("  Text: '{}', color: {}, pos: ({}, {})", 
+                    text_shape.text, text_shape.text_options.text_color, abs_x, abs_y);
+                
+                // Render text directly
+                let dpi = 120.0;
+                let dpi_scale_factor = dpi / 72.0;
+                let font_size = text_shape.text_options.font_size * dpi_scale_factor;
+                let font_scale = Scale::uniform(font_size);
+                
+                // Render each line
+                for line_id in &text_shape.lines {
+                    let line = session.get_text_line(*line_id);
+                    let line_pos = session.get_position(line.entity);
+                    
+                    // Calculate absolute position for this line
+                    let line_x = abs_x + (line_pos.0 * scale).round() as i32;
+                    let line_y = abs_y + (line_pos.1 * scale).round() as i32;
+                    
+                    println!("  Line '{}' at ({}, {})", line.text, line_x, line_y);
+                    
+                    // Draw the text directly
+                    let text_width = (session.get_size(*line_id).0 * scale).round() as i32;
+                    draw_high_quality_text(
+                        imgbuf,
+                        &line.text,
+                        line_x,
+                        line_y,
+                        &font,
+                        font_scale,
+                        text_color,
+                        text_width
+                    );
+                }
+            },
+            // For other types, we'll use render_node but with a fully calculated position
+            _ => {
+                // Calculate absolute position without any scaling
+                let adjusted_parent_offset = (
+                    pos.0 / scale,
+                    pos.1 / scale
+                );
+                
+                // Log the adjusted values
+                println!("  Using adjusted_parent_offset=({:.1},{:.1})", 
+                    adjusted_parent_offset.0, adjusted_parent_offset.1);
+                    
+                // Render the child with the adjusted parent offset
+                render_node(child, session, imgbuf, adjusted_parent_offset, scale);
+            }
+        }
     }
 }
 
