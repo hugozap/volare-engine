@@ -223,6 +223,13 @@ impl DiagramBuilder {
         self.images.insert(image_id, image);
         DiagramTreeNode::new(EntityType::ImageShape, image_id)
     }
+    
+    pub fn new_image_from_file(&mut self, file_path: &str, preferred_size:(f64, f64)) -> DiagramTreeNode {
+        let image_id = self.new_entity(EntityType::ImageShape);
+        let image = ShapeImage::from_file(image_id, file_path.to_string(), preferred_size);
+        self.images.insert(image_id, image);
+        DiagramTreeNode::new(EntityType::ImageShape, image_id)
+    }
 
     // Creates a new Group.
     pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {

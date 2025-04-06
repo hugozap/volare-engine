@@ -128,9 +128,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     table_items.push(text);
 
-    //Add sample image
-    let sampleImage = session.new_image(&getSampleImage(), (200.0, 600.0));
-    // table_items.push(sampleImage);
+    //Add sample image from file (first instance)
+    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (200.0, 200.0));
+    table_items.push(sampleImage);
+    
+    //Add sample image from file
+    // The path is relative to where the binary is run
+    let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
+    table_items.push(file_image);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
@@ -171,11 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn getSampleImage() -> String {
-    //load from assets/sample-image.base64 included in the crate
-    let image_base64 = include_str!("../assets/sample-image.base64");
-    image_base64.to_string()
-}
+// Sample image loading is now handled directly through file loading
 
 //function that returns a sample table with 10 elements and 3 columns
 

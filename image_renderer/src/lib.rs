@@ -1,9 +1,13 @@
 use std::io::Write;
-use image::{Rgba, RgbaImage};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use image::{Rgba, RgbaImage, GenericImageView, DynamicImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use rusttype::{Font, Scale};
 use bresenham::Bresenham;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, 
@@ -102,6 +106,9 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
         }
         EntityType::HorizontalStackShape => {
             render_horizontal_stack(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::ImageShape => {
+            render_image(session, imgbuf, entity_id, node, abs_pos, scale);
         }
         EntityType::TableShape => {
             // Get table properties
@@ -485,6 +492,139 @@ fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _en
     // Render children
     for child in node.children.iter() {
         render_node(child, session, imgbuf, pos, scale);
+    }
+}
+
+fn render_image(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, _node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+    // Get image properties
+    let image_shape = session.get_image(entity_id);
+    let size = session.get_size(entity_id);
+    
+    // Apply scaling factor to dimensions
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+    
+    // Skip if outside bounds
+    if x < 0 || y < 0 || width == 0 || height == 0 || 
+       x + width as i32 > imgbuf.width() as i32 || 
+       y + height as i32 > imgbuf.height() as i32 {
+        println!("Image outside bounds, skipping");
+        return;
+    }
+    
+    // Load the image either from file or base64 data
+    let loaded_img = if let Some(file_path) = &image_shape.file_path {
+        // Load image from file
+        println!("Loading image from file: {}", file_path);
+        match load_image_from_file(file_path) {
+            Ok(img) => img,
+            Err(e) => {
+                println!("Error loading image from file: {}", e);
+                // Return with a placeholder or error indicator
+                draw_placeholder_image(imgbuf, x, y, width, height);
+                return;
+            }
+        }
+    } else if !image_shape.image.is_empty() {
+        // Load image from base64 data
+        println!("Loading image from base64 data");
+        match load_image_from_base64(&image_shape.image) {
+            Ok(img) => img,
+            Err(e) => {
+                println!("Error loading image from base64: {}", e);
+                // Return with a placeholder or error indicator
+                draw_placeholder_image(imgbuf, x, y, width, height);
+                return;
+            }
+        }
+    } else {
+        println!("No image data or file path provided");
+        // Draw an empty placeholder if no source is provided
+        draw_placeholder_image(imgbuf, x, y, width, height);
+        return;
+    };
+    
+    // Resize the image to fit the allocated space while maintaining aspect ratio
+    let resized_img = loaded_img.resize_exact(width, height, image::imageops::FilterType::Lanczos3);
+    
+    // Convert the image to an RgbaImage
+    let img_rgba = resized_img.to_rgba8();
+    
+    // Draw the image onto our output buffer at the specified position
+    for (ix, iy, pixel) in img_rgba.enumerate_pixels() {
+        let dest_x = x + ix as i32;
+        let dest_y = y + iy as i32;
+        
+        // Only draw within bounds
+        if dest_x >= 0 && dest_x < imgbuf.width() as i32 && 
+           dest_y >= 0 && dest_y < imgbuf.height() as i32 {
+            imgbuf.put_pixel(dest_x as u32, dest_y as u32, *pixel);
+        }
+    }
+    
+    // Draw a thin border around the image for visual clarity
+    let border_color = Rgba([80, 80, 80, 255]);
+    let rect = Rect::at(x, y).of_size(width, height);
+    draw_hollow_rect_mut(imgbuf, rect, border_color);
+}
+
+// Helper function to load an image from a file
+fn load_image_from_file(file_path: &str) -> Result<DynamicImage, String> {
+    let path = Path::new(file_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    
+    match image::open(path) {
+        Ok(img) => Ok(img),
+        Err(e) => Err(format!("Failed to load image: {}", e)),
+    }
+}
+
+// Helper function to load an image from base64 data
+fn load_image_from_base64(base64_str: &str) -> Result<DynamicImage, String> {
+    // Decode base64 string to bytes
+    let img_data = match BASE64.decode(base64_str) {
+        Ok(data) => data,
+        Err(e) => return Err(format!("Failed to decode base64: {}", e)),
+    };
+    
+    // Load image from memory
+    match image::load_from_memory(&img_data) {
+        Ok(img) => Ok(img),
+        Err(e) => Err(format!("Failed to load image from memory: {}", e)),
+    }
+}
+
+// Draw a placeholder for missing or error images
+fn draw_placeholder_image(imgbuf: &mut RgbaImage, x: i32, y: i32, width: u32, height: u32) {
+    // Fill with light gray
+    let fill_color = Rgba([220, 220, 220, 255]);
+    let rect = Rect::at(x, y).of_size(width, height);
+    draw_filled_rect_mut(imgbuf, rect, fill_color);
+    
+    // Draw border
+    let border_color = Rgba([150, 150, 150, 255]);
+    draw_hollow_rect_mut(imgbuf, rect, border_color);
+    
+    // Draw an X from corner to corner
+    if width > 10 && height > 10 {
+        // Draw diagonal lines for the X
+        for i in 0..width.min(height) {
+            let ix = x + i as i32;
+            let iy = y + i as i32;
+            if ix < imgbuf.width() as i32 && iy < imgbuf.height() as i32 {
+                imgbuf.put_pixel(ix as u32, iy as u32, Rgba([100, 100, 100, 255]));
+            }
+            
+            let ix2 = x + i as i32;
+            let iy2 = y + (height - i - 1) as i32;
+            if ix2 < imgbuf.width() as i32 && iy2 >= 0 && iy2 < imgbuf.height() as i32 {
+                imgbuf.put_pixel(ix2 as u32, iy2 as u32, Rgba([100, 100, 100, 255]));
+            }
+        }
     }
 }
 
