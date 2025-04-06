@@ -1,6 +1,7 @@
 use std::io::Write;
 use volare_engine_layout::diagram_builder::DiagramTreeNode;
 use volare_engine_layout::*;
+use volare_engine_layout::FreeContainer;
 //use error
 use std::io::Error;
 
@@ -83,6 +84,10 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
         EntityType:: PolyLine => {
             render_polyline(session, &mut svg, entity_id, node);
         }
+        
+        EntityType::FreeContainer => {
+            render_free_container(session, &mut svg, entity_id, node);
+        }
 
         _ => {}
         
@@ -108,6 +113,55 @@ fn render_polyline(session: &DiagramBuilder, svg: &mut String, entity_id: Entity
         points_str,
         polyline_shape.line_options.stroke_color,
         polyline_shape.line_options.stroke_width));
+    svg.push_str("</g>");
+}
+
+fn render_free_container(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let container = session.get_free_container(entity_id);
+    let pos = session.get_position(entity_id);
+    
+    // Open a group for the container with the correct position
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    
+    // If there's a background color, draw a rectangle with it
+    if let Some(bg_color) = &container.background_color {
+        svg.push_str(&format!(
+            r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" "#,
+            size.0, size.1, bg_color
+        ));
+        
+        // Add border if specified
+        if let Some(border_color) = &container.border_color {
+            if container.border_width > 0.0 {
+                svg.push_str(&format!(
+                    r#"stroke="{}" stroke-width="{}" "#,
+                    border_color, container.border_width
+                ));
+            }
+        }
+        
+        svg.push_str("/>");
+    } 
+    // If there's only a border but no background, draw just the outline
+    else if let Some(border_color) = &container.border_color {
+        if container.border_width > 0.0 {
+            svg.push_str(&format!(
+                r#"<rect x="0" y="0" width="{}" height="{}" fill="none" stroke="{}" stroke-width="{}" />"#,
+                size.0, size.1, border_color, container.border_width
+            ));
+        }
+    }
+    
+    // Render children
+    for child in node.children.iter() {
+        svg.push_str(render_node(child, session).as_str());
+    }
+    
+    // Close the container group
     svg.push_str("</g>");
 }
 

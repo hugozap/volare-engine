@@ -120,7 +120,8 @@ pub enum EntityType {
     HorizontalStackShape,
     TableShape,
     TextLine,
-    PolyLine
+    PolyLine,
+    FreeContainer
 }
 
 pub fn get_entity_type(entity_id: EntityID) -> EntityType {
@@ -137,6 +138,7 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
         9 => EntityType::TableShape,
         10 => EntityType::TextLine,
         11 => EntityType::PolyLine,
+        12 => EntityType::FreeContainer,
         _ => panic!("Invalid entity type"),
     }
 }
@@ -890,5 +892,78 @@ impl ShapeImage {
             file_path: Some(file_path),
             preferred_size,
         }
+    }
+}
+
+/// A container that allows children to be positioned with absolute coordinates
+/// Children's positions are relative to the container's top-left corner
+pub struct FreeContainer {
+    pub entity: EntityID,
+    pub children: Vec<(EntityID, (f64, f64))>, // Each child has a position relative to the container
+    pub background_color: Option<String>,      // Optional background color
+    pub border_color: Option<String>,          // Optional border color
+    pub border_width: f64,                    // Border width (0 for no border)
+}
+
+impl Clone for FreeContainer {
+    fn clone(&self) -> Self {
+        FreeContainer {
+            entity: self.entity,
+            children: self.children.clone(),
+            background_color: self.background_color.clone(),
+            border_color: self.border_color.clone(),
+            border_width: self.border_width,
+        }
+    }
+}
+
+impl Entity for FreeContainer {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::FreeContainer
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl FreeContainer {
+    /// Create a new empty FreeContainer
+    pub fn new(entity: EntityID) -> Self {
+        FreeContainer {
+            entity,
+            children: Vec::new(),
+            background_color: None,
+            border_color: None,
+            border_width: 0.0,
+        }
+    }
+    
+    /// Add a child to the container at the specified position
+    pub fn add_child(&mut self, child_id: EntityID, position: (f64, f64)) {
+        self.children.push((child_id, position));
+    }
+    
+    /// Add multiple children at once with their positions
+    pub fn with_children(mut self, children_with_positions: Vec<(EntityID, (f64, f64))>) -> Self {
+        self.children.extend(children_with_positions);
+        self
+    }
+    
+    /// Set background color
+    pub fn with_background_color(mut self, color: &str) -> Self {
+        self.background_color = Some(color.to_string());
+        self
+    }
+    
+    /// Set border properties
+    pub fn with_border(mut self, color: &str, width: f64) -> Self {
+        self.border_color = Some(color.to_string());
+        self.border_width = width;
+        self
     }
 }

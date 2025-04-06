@@ -3,7 +3,7 @@
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, HorizontalStack,
     ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table,
-    VerticalStack,PolyLine,
+    VerticalStack, PolyLine, FreeContainer,
 };
 
 /* The box layout includes the padding and the dimensions
@@ -334,6 +334,46 @@ pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
     session.set_size(polyline.entity, width, height);
 }
 
+/**
+ * Layout for the FreeContainer
+ * Children have absolute positions relative to the container
+ * The container size is determined by the maximum extent of its children
+ */
+pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeContainer) {
+    // We need to determine the size of the container based on the positions and sizes of its children
+    let mut max_width = 0.0;
+    let mut max_height = 0.0;
+    
+    // Iterate through all children and find the maximum extent
+    for (child_id, position) in &container.children {
+        // Get the child's size
+        let child_size = session.get_size(*child_id);
+        
+        // Set the child's position relative to the container
+        session.set_position(*child_id, position.0, position.1);
+        
+        // Calculate the right and bottom edges of this child
+        let right = position.0 + child_size.0;
+        let bottom = position.1 + child_size.1;
+        
+        // Update the maximum extent
+        if right > max_width {
+            max_width = right;
+        }
+        if bottom > max_height {
+            max_height = bottom;
+        }
+    }
+    
+    // Add a small margin to ensure we have enough space
+    let margin = 2.0;
+    max_width += margin;
+    max_height += margin;
+    
+    // Set the container's size
+    session.set_size(container.entity, max_width, max_height);
+}
+
 
 pub struct BoundingBox {
     x: f64,
@@ -422,6 +462,10 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::PolyLine => {
             let polyline = session.get_polyline(root.entity_id).clone();
             layout_polyline(session, &polyline);
+        }
+        EntityType::FreeContainer => {
+            let container = session.get_free_container(root.entity_id).clone();
+            layout_free_container(session, &container);
         }
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),

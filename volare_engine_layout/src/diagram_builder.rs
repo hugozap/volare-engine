@@ -36,6 +36,7 @@ pub struct DiagramBuilder {
     tables: HashMap<EntityID, Table>,
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
+    free_containers: HashMap<EntityID, FreeContainer>,
 }
 
 // Stores the type of entity and the index of the entity in the corresponding vector
@@ -91,6 +92,7 @@ impl DiagramBuilder {
             tables: HashMap::new(),
             images: HashMap::new(),
             polylines: HashMap::new(),
+            free_containers: HashMap::new(),
         }
     }
 
@@ -331,6 +333,63 @@ impl DiagramBuilder {
         self.polylines.insert(polyline_id, polyline);
         DiagramTreeNode::new(EntityType::PolyLine, polyline_id)
     }
+    
+    /// Creates a new FreeContainer that allows absolute positioning of children
+    /// The container will size itself based on the positions and sizes of its children
+    pub fn new_free_container(&mut self) -> DiagramTreeNode {
+        let container_id = self.new_entity(EntityType::FreeContainer);
+        let container = FreeContainer::new(container_id);
+        self.free_containers.insert(container_id, container);
+        DiagramTreeNode::new(EntityType::FreeContainer, container_id)
+    }
+    
+    /// Creates a new FreeContainer with all children at once
+    pub fn new_free_container_with_children(&mut self, children_with_positions: Vec<(DiagramTreeNode, (f64, f64))>) -> DiagramTreeNode {
+        let container_id = self.new_entity(EntityType::FreeContainer);
+        
+        // Create the free container
+        let mut container = FreeContainer::new(container_id);
+        
+        // Create the node for the tree
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::FreeContainer,
+            entity_id: container_id,
+            children: Vec::new(),
+        };
+        
+        // Add all children with their positions
+        for (child, position) in children_with_positions {
+            container.add_child(child.entity_id, position);
+            node.add_child(child);
+        }
+        
+        // Store the container
+        self.free_containers.insert(container_id, container);
+        
+        node
+    }
+    
+    /// Add a child to a FreeContainer at the specified position
+    /// The position is relative to the container's top-left corner
+    pub fn add_to_free_container(&mut self, container_id: EntityID, child: DiagramTreeNode, position: (f64, f64)) -> DiagramTreeNode {
+        // Get the free container
+        let container = self.free_containers.get_mut(&container_id).unwrap();
+        
+        // Add the child to the container with its position
+        container.add_child(child.entity_id, position);
+        
+        // Create a new tree node for the container with the child
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::FreeContainer,
+            entity_id: container_id,
+            children: Vec::new(),
+        };
+        
+        // Add the child node
+        node.add_child(child);
+        
+        node
+    }
 }
 
 // element list accessors
@@ -381,6 +440,14 @@ impl DiagramBuilder {
 
     pub fn get_polyline(&self, id: EntityID) -> &PolyLine {
         &self.polylines[&id]
+    }
+    
+    pub fn get_free_container(&self, id: EntityID) -> &FreeContainer {
+        &self.free_containers[&id]
+    }
+    
+    pub fn get_free_container_mut(&mut self, id: EntityID) -> &mut FreeContainer {
+        self.free_containers.get_mut(&id).unwrap()
     }
 }
 

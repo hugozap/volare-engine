@@ -270,6 +270,9 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
         EntityType::PolyLine => {
             render_polyline(session, imgbuf, entity_id, node, abs_pos, scale);
         }
+        EntityType::FreeContainer => {
+            render_free_container(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
         // For this initial implementation, we'll skip other shapes
         _ => {}
     }
@@ -565,6 +568,146 @@ fn render_polyline(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: 
             );
         }
     }
+}
+
+fn render_free_container(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+    // Log debug information
+    println!("==================================================");
+    println!("Rendering FreeContainer: id={}, pos=({:.1}, {:.1})", entity_id, pos.0, pos.1);
+    
+    // Unscale the position (since render_node applies scaling for us)
+    let container_pos = session.get_position(entity_id);
+    let size = session.get_size(entity_id);
+    
+    // Convert to i32 for drawing functions with scaling
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+    
+    println!("FreeContainer size: {}x{}", width, height);
+    println!("FreeContainer absolute position: x={}, y={}", x, y);
+    
+    // Get the container object
+    let container = session.get_free_container(entity_id);
+    
+    // Draw the container background first if specified
+    if let Some(bg_color) = &container.background_color {
+        let fill_color = parse_color(bg_color);
+        let rect = Rect::at(x, y).of_size(width, height);
+        draw_filled_rect_mut(imgbuf, rect, fill_color);
+        println!("Drew container background with color: {}", bg_color);
+    }
+    
+    // Draw the container border if specified
+    if let Some(border_color) = &container.border_color {
+        if container.border_width > 0.0 {
+            let stroke_color = parse_color(border_color);
+            let stroke_width = (container.border_width * scale).ceil() as u32;
+            
+            // Draw border with proper thickness
+            for i in 0..stroke_width {
+                if i < stroke_width {
+                    let inner_rect = Rect::at(x + i as i32, y + i as i32)
+                        .of_size(width - 2 * i, height - 2 * i);
+                    draw_hollow_rect_mut(imgbuf, inner_rect, stroke_color);
+                }
+            }
+            println!("Drew container border with color: {}", border_color);
+        }
+    }
+    
+    // Log the children counts
+    println!("Container has {} stored positions and {} children in tree", 
+             container.children.len(), node.children.len());
+    
+    // Create a mapping from child entity IDs to their positions
+    let mut child_positions = std::collections::HashMap::new();
+    for (child_id, position) in &container.children {
+        child_positions.insert(*child_id, *position);
+    }
+    
+    // Debug output of all children
+    for (i, child) in node.children.iter().enumerate() {
+        let child_id = child.entity_id;
+        if let Some(rel_pos) = child_positions.get(&child_id) {
+            println!("Child[{}]: id={}, type={:?}, stored_pos=({:.1},{:.1})", 
+                     i, child_id, child.entity_type, rel_pos.0, rel_pos.1);
+        } else {
+            println!("Child[{}]: id={}, type={:?}, NO STORED POSITION", 
+                     i, child_id, child.entity_type);
+        }
+    }
+    
+    // Render each child with its calculated position
+    for (i, child_node) in node.children.iter().enumerate() {
+        let child_id = child_node.entity_id;
+        
+        // Get the child's position relative to the container from the stored mapping
+        if let Some(rel_pos) = child_positions.get(&child_id) {
+            // Child is in the FreeContainer's children map
+            
+            // For debugging, get the child's size
+            let child_size = session.get_size(child_id);
+            println!("Child[{}]: id={}, size=({:.1},{:.1})", i, child_id, child_size.0, child_size.1);
+            
+            // The key fix: since render_node applies pos and scaling again,
+            // we need to provide a corrected parent_offset that when combined with
+            // the child's position and scaled will result in the correct absolute position
+            
+            // Get the child's original position in the session 
+            let original_child_pos = session.get_position(child_id);
+            
+            // Calculate the expected final position we want
+            let desired_final_pos = (
+                pos.0 + rel_pos.0 * scale,
+                pos.1 + rel_pos.1 * scale
+            );
+            
+            // Calculate the parent_offset that will give us this position after render_node applies
+            // its own calculation: abs_pos = (parent_offset + pos) * scale
+            // So we need: parent_offset = desired_final_pos / scale - pos
+            let adjusted_parent_offset = (
+                desired_final_pos.0 / scale - original_child_pos.0,
+                desired_final_pos.1 / scale - original_child_pos.1
+            );
+            
+            println!("Rendering child[{}]: desired_pos=({:.1},{:.1}), original_pos=({:.1},{:.1}), rel_pos=({:.1},{:.1})", 
+                i, desired_final_pos.0, desired_final_pos.1, original_child_pos.0, original_child_pos.1, rel_pos.0, rel_pos.1);
+            println!("  Using adjusted_parent_offset=({:.1},{:.1})", adjusted_parent_offset.0, adjusted_parent_offset.1);
+            
+            render_node(child_node, session, imgbuf, adjusted_parent_offset, scale);
+        } else {
+            // Child doesn't have a stored position
+            println!("WARNING: Child[{}] id={} has no stored position in FreeContainer!", i, child_id);
+            
+            // For children without explicit positions in the container, we'll use their 
+            // original positions from the session, which might be relative to the container
+            let child_pos = session.get_position(child_id);
+            
+            // Calculate the desired final position
+            let desired_final_pos = (
+                pos.0 + child_pos.0 * scale,
+                pos.1 + child_pos.1 * scale
+            );
+            
+            // The same adjustment as above for children with stored positions
+            let adjusted_parent_offset = (
+                desired_final_pos.0 / scale - child_pos.0,
+                desired_final_pos.1 / scale - child_pos.1
+            );
+            
+            // Log the calculated position
+            println!("Child[{}] with no stored position: desired_pos=({:.1},{:.1}), original_pos=({:.1},{:.1})", 
+                     i, desired_final_pos.0, desired_final_pos.1, child_pos.0, child_pos.1);
+            println!("  Using adjusted_parent_offset=({:.1},{:.1})", adjusted_parent_offset.0, adjusted_parent_offset.1);
+            
+            // Render the child with the adjusted parent offset
+            render_node(child_node, session, imgbuf, adjusted_parent_offset, scale);
+        }
+    }
+    
+    println!("==================================================");
 }
 
 fn render_image(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, _node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {

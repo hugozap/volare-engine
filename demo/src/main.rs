@@ -10,7 +10,7 @@ use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, Li
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions,
+    TableOptions, TextOptions, Fill,
 };
 //import io modules to write to file
 use measure_text::measure_text;
@@ -157,6 +157,87 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The path is relative to where the binary is run
     let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
     table_items.push(file_image);
+    
+    // Create a FreeContainer with multiple visual elements at specific positions using the new method
+    
+    // Create all elements first
+    let title_text = session.new_text(
+        "FreeContainer Demo",
+        TextOptions {
+            font_family: "Roboto".to_string(),
+            font_size: 18.0,
+            line_width: 100,
+            text_color: "#000000".to_string(),
+        },
+    );
+    
+    let red_circle = session.new_elipse(
+        (0.0, 0.0),  // center position (will be positioned by container)
+        (15.0, 15.0),  // radius
+        EllipseOptions {
+            fill_color: "#FF0000".to_string(),  // bright red
+            stroke_color: "black".to_string(),
+            stroke_width: 2.0,
+        }
+    );
+    
+    let blue_text = session.new_text(
+        "Blue Element",
+        TextOptions {
+            font_family: "Roboto".to_string(),
+            font_size: 16.0,
+            line_width: 100,
+            text_color: "white".to_string(),  // white text
+        },
+    );
+    
+    // Create a box around the blue text
+    let box_options = BoxOptions {
+        fill_color: Fill::Color("#0000FF".to_string()),  // blue background
+        stroke_color: "#000066".to_string(),  // dark blue border
+        stroke_width: 1.0,
+        padding: 5.0,
+        border_radius: 3.0,
+    };
+    let blue_box = session.new_box(blue_text, box_options);
+    
+    let green_ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (30.0, 20.0),
+        EllipseOptions {
+            fill_color: "#00CC00".to_string(),  // green
+            stroke_color: "#006600".to_string(),  // dark green
+            stroke_width: 2.0,
+        }
+    );
+    
+    let subtitle = session.new_text(
+        "Absolute positioning of elements",
+        TextOptions {
+            font_family: "Roboto".to_string(),
+            font_size: 12.0,
+            line_width: 100,
+            text_color: "#555555".to_string(),  // dark gray
+        },
+    );
+    
+    // Create a container with all children at once
+    let container_with_elements = session.new_free_container_with_children(vec![
+        (title_text, (30.0, 10.0)),
+        (red_circle, (40.0, 50.0)),
+        (blue_box, (80.0, 40.0)),
+        (green_ellipse, (150.0, 70.0)),
+        (subtitle, (30.0, 120.0)),
+    ]);
+    
+    // Add styling to the container with more vibrant colors
+    let free_container = session.get_free_container_mut(container_with_elements.entity_id);
+    free_container.background_color = Some("#FFDDDD".to_string()); // Light red background (more visible)
+    free_container.border_color = Some("#FF0000".to_string()); // Bright red border
+    free_container.border_width = 5.0; // Thicker border
+    
+    // Add the FreeContainer to the table
+    table_items.push(container_with_elements);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
