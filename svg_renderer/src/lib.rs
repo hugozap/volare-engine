@@ -23,7 +23,8 @@ impl<W: Write> Renderer<W> for SVGRenderer {
     ));
 
     svg.push_str(&format!(
-        r#"<svg width="{}" height="{}" viewBox="{} {} {} {}">"#,root_size.0, root_size.1,
+        r#"<svg width="{}" height="{}" viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
+        root_size.0, root_size.1,
         root_pos.0, root_pos.1, root_size.0, root_size.1
     ));
 
@@ -115,17 +116,67 @@ fn render_image(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,
     let size = session.get_size(entity_id);
     let image_shape = session.get_image(node.entity_id);
     let pos = session.get_position(entity_id);
+    
+    // Determine the image source
+    let image_src = if let Some(file_path) = &image_shape.file_path {
+        // For file-based images, we'll embed them as data URLs in the SVG
+        // We need to read the file, encode it to base64, and create a data URL
+        match read_image_file_as_data_url(file_path) {
+            Ok(data_url) => data_url,
+            Err(err) => {
+                eprintln!("Error loading image from file '{}': {}", file_path, err);
+                // Fallback to a placeholder for errors
+                "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22%23ddd%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2250%22%20font-family%3D%22sans-serif%22%20font-size%3D%2220%22%20text-anchor%3D%22middle%22%20alignment-baseline%3D%22middle%22%3EImage%20Error%3C%2Ftext%3E%3C%2Fsvg%3E".to_string()
+            }
+        }
+    } else {
+        // For base64 images, use the stored image data
+        // If it's already a data URL, use it as-is
+        image_shape.image.clone()
+    };
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    //Render base64 image
-    //Note: the base64 should start with data:image/png;base64,
+    
+    // Add the SVG image element with the appropriate source
     svg.push_str(&format!(r#"<image x="0" y="0" width="{}" height="{}" xlink:href="{}" />"#,
-     size.0, 
-     size.1, 
-     image_shape.image));
+        size.0, 
+        size.1, 
+        image_src));
+    
     svg.push_str("</g>");
+}
+
+// Helper function to read an image file and convert it to a data URL
+fn read_image_file_as_data_url(file_path: &str) -> Result<String, std::io::Error> {
+    use std::fs::File;
+    use std::io::Read;
+    use base64::engine::general_purpose::STANDARD as BASE64;
+    use base64::Engine;
+    use std::path::Path;
+    
+    // Read the file
+    let mut file = File::open(file_path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    
+    // Determine mime type based on file extension
+    let mime_type = match Path::new(file_path).extension().and_then(|ext| ext.to_str()) {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream", // Default mime type
+    };
+    
+    // Encode as base64 and create data URL
+    let base64_data = BASE64.encode(&buffer);
+    let data_url = format!("data:{};base64,{}", mime_type, base64_data);
+    
+    Ok(data_url)
 }
 
 fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
