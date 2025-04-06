@@ -182,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     
     let blue_text = session.new_text(
-        "Blue Element",
+        "Blue Element \n Another line!!",
         TextOptions {
             font_family: "Roboto".to_string(),
             font_size: 16.0,

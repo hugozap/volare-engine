@@ -33,7 +33,11 @@ impl<W: Write> Renderer<W> for SVGRenderer {
     //close svg tag
     svg.push_str("</svg>");
     svg.push_str("\n");
-    stream.write_all(svg.as_bytes()).map_err(|e| RendererError::new(&e.to_string()));
+    
+    // Properly handle the result from writing to the stream
+    stream.write_all(svg.as_bytes())
+        .map_err(|e| RendererError::new(&e.to_string()))?;
+    
     Ok(())
 }
 }
@@ -378,8 +382,7 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     for child in node.children.iter() {
         // If child is text, we'll center it in the box
         if child.entity_type == EntityType::TextShape {
-            // Get the text's original size
-            let text_size = session.get_size(child.entity_id);
+            // Center the text in the box - no need to get size separately
             
             // Calculate centering position
             let centered_text = center_text_in_box(session, child.entity_id, box_shape, size);
@@ -394,47 +397,65 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
 }
 
 // Helper function to center text inside a box
-fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
+fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, _box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
     let mut svg = String::new();
     let text_shape = session.get_text(text_id);
     let text_pos = session.get_position(text_id);
     let text_size = session.get_size(text_id);
     
-    // Calculate vertical centering
-    // The original padding for top is kept (typically 5px)
-    // This padding is already in text_pos.y
-    let v_padding = text_pos.1;
+    // For horizontal centering - use the box width directly
+    let center_x = box_size.0 / 2.0;
     
-    // For a single line, we can just horizontally center it
-    // Get box width with padding removed to account for both sides
-    let box_width = box_size.0;
-    let text_width = text_size.0;
+    // For vertical centering in SVG text, we need to use the box middle point
+    // SVG text positioning is more complex than canvas because it depends on
+    // text-anchor and dominant-baseline attributes
     
-    // Calculate horizontal center, accounting for padding
-    let center_x = box_width / 2.0;
+    // Use the middle of the box for Y position
+    let center_y = box_size.1 / 2.0;
     
-    // Create SVG group with text centered
+    // Add a small adjustment factor to account for font metrics
+    let font_size = f64::from(text_shape.text_options.font_size);
+    let adjusted_center_y = center_y + (font_size * 0.1);  // Small adjustment factor
+    
+    // Use dominant-baseline="central" to align text vertically at the center point
     svg.push_str(&format!(
-        r#"<text x="{}" y="{}" text-anchor="middle" fill="{}" font-size="{}" font-family="{}" >"#,
+        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" fill="{}" font-size="{}" font-family="{}" >"#,
         center_x,
-        v_padding,
+        adjusted_center_y, // Use center Y with central baseline
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family));
     
     // Add the text content
-    for line_id in text_shape.lines.iter() {
+    // For multi-line text, we need to adjust the vertical positioning
+    let line_count = text_shape.lines.len() as f64;
+    let font_size = f64::from(text_shape.text_options.font_size);
+    let total_text_height = line_count * font_size;
+    
+    // Calculate the vertical offset for the first line
+    // For multiple lines, we need to shift up by half the total height
+    let first_line_offset = if line_count > 1.0 {
+        -(total_text_height / 2.0) + (font_size / 2.0)
+    } else {
+        0.0 // Single line doesn't need vertical adjustment with dominant-baseline="central"
+    };
+    
+    for (i, line_id) in text_shape.lines.iter().enumerate() {
         let line = session.get_text_line(*line_id);
-        let line_pos = session.get_position(line.entity);
         
-        // Vertical position is relative to the text start position
-        // We need to maintain y positions for multi-line text
-        let y_offset = line_pos.1;
-        
-        svg.push_str(&format!(r#"<tspan x="{}" dy="{}" fill="{}" >"#,
-            center_x,
-            text_shape.text_options.font_size,
-            text_shape.text_options.text_color));
+        if i == 0 {
+            // First line gets positioned with the calculated offset
+            svg.push_str(&format!(r#"<tspan x="{}" dy="{}" fill="{}" >"#,
+                center_x,
+                first_line_offset,
+                text_shape.text_options.text_color));
+        } else {
+            // Subsequent lines get positioned with regular line height
+            svg.push_str(&format!(r#"<tspan x="{}" dy="{}" fill="{}" >"#,
+                center_x,
+                font_size,
+                text_shape.text_options.text_color));
+        }
         
         svg.push_str(&line.text.as_str());
         svg.push_str("</tspan>");

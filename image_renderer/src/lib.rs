@@ -364,14 +364,29 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
                 let font_size = text_shape.text_options.font_size * dpi_scale_factor;
                 let font_scale = Scale::uniform(font_size);
                 
-                // Render each line
-                for line_id in &text_shape.lines {
+                // Render each line - use position data from layout engine
+                // but adjust line spacing if needed for better aesthetics
+                let line_count = text_shape.lines.len();
+                let line_spacing_factor = if line_count > 1 { 0.6 } else { 1.0 }; // Further reduce spacing for multi-line text in boxes
+                
+                for (i, line_id) in text_shape.lines.iter().enumerate() {
                     let line = session.get_text_line(*line_id);
                     let line_pos = session.get_position(line.entity);
                     
                     // Calculate absolute position for this line
                     let line_x = abs_x + (line_pos.0 * scale).round() as i32;
-                    let line_y = abs_y + (line_pos.1 * scale).round() as i32;
+                    
+                    // For multi-line text, calculate position with adjusted spacing
+                    let y_pos = if i == 0 {
+                        // First line uses original position
+                        line_pos.1
+                    } else {
+                        // Subsequent lines use compressed spacing
+                        let prev_line_pos = session.get_position(text_shape.lines[i-1]);
+                        prev_line_pos.1 + (line_pos.1 - prev_line_pos.1) * line_spacing_factor
+                    };
+                    
+                    let line_y = abs_y + (y_pos * scale).round() as i32;
                     
                     println!("  Line '{}' at ({}, {})", line.text, line_x, line_y);
                     
@@ -443,8 +458,12 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
     let font_size = text_shape.text_options.font_size * dpi_scale_factor * text_scaling;
     let font_scale = Scale::uniform(font_size);
     
-    // Render each text line with custom anti-aliasing
-    for line_id in text_shape.lines.iter() {
+    // Render each text line with custom anti-aliasing and adjusted spacing
+    let line_count = text_shape.lines.len();
+    let line_spacing_factor = if line_count > 1 { 0.7 } else { 1.0 }; // Reduce spacing for multi-line text (less aggressive than for boxes)
+    
+    // Render each text line
+    for (i, line_id) in text_shape.lines.iter().enumerate() {
         let line = session.get_text_line(*line_id);
         let line_pos = session.get_position(line.entity);
         
@@ -453,7 +472,18 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
         let text_margin_horizontal = 4; // Small margin for visual spacing
         let text_margin_vertical = 2;   // Small vertical margin for better spacing
         let line_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32 + text_margin_horizontal;
-        let line_y = (pos.1 + line_pos.1 * scaling_factor).round() as i32 + text_margin_vertical;
+        
+        // Apply adjusted line spacing for multi-line text
+        let y_pos = if i == 0 {
+            // First line uses original position
+            line_pos.1
+        } else {
+            // Subsequent lines use compressed spacing
+            let prev_line_pos = session.get_position(text_shape.lines[i-1]);
+            prev_line_pos.1 + (line_pos.1 - prev_line_pos.1) * line_spacing_factor
+        };
+        
+        let line_y = (pos.1 + y_pos * scaling_factor).round() as i32 + text_margin_vertical;
         
         // Skip text if it would be drawn outside the image bounds
         if line_x < 0 || line_x >= imgbuf.width() as i32 || 
