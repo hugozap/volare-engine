@@ -267,6 +267,9 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                 );
             }
         }
+        EntityType::PolyLine => {
+            render_polyline(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
         // For this initial implementation, we'll skip other shapes
         _ => {}
     }
@@ -492,6 +495,75 @@ fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _en
     // Render children
     for child in node.children.iter() {
         render_node(child, session, imgbuf, pos, scale);
+    }
+}
+
+fn render_polyline(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, _node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+    // Get polyline properties
+    let polyline = session.get_polyline(entity_id);
+    let stroke_color = parse_color(&polyline.line_options.stroke_color);
+    let stroke_width = (polyline.line_options.stroke_width * scale) as f32;
+    
+    // Need at least 2 points to draw a line
+    if polyline.points.len() < 2 {
+        return;
+    }
+    
+    // Calculate absolute position with scaling
+    let abs_x = pos.0;
+    let abs_y = pos.1;
+    
+    // Draw line segments connecting all points
+    for i in 0..polyline.points.len() - 1 {
+        let (x1, y1) = polyline.points[i];
+        let (x2, y2) = polyline.points[i + 1];
+        
+        // Apply scaling and offset
+        let x1_scaled = (abs_x + x1 * scale) as i32;
+        let y1_scaled = (abs_y + y1 * scale) as i32;
+        let x2_scaled = (abs_x + x2 * scale) as i32;
+        let y2_scaled = (abs_y + y2 * scale) as i32;
+        
+        // Draw an anti-aliased line with proper thickness
+        draw_anti_aliased_line(
+            imgbuf,
+            x1_scaled,
+            y1_scaled,
+            x2_scaled,
+            y2_scaled,
+            stroke_color,
+            stroke_width
+        );
+    }
+    
+    // If it's a closed path (first point == last point), we're already done
+    // Otherwise, check if the polyline should be closed by connecting last point to first
+    if polyline.points.len() > 2 && polyline.points[0] != polyline.points[polyline.points.len() - 1] {
+        // If user wants a closed shape (determined by checking if the first and last points are close enough)
+        // This is just a heuristic - future implementations could add an explicit "closed" property
+        let first = polyline.points[0];
+        let last = polyline.points[polyline.points.len() - 1];
+        let distance = ((first.0 - last.0).powi(2) + (first.1 - last.1).powi(2)).sqrt();
+        
+        // If points are very close, consider it a closed shape (like a polygon)
+        if distance < 5.0 {
+            // Apply scaling and offset
+            let x1_scaled = (abs_x + last.0 * scale) as i32;
+            let y1_scaled = (abs_y + last.1 * scale) as i32;
+            let x2_scaled = (abs_x + first.0 * scale) as i32;
+            let y2_scaled = (abs_y + first.1 * scale) as i32;
+            
+            // Draw the closing line
+            draw_anti_aliased_line(
+                imgbuf,
+                x1_scaled,
+                y1_scaled,
+                x2_scaled,
+                y2_scaled,
+                stroke_color,
+                stroke_width
+            );
+        }
     }
 }
 

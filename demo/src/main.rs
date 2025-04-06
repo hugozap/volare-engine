@@ -49,6 +49,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             stroke_width: 1.0,
         },
     );
+    
+    // Create a more visible polyline - hexagon
+    let mut hex_points = Vec::new();
+    let hex_size = 50.0;
+    for i in 0..6 {
+        let angle = (i as f64) * std::f64::consts::PI / 3.0;
+        let x = hex_size * angle.cos() + hex_size;
+        let y = hex_size * angle.sin() + hex_size;
+        hex_points.push((x, y));
+    }
+    // Close the shape
+    hex_points.push(hex_points[0]);
+    
+    let hexagon = session.new_polyline(
+        hex_points,
+        LineOptions {
+            stroke_color: "blue".to_string(),
+            stroke_width: 2.0,
+        },
+    );
 
     //Create a table with 10 ellipses
     let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
@@ -70,6 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut table_items = Vec::new();
     table_items.push(tableEllipses);
     table_items.push(polyline);
+    table_items.push(hexagon);
     for i in 0..10 {
         let text = session.new_text(
             &format!("Text hey ☣ {} \nthis is a multiline text", i),
