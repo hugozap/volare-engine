@@ -373,8 +373,8 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
                     let line = session.get_text_line(*line_id);
                     let line_pos = session.get_position(line.entity);
                     
-                    // Calculate absolute position for this line
-                    let line_x = abs_x + (line_pos.0 * scale).round() as i32;
+                    // Calculate base position without any margins yet
+                    let base_x = abs_x + (line_pos.0 * scale).round() as i32;
                     
                     // For multi-line text, calculate position with adjusted spacing
                     let y_pos = if i == 0 {
@@ -388,25 +388,31 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
                     
                     let line_y = abs_y + (y_pos * scale).round() as i32;
                     
-                    println!("  Line '{}' at ({}, {})", line.text, line_x, line_y);
-                    
                     // Get the box dimensions
                     let box_width = width;
                     
-                    // Calculate the actual text width without the margins
-                    // This is needed to properly center text
-                    let text_width = (session.get_size(*line_id).0 * scale).round() as i32;
-                    
                     // Calculate the actual rendered text width using font metrics
-                    // for even more precise centering
+                    // for precise centering
                     let rendered_width = get_text_width(&line.text, &font, font_scale);
                     
-                    // Center the text horizontally within the box
-                    // Apply centering by adjusting the x position
-                    let centered_x = line_x + ((box_width as f32 - rendered_width) / 2.0) as i32;
+                    // Calculate the left-side bearing (space before the first glyph)
+                    // This is needed because RustType positioning doesn't always start exactly at the x position we provide
+                    let first_char_glyph = font.glyph(line.text.chars().next().unwrap_or(' '))
+                                              .scaled(font_scale)
+                                              .positioned(rusttype::point(0.0, 0.0));
                     
-                    println!("  Centering text: box_width={}, text_width={}, rendered_width={}, centered_x={}", 
-                        box_width, text_width, rendered_width, centered_x);
+                    let left_bearing = if let Some(bb) = first_char_glyph.pixel_bounding_box() {
+                        bb.min.x 
+                    } else {
+                        0
+                    };
+                    
+                    // Center the text horizontally within the box
+                    // Adjust for the bounding box left side offset
+                    let centered_x = base_x + ((box_width as f32 - rendered_width) / 2.0) as i32 - left_bearing;
+                    
+                    println!("  Line '{}' at ({}, {}), box_width={}, rendered_width={}, left_bearing={}",
+                        line.text, centered_x, line_y, box_width, rendered_width, left_bearing);
                         
                     // Draw the text with centered position
                     draw_high_quality_text(
@@ -417,7 +423,7 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
                         &font,
                         font_scale,
                         text_color,
-                        text_width
+                        box_width as i32  // Use box width as max width
                     );
                 }
             },
@@ -468,10 +474,9 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
         let line_pos = session.get_position(line.entity);
         
         // Convert to i32 for our draw functions with scaling
-        // Add a small margin for visual spacing
-        let text_margin_horizontal = 4; // Small margin for visual spacing
+        // Calculate base position without margins yet
+        let base_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32;
         let text_margin_vertical = 2;   // Small vertical margin for better spacing
-        let line_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32 + text_margin_horizontal;
         
         // Apply adjusted line spacing for multi-line text
         let y_pos = if i == 0 {
@@ -486,7 +491,7 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
         let line_y = (pos.1 + y_pos * scaling_factor).round() as i32 + text_margin_vertical;
         
         // Skip text if it would be drawn outside the image bounds
-        if line_x < 0 || line_x >= imgbuf.width() as i32 || 
+        if base_x < 0 || base_x >= imgbuf.width() as i32 || 
            line_y < 0 || line_y >= imgbuf.height() as i32 {
             continue;
         }
@@ -497,14 +502,14 @@ fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: Ent
         
         // Calculate the effective width available for text
         // We don't need a large safety margin since we're not truncating
-        let max_text_width = (containing_entity_size.0 * scaling_factor).round() as i32 - 
-                             (text_margin_horizontal * 2);
+        let margin = 4; // Small horizontal margin
+        let max_text_width = (containing_entity_size.0 * scaling_factor).round() as i32 - (margin * 2);
         
         // Draw high quality anti-aliased text without truncation
         draw_high_quality_text(
             imgbuf,
             &line.text,
-            line_x,
+            base_x,
             line_y,
             &font,
             font_scale,

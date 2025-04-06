@@ -196,7 +196,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         fill_color: Fill::Color("#0000FF".to_string()),  // blue background
         stroke_color: "#000066".to_string(),  // dark blue border
         stroke_width: 1.0,
-        padding: 5.0,
+        padding: 0.0,
         border_radius: 3.0,
     };
     let blue_box = session.new_box(blue_text, box_options);
