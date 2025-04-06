@@ -841,8 +841,10 @@ impl EllipseOptions {
 
 pub struct ShapeImage {
     pub entity: EntityID,
-    //base64 encoded image
+    //base64 encoded image or empty if using file_path
     pub image: String,
+    //path to image file on disk (optional)
+    pub file_path: Option<String>,
     pub preferred_size: (f64, f64),
 }
 
@@ -851,6 +853,7 @@ impl Clone for ShapeImage {
         ShapeImage {
             entity: self.entity,
             image: self.image.clone(),
+            file_path: self.file_path.clone(),
             preferred_size: self.preferred_size,
         }
     }
@@ -868,7 +871,6 @@ impl Entity for ShapeImage {
     fn as_any(&self) -> &dyn Any {
         self
     }
-
 }
 
 impl ShapeImage {
@@ -876,6 +878,16 @@ impl ShapeImage {
         ShapeImage {
             entity,
             image,
+            file_path: None,
+            preferred_size,
+        }
+    }
+    
+    pub fn from_file(entity: EntityID, file_path: String, preferred_size: (f64, f64)) -> ShapeImage {
+        ShapeImage {
+            entity,
+            image: String::new(), // Empty as we're using file_path instead
+            file_path: Some(file_path),
             preferred_size,
         }
     }
