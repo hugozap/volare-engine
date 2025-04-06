@@ -82,11 +82,13 @@ pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
     // Calculate height with a slight increase to account for descenders
     let height = (v_metrics.ascent - v_metrics.descent) + 2.0;
     
-    // Add a small safety factor (5%) to ensure we have enough space
-    let width_with_margin = final_width * 1.05;
+    // Instead of adding an asymmetric margin, we'll provide the exact text dimensions
+    // This ensures that layout algorithms can center text properly
+    // We can add a small buffer (1-2px) for safety without affecting centering
+    let exact_width = final_width + 2.0; // Just 2px buffer instead of 5%
     
-    println!("{}: {}x{} (original measurement: {})", text, width_with_margin, height, width);
+    println!("{}: {}x{} (original measurement: {})", text, exact_width, height, width);
     
     // Convert to f64 for return
-    (width_with_margin.into(), height.into())
+    (exact_width.into(), height.into())
 }

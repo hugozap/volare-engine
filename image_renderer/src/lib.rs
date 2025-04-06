@@ -375,12 +375,29 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
                     
                     println!("  Line '{}' at ({}, {})", line.text, line_x, line_y);
                     
-                    // Draw the text directly
+                    // Get the box dimensions
+                    let box_width = width;
+                    
+                    // Calculate the actual text width without the margins
+                    // This is needed to properly center text
                     let text_width = (session.get_size(*line_id).0 * scale).round() as i32;
+                    
+                    // Calculate the actual rendered text width using font metrics
+                    // for even more precise centering
+                    let rendered_width = get_text_width(&line.text, &font, font_scale);
+                    
+                    // Center the text horizontally within the box
+                    // Apply centering by adjusting the x position
+                    let centered_x = line_x + ((box_width as f32 - rendered_width) / 2.0) as i32;
+                    
+                    println!("  Centering text: box_width={}, text_width={}, rendered_width={}, centered_x={}", 
+                        box_width, text_width, rendered_width, centered_x);
+                        
+                    // Draw the text with centered position
                     draw_high_quality_text(
                         imgbuf,
                         &line.text,
-                        line_x,
+                        centered_x,
                         line_y,
                         &font,
                         font_scale,
@@ -1040,6 +1057,34 @@ fn draw_anti_aliased_line(
             }
         }
     }
+}
+
+// Helper function to calculate the exact rendered width of a text string
+fn get_text_width(text: &str, font: &Font, scale: Scale) -> f32 {
+    // Calculate the width using font metrics with kerning
+    let mut caret = 0.0f32;
+    let mut prev_glyph_id = None;
+    
+    for c in text.chars() {
+        // Get the glyph
+        let base_glyph = font.glyph(c);
+        let glyph_id = base_glyph.id();
+        
+        // Add kerning if we have a previous glyph
+        if let Some(prev_id) = prev_glyph_id {
+            caret += font.pair_kerning(scale, prev_id, glyph_id);
+        }
+        
+        // Get metrics for this glyph and add its advance width
+        let advance_width = font.glyph(c).scaled(scale).h_metrics().advance_width;
+        caret += advance_width;
+        
+        // Track previous glyph for kerning
+        prev_glyph_id = Some(glyph_id);
+    }
+    
+    // Return the final width
+    caret
 }
 
 // Draw an anti-aliased ellipse with a given thickness
