@@ -138,9 +138,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     //create a paragraph of lorem ipsum
-    let lorem_ipsum = br#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla euismod, nunc eget aliquam ultricies, nunc nisl ultricies nunc, vitae aliquam nisl nisl vitae nisl. Nul
-    sdfasdfadsfadsfasdfasdfasdfasdfasdfasd asdf asdjf; asdkfja k;sldjfalsjd fjas;kdlfjlasdfj; asdjf; asdfasdfasdlkfj;alksdjfajsdfkasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf asdjf asdfjajsd fasdjfkajsdfasd
-    asdfasdfasdflkja;ksdf asdf a"#;
+    let lorem_ipsum = br#"
+  The adjustment factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+  text appear more naturally centered to the human eye, rather than strictly mathematically centered.
+
+  Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
+  with certain fonts or at larger font sizes.
+
+  In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
+  positioning."#;
 
     //create text shape
     let text = session.new_text(

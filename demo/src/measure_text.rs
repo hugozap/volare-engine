@@ -71,7 +71,7 @@ pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
             .max()
             .unwrap_or(0);
             
-        (max_x - min_x) as f32 + 2.0 // Add a small buffer
+        (max_x - min_x) as f32 // Precise width without buffer
     } else {
         0.0
     };
@@ -79,13 +79,16 @@ pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
     // Use the larger of the two width measurements to ensure we don't underestimate
     let final_width = width.max(glyph_width);
     
-    // Calculate height with a slight increase to account for descenders
-    let height = (v_metrics.ascent - v_metrics.descent) + 2.0;
+    // Calculate exact height without any buffer
+    let height = v_metrics.ascent - v_metrics.descent;
     
     // Instead of adding an asymmetric margin, we'll provide the exact text dimensions
-    // This ensures that layout algorithms can center text properly
-    // We can add a small buffer (1-2px) for safety without affecting centering
-    let exact_width = final_width + 2.0; // Just 2px buffer instead of 5%
+    // with no additional buffer unless explicitly needed
+    // This ensures text fits precisely without extra margins
+    let exact_width = final_width; // No buffer - exact measurement
+    
+    // Same for height - exact measurement
+    // We don't add buffer to height either for more precise layout
     
     println!("{}: {}x{} (original measurement: {})", text, exact_width, height, width);
     

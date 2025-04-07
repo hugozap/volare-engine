@@ -397,14 +397,20 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
 }
 
 // Helper function to center text inside a box
-fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, _box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
+fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
     let mut svg = String::new();
     let text_shape = session.get_text(text_id);
-    let text_pos = session.get_position(text_id);
     let text_size = session.get_size(text_id);
     
-    // For horizontal centering - use the box width directly
+    // Only apply padding if the box has padding defined and it's greater than 0
+    let effective_padding = box_shape.box_options.padding;
+    
+    // For horizontal centering - examine the box padding
+    // If padding is zero, we should center the text exactly
     let center_x = box_size.0 / 2.0;
+    
+    // Log padding value to help with debugging
+    println!("SVG text centering - box_size: {:?}, padding: {}", box_size, effective_padding);
     
     // For vertical centering in SVG text, we need to use the box middle point
     // SVG text positioning is more complex than canvas because it depends on
@@ -415,7 +421,7 @@ fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, _box_shape: &
     
     // Add a small adjustment factor to account for font metrics
     let font_size = f64::from(text_shape.text_options.font_size);
-    let adjusted_center_y = center_y + (font_size * 0.1);  // Small adjustment factor
+    let adjusted_center_y = center_y + (font_size * 0.05);  // Smaller adjustment factor
     
     // Use dominant-baseline="central" to align text vertically at the center point
     svg.push_str(&format!(
@@ -430,12 +436,18 @@ fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, _box_shape: &
     // For multi-line text, we need to adjust the vertical positioning
     let line_count = text_shape.lines.len() as f64;
     let font_size = f64::from(text_shape.text_options.font_size);
-    let total_text_height = line_count * font_size;
+    
+    // Adjust line spacing based on box padding
+    // Use tighter spacing when padding is zero or very small
+    let line_spacing_factor = if effective_padding <= 1.0 { 0.8 } else { 1.0 };
+    let adjusted_font_size = font_size * line_spacing_factor;
+    
+    let total_text_height = line_count * adjusted_font_size;
     
     // Calculate the vertical offset for the first line
     // For multiple lines, we need to shift up by half the total height
     let first_line_offset = if line_count > 1.0 {
-        -(total_text_height / 2.0) + (font_size / 2.0)
+        -(total_text_height / 2.0) + (adjusted_font_size / 2.0)
     } else {
         0.0 // Single line doesn't need vertical adjustment with dominant-baseline="central"
     };
@@ -450,10 +462,10 @@ fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, _box_shape: &
                 first_line_offset,
                 text_shape.text_options.text_color));
         } else {
-            // Subsequent lines get positioned with regular line height
+            // Subsequent lines get positioned with adjusted line height
             svg.push_str(&format!(r#"<tspan x="{}" dy="{}" fill="{}" >"#,
                 center_x,
-                font_size,
+                adjusted_font_size, // Use the adjusted font size for more compact spacing
                 text_shape.text_options.text_color));
         }
         
