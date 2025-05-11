@@ -385,7 +385,7 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
             // Center the text in the box - no need to get size separately
             
             // Calculate centering position
-            let centered_text = center_text_in_box(session, child.entity_id, box_shape, size);
+            let centered_text = render_text_in_box(session, child.entity_id, box_shape, size);
             svg.push_str(&centered_text);
         } else {
             // For non-text children, render normally
@@ -395,88 +395,51 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
 
     svg.push_str("</g>");
 }
-
-// Helper function to center text inside a box
-fn center_text_in_box(session: &DiagramBuilder, text_id: EntityID, box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
+fn render_text_in_box(session: &DiagramBuilder, text_id: EntityID, box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
     let mut svg = String::new();
     let text_shape = session.get_text(text_id);
     let text_size = session.get_size(text_id);
-    
-    // Only apply padding if the box has padding defined and it's greater than 0
-    let effective_padding = box_shape.box_options.padding;
-    
-    // For horizontal centering - examine the box padding
-    // If padding is zero, we should center the text exactly
-    let center_x = box_size.0 / 2.0;
-    
-    // Log padding value to help with debugging
-    println!("SVG text centering - box_size: {:?}, padding: {}", box_size, effective_padding);
-    
-    // For vertical centering in SVG text, we need to use the box middle point
-    // SVG text positioning is more complex than canvas because it depends on
-    // text-anchor and dominant-baseline attributes
-    
-    // Use the middle of the box for Y position
-    let center_y = box_size.1 / 2.0;
-    
-    // Add a small adjustment factor to account for font metrics
-    let font_size = f64::from(text_shape.text_options.font_size);
-    let adjusted_center_y = center_y + (font_size * 0.05);  // Smaller adjustment factor
-    
-    // Use dominant-baseline="central" to align text vertically at the center point
-    svg.push_str(&format!(
-        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" fill="{}" font-size="{}" font-family="{}" >"#,
-        center_x,
-        adjusted_center_y, // Use center Y with central baseline
-        text_shape.text_options.text_color,
-        text_shape.text_options.font_size,
-        text_shape.text_options.font_family));
-    
-    // Add the text content
-    // For multi-line text, we need to adjust the vertical positioning
     let line_count = text_shape.lines.len() as f64;
     let font_size = f64::from(text_shape.text_options.font_size);
+
+    // Calculate center position
+    let center_x = box_size.0 / 2.0;
+    let center_y = box_size.1 / 2.0;
     
-    // Adjust line spacing based on box padding
-    // Use tighter spacing when padding is zero or very small
-    let line_spacing_factor = if effective_padding <= 1.0 { 0.8 } else { 1.0 };
-    let adjusted_font_size = font_size * line_spacing_factor;
+    // SVG text rendering approach - use text-anchor="middle" with tspan elements
+    svg.push_str(&format!(
+        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" fill="{}" font-size="{}" font-family="{}">"#,
+        center_x,
+        center_y,  // Position at the exact center of the box
+        text_shape.text_options.text_color,
+        text_shape.text_options.font_size,
+        text_shape.text_options.font_family
+    ));
     
-    let total_text_height = line_count * adjusted_font_size;
-    
-    // Calculate the vertical offset for the first line
-    // For multiple lines, we need to shift up by half the total height
-    let first_line_offset = if line_count > 1.0 {
-        -(total_text_height / 2.0) + (adjusted_font_size / 2.0)
-    } else {
-        0.0 // Single line doesn't need vertical adjustment with dominant-baseline="central"
-    };
-    
-    for (i, line_id) in text_shape.lines.iter().enumerate() {
+    // Now position each line relative to the center
+    for (_i, line_id) in text_shape.lines.iter().enumerate() {
         let line = session.get_text_line(*line_id);
-        
-        if i == 0 {
-            // First line gets positioned with the calculated offset
-            svg.push_str(&format!(r#"<tspan x="{}" dy="{}" fill="{}" >"#,
-                center_x,
-                first_line_offset,
-                text_shape.text_options.text_color));
+
+        let txt = if line.text.trim().is_empty() {
+            "&#8203;".to_string()  // Create a new String directly
         } else {
-            // Subsequent lines get positioned with adjusted line height
-            svg.push_str(&format!(r#"<tspan x="{}" dy="{}" fill="{}" >"#,
-                center_x,
-                adjusted_font_size, // Use the adjusted font size for more compact spacing
-                text_shape.text_options.text_color));
-        }
+            line.text.clone()  // Clone the original
+        };
+
+        let posline = session.get_position(*line_id);
         
-        svg.push_str(&line.text.as_str());
-        svg.push_str("</tspan>");
+        svg.push_str(&format!(
+            r#"<tspan x="{}" y="{}" fill="{}">{}</tspan>"#,
+            center_x,
+            posline.1,
+            text_shape.text_options.text_color,
+            txt
+        ));
     }
     
     svg.push_str("</text>");
     svg
 }
-
 //Same as box but with support for fill gradients
 
 
@@ -506,7 +469,14 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family));
-        svg.push_str(&line.text.as_str());
+        let txt = if line.text.trim().is_empty() {
+            "&#8203;".to_string()  // Create a new String directly
+        } else {
+            line.text.clone()  // Clone the original
+        };
+        println!("text:::");
+        println!("text {}", txt);
+        svg.push_str(&txt);
         svg.push_str("</tspan>");
     }
     svg.push_str("</text>");
