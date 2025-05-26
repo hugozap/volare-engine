@@ -219,10 +219,8 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
 
         //update the row and col sizes
         let elem_size = session.get_size(*elem);
-        // Add a safety margin to ensure enough space for text 
-        // Use cell_padding for both sides plus a small buffer (10%)
         if elem_size.0 > col_widths[col] {
-            col_widths[col] = elem_size.0 + table.table_options.cell_padding as f64 * 2.0 + (elem_size.0 * 0.10);
+            col_widths[col] = elem_size.0 + table.table_options.cell_padding as f64 * 2.0;
         }
         if elem_size.1 > row_heights[row] {
             row_heights[row] = elem_size.1 + table.table_options.cell_padding as f64 * 2.0;

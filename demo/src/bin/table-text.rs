@@ -27,10 +27,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let thetext =  br#"
     The adjustment factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
     text appear more naturally centered to the human eye, rather than strictly mathematically centered.
+
   
     Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
     with certain fonts or at larger font sizes.
 
+  
     In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
     positioning."#;
     

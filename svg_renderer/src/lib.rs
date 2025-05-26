@@ -462,10 +462,9 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
     for line_id in text_shape.lines.iter() {
         let line = session.get_text_line(*line_id);
         let pos = session.get_position(line.entity);
-        let transform = format!("translate({} {})", pos.0, pos.1);
-        svg.push_str(&format!(r#"<tspan x="0" dy="{}" transform="{}" fill="{}" font-size="{}" font-family="{}" >"#,
-        text_shape.text_options.font_size, 
-        transform,
+        svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}" font-family="{}" alignment-baseline="middle" >"#,
+        pos.0,
+        pos.1,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family));

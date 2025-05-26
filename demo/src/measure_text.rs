@@ -16,7 +16,7 @@ Browsers use 96 DPI by default so we need to scale the font size
  */
 
 pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
-    let font_data = include_bytes!("../assets/Roboto-Regular.ttf");
+    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
     // Use a higher DPI for more accurate measurements
@@ -98,7 +98,7 @@ pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
 
 
 pub fn measure_text_svg(text: &str, options: &TextOptions) -> (f64, f64) {
-    let font_data = include_bytes!("../assets/Roboto-Regular.ttf");
+    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
     // Standard SVG DPI

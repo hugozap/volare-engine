@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
     let text_options = TextOptions {
-        font_family: "Roboto".to_string(),
+        font_family: "AnonymicePro Nerd Font".to_string(),
         font_size: 12.0,
         line_width: 100,
         text_color: "black".to_string(),
@@ -87,28 +87,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
 
     //Create a list of 10 texts
-    let mut table_items = Vec::new();
-    table_items.push(tableEllipses);
-    table_items.push(polyline);
-    table_items.push(hexagon);
-    for i in 0..10 {
-        let text = session.new_text(
-            &format!("Text hey ☣ {} \nthis is a multiline text", i),
-            text_options.clone(),
-        );
-        table_items.push(text);
-        //texts.push(get_test_table(&mut session));
-    }
+     let mut table_items = Vec::new();
+    // table_items.push(tableEllipses);
+    // table_items.push(polyline);
+    // table_items.push(hexagon);
+    // for i in 0..10 {
+    //     let text = session.new_text(
+    //         &format!("Text hey ☣ {} \nthis is a multiline text", i),
+    //         text_options.clone(),
+    //     );
+    //     table_items.push(text);
+    //     //texts.push(get_test_table(&mut session));
+    // }
     //Add a couple of ellipses
-    let ellipse = session.new_elipse(
-        (0.0, 0.0),
-        (10.0, 10.0),
-        EllipseOptions {
-            fill_color: "red".to_string(),
-            stroke_color: "black".to_string(),
-            stroke_width: 1.0,
-        },
-    );
 
     //Create an ellipse and wrap it with a box
     let ellipse = session.new_elipse(
@@ -121,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    table_items.push(ellipse);
+    //table_items.push(ellipse);
 
     //Now add 10 ellipses
     for i in 0..10 {
@@ -134,12 +125,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 stroke_width: 1.0,
             },
         );
-        table_items.push(ellipse);
+       // table_items.push(ellipse);
     }
 
     //create a paragraph of lorem ipsum
     let lorem_ipsum = br#"
-  The adjustment factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+  THE adjustment \u{f1878} factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
   text appear more naturally centered to the human eye, rather than strictly mathematically centered.
 
   Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
@@ -170,7 +161,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let title_text = session.new_text(
         "FreeContainer Demo",
         TextOptions {
-            font_family: "Roboto".to_string(),
+            font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 18.0,
             line_width: 100,
             text_color: "#000000".to_string(),
@@ -187,20 +178,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     );
 
-    let thetext =  br#"
-    The adjustment factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+    let thetext =  format!(r#"
+    The adjustment factor {} (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
     text appear more naturally centered to the human eye, rather than strictly mathematically centered.
   
     Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
     with certain fonts or at larger font sizes.
   
     In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
-    positioning."#;
+    positioning."#, "\u{f1878}");
     
     let blue_text = session.new_text(
-        std::str::from_utf8(thetext).unwrap(),
+        &thetext,
         TextOptions {
-            font_family: "Roboto".to_string(),
+            font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 16.0,
             line_width: 100,
             text_color: "white".to_string(),  // white text
@@ -210,7 +201,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a box around the blue text
     let box_options = BoxOptions {
         fill_color: Fill::Color("#0000FF".to_string()),  // blue background
-        stroke_color: "#000066".to_string(),  // dark blue border
+        stroke_color: "green".to_string(),  // dark blue border
         stroke_width: 1.0,
         padding: 0.0,
         border_radius: 3.0,
@@ -230,7 +221,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subtitle = session.new_text(
         "Absolute positioning of elements",
         TextOptions {
-            font_family: "Roboto".to_string(),
+            font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 12.0,
             line_width: 100,
             text_color: "#555555".to_string(),  // dark gray
@@ -257,7 +248,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 2;
     let table = session.new_table(table_items, 5, toptions);
 
     // Calculate layout
@@ -280,16 +271,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
 
     // Render PNG
-    let mut png_path = temp_dir.clone();
-    png_path.push("png-render-test.png");
-    let png_renderer = PNGRenderer {};
-    let mut png_file = File::create(&png_path).unwrap();
-    let png_res = png_renderer.render(&session, &table, &mut png_file);
-    if png_res.is_err() {
-        println!("PNG Render Error: {}", png_res.err().unwrap());
-        std::process::exit(1);
-    }
-    println!("PNG file written to: {}", png_path.to_str().unwrap());
+    // let mut png_path = temp_dir.clone();
+    // png_path.push("png-render-test.png");
+    // let png_renderer = PNGRenderer {};
+    // let mut png_file = File::create(&png_path).unwrap();
+    // let png_res = png_renderer.render(&session, &table, &mut png_file);
+    // if png_res.is_err() {
+    //     println!("PNG Render Error: {}", png_res.err().unwrap());
+    //     std::process::exit(1);
+    // }
+    // println!("PNG file written to: {}", png_path.to_str().unwrap());
 
     Ok(())
 }
@@ -301,7 +292,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// .
 fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     let text_options = TextOptions {
-        font_family: "Roboto".to_string(),
+        font_family: "AnonymicePro Nerd Font".to_string(),
         font_size: 12.0,
         line_width: 100,
         text_color: "black".to_string(),
