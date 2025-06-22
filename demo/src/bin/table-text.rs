@@ -42,7 +42,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             font_family: "Roboto".to_string(),
             font_size: 16.0,
             line_width: 100,
-            text_color: "white".to_string(),  // white text
+            text_color: "white".to_string(),  // white 
+            line_spacing: 0.0
         },
     );
 

@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         font_size: 12.0,
         line_width: 100,
         text_color: "black".to_string(),
+        line_spacing: 0.0,
     };
     session.set_measure_text_fn(measure_text);
 
@@ -165,6 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             font_size: 18.0,
             line_width: 100,
             text_color: "#000000".to_string(),
+            line_spacing: 0.0,
         },
     );
     
@@ -195,6 +197,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             font_size: 16.0,
             line_width: 100,
             text_color: "white".to_string(),  // white text
+            line_spacing: 0.0,
         },
     );
     
@@ -225,6 +228,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             font_size: 12.0,
             line_width: 100,
             text_color: "#555555".to_string(),  // dark gray
+            line_spacing: 0.0,
         },
     );
     

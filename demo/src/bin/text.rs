@@ -25,13 +25,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut table_items = Vec::new();
 
-    let thetext =  br#""Lorem ipsum dolor sit amet, consectetur adipiscing elit.""#;
+    let thetext =  br#""Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+otra linea texto
+otra mas...
+It could also be compensating for the fact that pos includes
+cumulative scaling from parent transforms, 
+and you need to pass down the "base" position to child renderers.
+The comment "Calculate absolute position without any scaling" suggests the goal is to get back to unscaled coordinates that the child rendering pipeline expects.""#;
 
     let textOpts =  TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 16.0,
             line_width: 100,
             text_color: "white".to_string(),  // white text
+            line_spacing: 5.0,
         };
 
     let blue_text = session.new_text(
@@ -46,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         fill_color: Fill::Color("#0000FF".to_string()),  // blue background
         stroke_color: "#000066".to_string(),  // dark blue border
         stroke_width: 1.0,
-        padding: 0.0,
+        padding: 2.0,
         border_radius: 0.0,
     };
 

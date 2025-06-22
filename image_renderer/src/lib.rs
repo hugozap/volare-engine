@@ -1,22 +1,17 @@
-use std::io::Write;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-use image::{Rgba, RgbaImage, GenericImageView, DynamicImage};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use bresenham::Bresenham;
+use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use rusttype::{Font, Scale};
-use bresenham::Bresenham;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
+use std::path::Path;
 
 use volare_engine_layout::{
-    diagram_builder::DiagramTreeNode, 
-    Renderer, 
-    DiagramBuilder, 
+    diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, Fill, Renderer,
     RendererError,
-    EntityType,
-    EntityID,
-    Fill
 };
 
 /**
@@ -33,18 +28,19 @@ impl<W: Write> Renderer<W> for PNGRenderer {
         stream: &mut W,
     ) -> Result<(), RendererError> {
         let root_size = session.get_size(diagram_node.entity_id);
-        
+
         // Use a scaling factor for higher resolution output but don't scale too much
         // 1.5 is a good balance between quality and maintaining layout proportions
-        let scaling_factor = 2.0; 
-        
+        // TODO: Esto debe ser un parametro?
+        let scaling_factor = 1.5;
+
         // Calculate image dimensions with scaling
         let width = ((root_size.0 * scaling_factor).ceil() as u32).max(200);
         let height = ((root_size.1 * scaling_factor).ceil() as u32).max(200);
-        
+
         // Debug output
         println!("Creating PNG image with dimensions: {}x{}", width, height);
-        
+
         // Create an image with a white background
         let mut imgbuf = RgbaImage::from_fn(width, height, |_, _| Rgba([255, 255, 255, 255]));
 
@@ -60,36 +56,52 @@ impl<W: Write> Renderer<W> for PNGRenderer {
         }
 
         // Pass scaling factor to the render function
-        render_node(diagram_node, session, &mut imgbuf, (0.0, 0.0), scaling_factor);
+        render_node(
+            diagram_node,
+            session,
+            &mut imgbuf,
+            (0.0, 0.0),
+            scaling_factor,
+        );
 
         // Write the PNG image to the stream
         let encoder = image::png::PngEncoder::new(stream);
-        encoder.encode(
-            imgbuf.as_raw(),
-            imgbuf.width(),
-            imgbuf.height(),
-            image::ColorType::Rgba8,
-        ).map_err(|e| RendererError::new(&e.to_string()))?;
+        encoder
+            .encode(
+                imgbuf.as_raw(),
+                imgbuf.width(),
+                imgbuf.height(),
+                image::ColorType::Rgba8,
+            )
+            .map_err(|e| RendererError::new(&e.to_string()))?;
 
         Ok(())
     }
 }
 
 // Render a node and its children
-fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut RgbaImage, parent_offset: (f64, f64), scale: f64) {
+fn render_node(
+    node: &DiagramTreeNode,
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    parent_offset: (f64, f64),
+    scale: f64,
+) {
     let entity_id = node.entity_id;
     let pos = session.get_position(entity_id);
-    
+
     // Calculate absolute position by adding parent offset, then apply scaling
     let abs_pos = (
-        (parent_offset.0 + pos.0) * scale, 
-        (parent_offset.1 + pos.1) * scale
+        (parent_offset.0 + pos.0) * scale,
+        (parent_offset.1 + pos.1) * scale,
     );
-    
+
     // Debug output to track node positioning
     let size = session.get_size(entity_id);
-    println!("Rendering node type: {:?}, id: {}, pos: ({:.1}, {:.1}), size: ({:.1}, {:.1})",
-             node.entity_type, entity_id, abs_pos.0, abs_pos.1, size.0, size.1);
+    println!(
+        "Rendering node type: {:?}, id: {}, pos: ({:.1}, {:.1}), size: ({:.1}, {:.1})",
+        node.entity_type, entity_id, abs_pos.0, abs_pos.1, size.0, size.1
+    );
 
     match node.entity_type {
         EntityType::GroupShape => {
@@ -114,19 +126,24 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             // Get table properties
             let table_shape = session.get_table(entity_id);
             let size = session.get_size(entity_id);
-            
+
             // Apply scaling factor to dimensions
             let width = (size.0 * scale).ceil() as u32;
             let height = (size.1 * scale).ceil() as u32;
             let x = abs_pos.0.round() as i32;
             let y = abs_pos.1.round() as i32;
-            
-            if x >= 0 && y >= 0 && width > 0 && height > 0 &&
-               x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
+
+            if x >= 0
+                && y >= 0
+                && width > 0
+                && height > 0
+                && x + width as i32 <= imgbuf.width() as i32
+                && y + height as i32 <= imgbuf.height() as i32
+            {
                 // Draw table outer border with specified color
                 let border_color = parse_color(&table_shape.table_options.border_color);
                 let border_width = (table_shape.table_options.border_width as f64 * scale) as u32;
-                
+
                 // Draw outer border (make it thicker for visibility)
                 let rect = Rect::at(x, y).of_size(width, height);
                 for i in 0..border_width {
@@ -136,36 +153,40 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                         draw_hollow_rect_mut(imgbuf, inner_rect, border_color);
                     }
                 }
-                
+
                 // Draw header area
                 let header_rect = session.get_size(table_shape.header_rect);
                 let header_height = (header_rect.1 * scale).ceil() as u32;
                 if header_height > 0 {
                     // Get the exact header color from the options
-                    let header_fill_color = parse_color(&table_shape.table_options.header_fill_color);
-                    
+                    let header_fill_color =
+                        parse_color(&table_shape.table_options.header_fill_color);
+
                     // Debug print the header color
-                    println!("Table header color: {}", table_shape.table_options.header_fill_color);
-                    
+                    println!(
+                        "Table header color: {}",
+                        table_shape.table_options.header_fill_color
+                    );
+
                     // Fill the header area
                     let header_rect = Rect::at(x, y).of_size(width, header_height);
                     draw_filled_rect_mut(imgbuf, header_rect, header_fill_color);
                     draw_hollow_rect_mut(imgbuf, header_rect, border_color);
                 }
-                
+
                 // Use the predefined grid lines from the table
                 // This uses the actual table_shape.col_lines and table_shape.row_lines
                 // instead of trying to infer them from child positions
-                
+
                 // Draw column lines (vertical dividers)
                 for col_line_id in &table_shape.col_lines {
                     // Get the position of this column line
                     let line_pos = session.get_position(*col_line_id);
                     let line_size = session.get_size(*col_line_id);
-                    
+
                     // Calculate the absolute x position with scaling
                     let line_x = (abs_pos.0 + line_pos.0 * scale as f64).round() as i32;
-                    
+
                     // Only draw if the line is within the image bounds
                     if line_x >= 0 && line_x < imgbuf.width() as i32 {
                         // Draw a vertical line from top to bottom of table
@@ -177,16 +198,16 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                         }
                     }
                 }
-                
+
                 // Draw row lines (horizontal dividers)
                 for row_line_id in &table_shape.row_lines {
                     // Get the position of this row line
                     let line_pos = session.get_position(*row_line_id);
                     let line_size = session.get_size(*row_line_id);
-                    
+
                     // Calculate the absolute y position with scaling
                     let line_y = (abs_pos.1 + line_pos.1 * scale as f64).round() as i32;
-                    
+
                     // Only draw if the line is within the image bounds
                     if line_y >= 0 && line_y < imgbuf.height() as i32 {
                         // Draw a horizontal line from left to right of table
@@ -198,7 +219,7 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                         }
                     }
                 }
-                
+
                 // Render children (cells)
                 for child in node.children.iter() {
                     render_node(child, session, imgbuf, abs_pos, scale);
@@ -209,51 +230,56 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
             // Get ellipse properties
             let ellipse_shape = session.get_ellipse(entity_id);
             let size = session.get_size(entity_id);
-            
+
             // Apply scaling factor to dimensions
             let width = (size.0 * scale).ceil() as u32;
             let height = (size.1 * scale).ceil() as u32;
             let x = abs_pos.0.round() as i32;
             let y = abs_pos.1.round() as i32;
-            
-            if x >= 0 && y >= 0 && width > 0 && height > 0 &&
-               x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
+
+            if x >= 0
+                && y >= 0
+                && width > 0
+                && height > 0
+                && x + width as i32 <= imgbuf.width() as i32
+                && y + height as i32 <= imgbuf.height() as i32
+            {
                 // Get colors from the ellipse properties
                 let fill_color = parse_color(&ellipse_shape.ellipse_options.fill_color);
                 let stroke_color = parse_color(&ellipse_shape.ellipse_options.stroke_color);
-                
+
                 // Calculate center coordinates
                 let center_x = x + (width / 2) as i32;
                 let center_y = y + (height / 2) as i32;
                 let radius_x = (width / 2) as i32;
                 let radius_y = (height / 2) as i32;
-                
+
                 // Draw filled ellipse first, using floating point for more accurate ellipse equation
                 for py in y..y + height as i32 {
                     if py < 0 || py >= imgbuf.height() as i32 {
-                        continue;  // Skip if outside vertical bounds
+                        continue; // Skip if outside vertical bounds
                     }
-                    
+
                     for px in x..x + width as i32 {
                         if px < 0 || px >= imgbuf.width() as i32 {
-                            continue;  // Skip if outside horizontal bounds
+                            continue; // Skip if outside horizontal bounds
                         }
-                        
+
                         // Calculate if this pixel is inside the ellipse using floating point
                         // for higher precision: (x/a)² + (y/b)² <= 1
                         let dx = (px - center_x) as f64;
                         let dy = (py - center_y) as f64;
                         let rx = radius_x as f64;
                         let ry = radius_y as f64;
-                        
+
                         let eq_value = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
-                        
+
                         if eq_value <= 1.0 {
                             imgbuf.put_pixel(px as u32, py as u32, fill_color);
                         }
                     }
                 }
-                
+
                 // Draw the ellipse border using a modified Bresenham algorithm for smoother outlines
                 // This implementation gives much higher quality anti-aliased edges
                 draw_anti_aliased_ellipse(
@@ -263,7 +289,7 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
                     radius_x,
                     radius_y,
                     stroke_color,
-                    (ellipse_shape.ellipse_options.stroke_width * scale as f64) as f32
+                    (ellipse_shape.ellipse_options.stroke_width * scale as f64) as f32,
                 );
             }
         }
@@ -278,30 +304,48 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder, imgbuf: &mut Rg
     }
 }
 
-fn render_group(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_group(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    _entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     for child in node.children.iter() {
         render_node(child, session, imgbuf, pos, scale);
     }
 }
 
-fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_box(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     let size = session.get_size(entity_id);
     let box_shape = session.get_box(node.entity_id);
-    
+
     // Convert to i32 for drawing functions with scaling
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
     let width = (size.0 * scale).ceil() as u32;
     let height = (size.1 * scale).ceil() as u32;
-    
+
     // Safety check to avoid drawing outside the image bounds
-    if x < 0 || y < 0 || width == 0 || height == 0 || 
-       x + width as i32 > imgbuf.width() as i32 || 
-       y + height as i32 > imgbuf.height() as i32 {
+    if x < 0
+        || y < 0
+        || width == 0
+        || height == 0
+        || x + width as i32 > imgbuf.width() as i32
+        || y + height as i32 > imgbuf.height() as i32
+    {
         // Skip this box if it's outside the bounds
         return;
     }
-    
+
     let rect = Rect::at(x, y).of_size(width, height);
 
     // Handle fill color
@@ -309,218 +353,148 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
         Fill::Color(color) => {
             let rgba = parse_color(color);
             draw_filled_rect_mut(imgbuf, rect, rgba);
-        },
+        }
         // For now, we'll just use a default color for gradients
         _ => {
             draw_filled_rect_mut(imgbuf, rect, Rgba([255, 255, 255, 255]));
         }
     }
-    
+
     // Draw border/stroke with scaled width
     let stroke_color = parse_color(&box_shape.box_options.stroke_color);
     let stroke_width = (box_shape.box_options.stroke_width * scale).ceil() as u32;
-    
+
     // Draw border with proper thickness
     for i in 0..stroke_width {
         if i < stroke_width {
-            let inner_rect = Rect::at(x + i as i32, y + i as i32)
-                .of_size(width - 2 * i, height - 2 * i);
+            let inner_rect =
+                Rect::at(x + i as i32, y + i as i32).of_size(width - 2 * i, height - 2 * i);
             draw_hollow_rect_mut(imgbuf, inner_rect, stroke_color);
         }
     }
-    
+
     // Render children inside the box, accounting for padding
     for child in node.children.iter() {
         let child_id = child.entity_id;
         let child_pos = session.get_position(child_id);
-        
+
         // Instead of trying to be clever about nested transforms, let's use the simplest
         // and most direct approach: manually handle rendering the text here
-        
+
         // Log child details
-        println!("Rendering box child: id={}, type={:?}, box_pos=({:.1},{:.1}), child_pos=({:.1},{:.1})",
-            child_id, child.entity_type, pos.0, pos.1, child_pos.0, child_pos.1);
-        
+        println!(
+            "Rendering box child: id={}, type={:?}, box_pos=({:.1},{:.1}), child_pos=({:.1},{:.1})",
+            child_id, child.entity_type, pos.0, pos.1, child_pos.0, child_pos.1
+        );
+
         // Get absolute position for child relative to box
         let abs_x = (pos.0 + child_pos.0 * scale).round() as i32;
         let abs_y = (pos.1 + child_pos.1 * scale).round() as i32;
-        
-        // For text elements in boxes, we'll handle them specially
-        match child.entity_type {
-            EntityType::TextShape => {
-                // Get the text and render it directly
-                let text_shape = session.get_text(child_id);
-                //TODO: dynamically load the font data!
-                //let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
-                let font_data = include_bytes!("../../demo/assets/AnonymiceProNerdFont-Regular.ttf");
-                let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
-                
-                // Convert text color string to RGBA
-                let text_color = parse_color(&text_shape.text_options.text_color);
-                println!("  Text: '{}', color: {}, pos: ({}, {})", 
-                    text_shape.text, text_shape.text_options.text_color, abs_x, abs_y);
-                
-                // Render text directly
-                // let dpi = 120.0;
-                // let dpi_scale_factor = dpi / 72.0;
-                // let font_size = text_shape.text_options.font_size * dpi_scale_factor;
 
-                // TODO: for SVG should we use scaling?
-                let font_size = text_shape.text_options.font_size;
-                let font_scale = Scale::uniform(font_size * scale as f32);
+        // Calculate absolute position without any scaling
+        let adjusted_parent_offset = (pos.0 / scale, pos.1 / scale);
 
-                
-                // Render each line - use position data from layout engine
-                // but adjust line spacing if needed for better aesthetics
-                let line_count = text_shape.lines.len();
-                let line_spacing_factor = if line_count > 1 { 0.6 } else { 1.0 }; // Further reduce spacing for multi-line text in boxes
-                
-                for (i, line_id) in text_shape.lines.iter().enumerate() {
-                    let line = session.get_text_line(*line_id);
-                    let line_pos = session.get_position(line.entity);
-                    
-                    // Calculate base position without any margins yet
-                    let base_x = abs_x + (line_pos.0 * scale).round() as i32;
-                    
-                    // For multi-line text, calculate position with adjusted spacing
-                    let y_pos = if i == 0 {
-                        // First line uses original position
-                        line_pos.1
-                    } else {
-                        // Subsequent lines use compressed spacing
-                        let prev_line_pos = session.get_position(text_shape.lines[i-1]);
-                        prev_line_pos.1 + (line_pos.1 - prev_line_pos.1) * line_spacing_factor
-                    };
-                    
-                    let line_y = abs_y + (y_pos * scale).round() as i32;
-                    
-                    // Get the box dimensions
-                    let box_width = width;
-                    
-                    // Calculate the actual rendered text width using font metrics
-                    // for precise centering
-                    let rendered_width = get_text_width(&line.text, &font, font_scale);
-                    
-                    // Calculate the left-side bearing (space before the first glyph)
-                    // This is needed because RustType positioning doesn't always start exactly at the x position we provide
-                    let first_char_glyph = font.glyph(line.text.chars().next().unwrap_or(' '))
-                                              .scaled(font_scale)
-                                              .positioned(rusttype::point(0.0, 0.0));
-                    
-                    let left_bearing = if let Some(bb) = first_char_glyph.pixel_bounding_box() {
-                        bb.min.x 
-                    } else {
-                        0
-                    };
-                    
-                    // Center the text horizontally within the box
-                    // Adjust for the bounding box left side offset
-                    let centered_x = base_x + ((box_width as f32 - rendered_width) / 2.0) as i32 - left_bearing;
-                    
-                    println!("  Line '{}' at ({}, {}), box_width={}, rendered_width={}, left_bearing={}",
-                        line.text, centered_x, line_y, box_width, rendered_width, left_bearing);
-                        
-                    // Draw the text with centered position
-                    draw_high_quality_text(
-                        imgbuf,
-                        &line.text,
-                        centered_x,
-                        line_y,
-                        &font,
-                        font_scale,
-                        text_color,
-                        box_width as i32  // Use box width as max width
-                    );
-                }
-            },
-            // For other types, we'll use render_node but with a fully calculated position
-            _ => {
-                // Calculate absolute position without any scaling
-                let adjusted_parent_offset = (
-                    pos.0 / scale,
-                    pos.1 / scale
-                );
-                
-                // Log the adjusted values
-                println!("  Using adjusted_parent_offset=({:.1},{:.1})", 
-                    adjusted_parent_offset.0, adjusted_parent_offset.1);
-                    
-                // Render the child with the adjusted parent offset
-                render_node(child, session, imgbuf, adjusted_parent_offset, scale);
-            }
-        }
+        // Log the adjusted values
+        println!(
+            "  Using adjusted_parent_offset=({:.1},{:.1})",
+            adjusted_parent_offset.0, adjusted_parent_offset.1
+        );
+
+        // Render the child with the adjusted parent offset
+        // TODO: Centering logic for elems inside box
+        render_node(child, session, imgbuf, adjusted_parent_offset, scale);
     }
 }
 
-fn render_text(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scaling_factor: f64) {
-    let text_shape = session.get_text(node.entity_id);
-    let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
+fn render_text(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
+    // Get the text and render it directly
+    let text_shape = session.get_text(entity_id);
+    //get size
+    let size = session.get_size(entity_id);
+    //TODO: dynamically load the font data!
+    //let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
+    let font_data = include_bytes!("../../demo/assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
-    
-    // Convert text color string to Rgba
+
+    // Convert text color string to RGBA
     let text_color = parse_color(&text_shape.text_options.text_color);
-    
-    // Calculate font scaling - be careful not to over-scale to maintain proper text layout
-    // We'll use a modest DPI increase for quality, but scale the font more conservatively
-    let dpi = 120.0; // Better quality without excessive scaling
-    let dpi_scale_factor = dpi / 72.0;
-    
-    // Ensure we use a scaling factor that matches the layout measurements
-    let text_scaling = (scaling_factor * 0.95) as f32; // Increased to 0.95 to match measurement DPI better
-    let font_size = text_shape.text_options.font_size * dpi_scale_factor * text_scaling;
-    let font_scale = Scale::uniform(font_size);
-    
-    // Render each text line with custom anti-aliasing and adjusted spacing
+    println!(
+        "  Text: '{}', color: {}, pos: ({}, {})",
+        text_shape.text, text_shape.text_options.text_color, pos.0, pos.1
+    );
+
+    // Render text directly
+    // let dpi = 120.0;
+    // let dpi_scale_factor = dpi / 72.0;
+    // let font_size = text_shape.text_options.font_size * dpi_scale_factor;
+
+    let font_size = text_shape.text_options.font_size;
+    let font_scale = Scale::uniform(font_size * scale as f32);
+
+    // Render each line - use position data from layout engine
+    // but adjust line spacing if needed for better aesthetics
     let line_count = text_shape.lines.len();
-    let line_spacing_factor = if line_count > 1 { 0.7 } else { 1.0 }; // Reduce spacing for multi-line text (less aggressive than for boxes)
-    
-    // Render each text line
+    let line_spacing_factor = if line_count > 1 { 0.6 } else { 1.0 }; // Further reduce spacing for multi-line text in boxes
+
     for (i, line_id) in text_shape.lines.iter().enumerate() {
         let line = session.get_text_line(*line_id);
+        let lineSize = session.get_size(line.entity);
         let line_pos = session.get_position(line.entity);
-        
-        // Convert to i32 for our draw functions with scaling
-        // Calculate base position without margins yet
-        let base_x = (pos.0 + line_pos.0 * scaling_factor).round() as i32;
-        let text_margin_vertical = 2;   // Small vertical margin for better spacing
-        
-        // Apply adjusted line spacing for multi-line text
+
+        // Calculate base position without any margins yet
+        let base_x = (pos.0 * scale) as i32 + (line_pos.0 * scale).round() as i32;
+
+        // For multi-line text, calculate position with adjusted spacing
         let y_pos = if i == 0 {
             // First line uses original position
             line_pos.1
         } else {
             // Subsequent lines use compressed spacing
-            let prev_line_pos = session.get_position(text_shape.lines[i-1]);
+            let prev_line_pos = session.get_position(text_shape.lines[i - 1]);
             prev_line_pos.1 + (line_pos.1 - prev_line_pos.1) * line_spacing_factor
         };
-        
-        let line_y = (pos.1 + y_pos * scaling_factor).round() as i32 + text_margin_vertical;
-        
-        // Skip text if it would be drawn outside the image bounds
-        if base_x < 0 || base_x >= imgbuf.width() as i32 || 
-           line_y < 0 || line_y >= imgbuf.height() as i32 {
-            continue;
-        }
-        
-        // Get the entity size that contains this text to use as the max width
-        // The table layout module should have already determined the optimal cell size
-        let containing_entity_size = session.get_size(node.entity_id);
-        
-        // Calculate the effective width available for text
-        // We don't need a large safety margin since we're not truncating
-        let margin = 4; // Small horizontal margin
-        let max_text_width = (containing_entity_size.0 * scaling_factor).round() as i32 - (margin * 2);
-        
-        // Draw high quality anti-aliased text without truncation
+
+        let line_y = pos.0 as i32 + (y_pos * scale).round() as i32;
+
+        // Calculate the actual rendered text width using font metrics
+        // for precise centering
+        //let rendered_width = get_text_width(&line.text, &font, font_scale);
+        let rendered_width = lineSize.0;
+        // Calculate the left-side bearing (space before the first glyph)
+        // This is needed because RustType positioning doesn't always start exactly at the x position we provide
+        let first_char_glyph = font
+            .glyph(line.text.chars().next().unwrap_or(' '))
+            .scaled(font_scale)
+            .positioned(rusttype::point(0.0, 0.0));
+
+        let left_bearing = if let Some(bb) = first_char_glyph.pixel_bounding_box() {
+            bb.min.x
+        } else {
+            0
+        };
+
+        // Center the text horizontally within the box
+        // Adjust for the bounding box left side offset
+        let centered_x =
+            base_x + ((lineSize.0 as f32 - rendered_width as f32) / 2.0) as i32 - left_bearing;
+
+        // Draw the text with centered position
         draw_high_quality_text(
             imgbuf,
             &line.text,
-            base_x,
+            centered_x,
             line_y,
             &font,
             font_scale,
             text_color,
-            max_text_width
+            size.0 as i32, // Use box width as max width
         );
     }
 }
@@ -534,37 +508,37 @@ fn draw_high_quality_text(
     font: &Font,
     scale: Scale,
     color: Rgba<u8>,
-    _max_width: i32  // We keep this parameter for API compatibility but don't use it
+    _max_width: i32, // We keep this parameter for API compatibility but don't use it
 ) {
     // Calculate the vertical metrics once
     let v_metrics = font.v_metrics(scale);
     let offset_y = v_metrics.ascent;
-    
+
     // Layout the glyphs in the text with proper positioning
     let mut caret = rusttype::point(0.0, offset_y);
     let mut last_glyph_id = None;
     let mut glyphs: Vec<rusttype::PositionedGlyph> = Vec::new();
-    
+
     // Process each character for proper kerning and positioning
     for c in text.chars() {
         // Create the glyph
         let base_glyph = font.glyph(c);
-        
+
         // Apply kerning if we have a previous glyph
         if let Some(previous) = last_glyph_id {
             caret.x += font.pair_kerning(scale, previous, base_glyph.id());
         }
-        
+
         last_glyph_id = Some(base_glyph.id());
-        
+
         // Get the advance width before we consume the glyph with scaled()
         let advance_width = base_glyph.scaled(scale).h_metrics().advance_width;
-        
+
         // Position the glyph and add it to our collection
         // We need to create the glyph again since scaled() consumes it
         let positioned_glyph = font.glyph(c).scaled(scale).positioned(caret);
         glyphs.push(positioned_glyph);
-        
+
         // Advance the caret using our saved advance_width
         caret.x += advance_width;
     }
@@ -577,13 +551,13 @@ fn draw_high_quality_text(
                 // Map to actual screen position
                 let px = x + bounding_box.min.x + gx as i32;
                 let py = y + bounding_box.min.y + gy as i32;
-                
+
                 // Only draw if inside image bounds
                 if px >= 0 && px < imgbuf.width() as i32 && py >= 0 && py < imgbuf.height() as i32 {
                     // Create a color with adjusted alpha for anti-aliasing
                     let alpha = (glyph_opacity * color[3] as f32) as u8;
                     let antialiased_color = Rgba([color[0], color[1], color[2], alpha]);
-                    
+
                     // Blend with existing pixels for smoother rendering
                     blend_pixel(imgbuf, px, py, antialiased_color, glyph_opacity);
                 }
@@ -592,72 +566,103 @@ fn draw_high_quality_text(
     }
 }
 
-fn render_vertical_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_vertical_stack(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    _entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     // Draw a debug rectangle to show the stack bounds
     let size = session.get_size(_entity_id);
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
     let width = (size.0 * scale).ceil() as u32;
     let height = (size.1 * scale).ceil() as u32;
-    
-    if x >= 0 && y >= 0 && width > 0 && height > 0 &&
-       x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
+
+    if x >= 0
+        && y >= 0
+        && width > 0
+        && height > 0
+        && x + width as i32 <= imgbuf.width() as i32
+        && y + height as i32 <= imgbuf.height() as i32
+    {
         let rect = Rect::at(x, y).of_size(width, height);
         draw_hollow_rect_mut(imgbuf, rect, Rgba([0, 0, 255, 128]));
     }
-    
+
     // Render children
     for child in node.children.iter() {
         render_node(child, session, imgbuf, pos, scale);
     }
 }
 
-fn render_horizontal_stack(session: &DiagramBuilder, imgbuf: &mut RgbaImage, _entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_horizontal_stack(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    _entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     // Draw a debug rectangle to show the stack bounds
     let size = session.get_size(_entity_id);
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
     let width = (size.0 * scale).ceil() as u32;
     let height = (size.1 * scale).ceil() as u32;
-    
-    if x >= 0 && y >= 0 && width > 0 && height > 0 &&
-       x + width as i32 <= imgbuf.width() as i32 && y + height as i32 <= imgbuf.height() as i32 {
+
+    if x >= 0
+        && y >= 0
+        && width > 0
+        && height > 0
+        && x + width as i32 <= imgbuf.width() as i32
+        && y + height as i32 <= imgbuf.height() as i32
+    {
         let rect = Rect::at(x, y).of_size(width, height);
         draw_hollow_rect_mut(imgbuf, rect, Rgba([0, 255, 0, 128]));
     }
-    
+
     // Render children
     for child in node.children.iter() {
         render_node(child, session, imgbuf, pos, scale);
     }
 }
 
-fn render_polyline(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, _node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_polyline(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    _node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     // Get polyline properties
     let polyline = session.get_polyline(entity_id);
     let stroke_color = parse_color(&polyline.line_options.stroke_color);
     let stroke_width = (polyline.line_options.stroke_width * scale) as f32;
-    
+
     // Need at least 2 points to draw a line
     if polyline.points.len() < 2 {
         return;
     }
-    
+
     // Calculate absolute position with scaling
     let abs_x = pos.0;
     let abs_y = pos.1;
-    
+
     // Draw line segments connecting all points
     for i in 0..polyline.points.len() - 1 {
         let (x1, y1) = polyline.points[i];
         let (x2, y2) = polyline.points[i + 1];
-        
+
         // Apply scaling and offset
         let x1_scaled = (abs_x + x1 * scale) as i32;
         let y1_scaled = (abs_y + y1 * scale) as i32;
         let x2_scaled = (abs_x + x2 * scale) as i32;
         let y2_scaled = (abs_y + y2 * scale) as i32;
-        
+
         // Draw an anti-aliased line with proper thickness
         draw_anti_aliased_line(
             imgbuf,
@@ -666,19 +671,20 @@ fn render_polyline(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: 
             x2_scaled,
             y2_scaled,
             stroke_color,
-            stroke_width
+            stroke_width,
         );
     }
-    
+
     // If it's a closed path (first point == last point), we're already done
     // Otherwise, check if the polyline should be closed by connecting last point to first
-    if polyline.points.len() > 2 && polyline.points[0] != polyline.points[polyline.points.len() - 1] {
+    if polyline.points.len() > 2 && polyline.points[0] != polyline.points[polyline.points.len() - 1]
+    {
         // If user wants a closed shape (determined by checking if the first and last points are close enough)
         // This is just a heuristic - future implementations could add an explicit "closed" property
         let first = polyline.points[0];
         let last = polyline.points[polyline.points.len() - 1];
         let distance = ((first.0 - last.0).powi(2) + (first.1 - last.1).powi(2)).sqrt();
-        
+
         // If points are very close, consider it a closed shape (like a polygon)
         if distance < 5.0 {
             // Apply scaling and offset
@@ -686,7 +692,7 @@ fn render_polyline(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: 
             let y1_scaled = (abs_y + last.1 * scale) as i32;
             let x2_scaled = (abs_x + first.0 * scale) as i32;
             let y2_scaled = (abs_y + first.1 * scale) as i32;
-            
+
             // Draw the closing line
             draw_anti_aliased_line(
                 imgbuf,
@@ -695,33 +701,43 @@ fn render_polyline(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: 
                 x2_scaled,
                 y2_scaled,
                 stroke_color,
-                stroke_width
+                stroke_width,
             );
         }
     }
 }
 
-fn render_free_container(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_free_container(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     // Log debug information
     println!("==================================================");
-    println!("Rendering FreeContainer: id={}, pos=({:.1}, {:.1})", entity_id, pos.0, pos.1);
-    
+    println!(
+        "Rendering FreeContainer: id={}, pos=({:.1}, {:.1})",
+        entity_id, pos.0, pos.1
+    );
+
     // Unscale the position (since render_node applies scaling for us)
     let container_pos = session.get_position(entity_id);
     let size = session.get_size(entity_id);
-    
+
     // Convert to i32 for drawing functions with scaling
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
     let width = (size.0 * scale).ceil() as u32;
     let height = (size.1 * scale).ceil() as u32;
-    
+
     println!("FreeContainer size: {}x{}", width, height);
     println!("FreeContainer absolute position: x={}, y={}", x, y);
-    
+
     // Get the container object
     let container = session.get_free_container(entity_id);
-    
+
     // Draw the container background first if specified
     if let Some(bg_color) = &container.background_color {
         let fill_color = parse_color(bg_color);
@@ -729,137 +745,161 @@ fn render_free_container(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entit
         draw_filled_rect_mut(imgbuf, rect, fill_color);
         println!("Drew container background with color: {}", bg_color);
     }
-    
+
     // Draw the container border if specified
     if let Some(border_color) = &container.border_color {
         if container.border_width > 0.0 {
             let stroke_color = parse_color(border_color);
             let stroke_width = (container.border_width * scale).ceil() as u32;
-            
+
             // Draw border with proper thickness
             for i in 0..stroke_width {
                 if i < stroke_width {
-                    let inner_rect = Rect::at(x + i as i32, y + i as i32)
-                        .of_size(width - 2 * i, height - 2 * i);
+                    let inner_rect =
+                        Rect::at(x + i as i32, y + i as i32).of_size(width - 2 * i, height - 2 * i);
                     draw_hollow_rect_mut(imgbuf, inner_rect, stroke_color);
                 }
             }
             println!("Drew container border with color: {}", border_color);
         }
     }
-    
+
     // Log the children counts
-    println!("Container has {} stored positions and {} children in tree", 
-             container.children.len(), node.children.len());
-    
+    println!(
+        "Container has {} stored positions and {} children in tree",
+        container.children.len(),
+        node.children.len()
+    );
+
     // Create a mapping from child entity IDs to their positions
     let mut child_positions = std::collections::HashMap::new();
     for (child_id, position) in &container.children {
         child_positions.insert(*child_id, *position);
     }
-    
+
     // Debug output of all children
     for (i, child) in node.children.iter().enumerate() {
         let child_id = child.entity_id;
         if let Some(rel_pos) = child_positions.get(&child_id) {
-            println!("Child[{}]: id={}, type={:?}, stored_pos=({:.1},{:.1})", 
-                     i, child_id, child.entity_type, rel_pos.0, rel_pos.1);
+            println!(
+                "Child[{}]: id={}, type={:?}, stored_pos=({:.1},{:.1})",
+                i, child_id, child.entity_type, rel_pos.0, rel_pos.1
+            );
         } else {
-            println!("Child[{}]: id={}, type={:?}, NO STORED POSITION", 
-                     i, child_id, child.entity_type);
+            println!(
+                "Child[{}]: id={}, type={:?}, NO STORED POSITION",
+                i, child_id, child.entity_type
+            );
         }
     }
-    
+
     // Render each child with its calculated position
     for (i, child_node) in node.children.iter().enumerate() {
         let child_id = child_node.entity_id;
-        
+
         // Get the child's position relative to the container from the stored mapping
         if let Some(rel_pos) = child_positions.get(&child_id) {
             // Child is in the FreeContainer's children map
-            
+
             // For debugging, get the child's size
             let child_size = session.get_size(child_id);
-            println!("Child[{}]: id={}, size=({:.1},{:.1})", i, child_id, child_size.0, child_size.1);
-            
+            println!(
+                "Child[{}]: id={}, size=({:.1},{:.1})",
+                i, child_id, child_size.0, child_size.1
+            );
+
             // The key fix: since render_node applies pos and scaling again,
             // we need to provide a corrected parent_offset that when combined with
             // the child's position and scaled will result in the correct absolute position
-            
-            // Get the child's original position in the session 
+
+            // Get the child's original position in the session
             let original_child_pos = session.get_position(child_id);
-            
+
             // Calculate the expected final position we want
-            let desired_final_pos = (
-                pos.0 + rel_pos.0 * scale,
-                pos.1 + rel_pos.1 * scale
-            );
-            
+            let desired_final_pos = (pos.0 + rel_pos.0 * scale, pos.1 + rel_pos.1 * scale);
+
             // Calculate the parent_offset that will give us this position after render_node applies
             // its own calculation: abs_pos = (parent_offset + pos) * scale
             // So we need: parent_offset = desired_final_pos / scale - pos
             let adjusted_parent_offset = (
                 desired_final_pos.0 / scale - original_child_pos.0,
-                desired_final_pos.1 / scale - original_child_pos.1
+                desired_final_pos.1 / scale - original_child_pos.1,
             );
-            
+
             println!("Rendering child[{}]: desired_pos=({:.1},{:.1}), original_pos=({:.1},{:.1}), rel_pos=({:.1},{:.1})", 
                 i, desired_final_pos.0, desired_final_pos.1, original_child_pos.0, original_child_pos.1, rel_pos.0, rel_pos.1);
-            println!("  Using adjusted_parent_offset=({:.1},{:.1})", adjusted_parent_offset.0, adjusted_parent_offset.1);
-            
+            println!(
+                "  Using adjusted_parent_offset=({:.1},{:.1})",
+                adjusted_parent_offset.0, adjusted_parent_offset.1
+            );
+
             render_node(child_node, session, imgbuf, adjusted_parent_offset, scale);
         } else {
             // Child doesn't have a stored position
-            println!("WARNING: Child[{}] id={} has no stored position in FreeContainer!", i, child_id);
-            
-            // For children without explicit positions in the container, we'll use their 
+            println!(
+                "WARNING: Child[{}] id={} has no stored position in FreeContainer!",
+                i, child_id
+            );
+
+            // For children without explicit positions in the container, we'll use their
             // original positions from the session, which might be relative to the container
             let child_pos = session.get_position(child_id);
-            
+
             // Calculate the desired final position
-            let desired_final_pos = (
-                pos.0 + child_pos.0 * scale,
-                pos.1 + child_pos.1 * scale
-            );
-            
+            let desired_final_pos = (pos.0 + child_pos.0 * scale, pos.1 + child_pos.1 * scale);
+
             // The same adjustment as above for children with stored positions
             let adjusted_parent_offset = (
                 desired_final_pos.0 / scale - child_pos.0,
-                desired_final_pos.1 / scale - child_pos.1
+                desired_final_pos.1 / scale - child_pos.1,
             );
-            
+
             // Log the calculated position
             println!("Child[{}] with no stored position: desired_pos=({:.1},{:.1}), original_pos=({:.1},{:.1})", 
                      i, desired_final_pos.0, desired_final_pos.1, child_pos.0, child_pos.1);
-            println!("  Using adjusted_parent_offset=({:.1},{:.1})", adjusted_parent_offset.0, adjusted_parent_offset.1);
-            
+            println!(
+                "  Using adjusted_parent_offset=({:.1},{:.1})",
+                adjusted_parent_offset.0, adjusted_parent_offset.1
+            );
+
             // Render the child with the adjusted parent offset
             render_node(child_node, session, imgbuf, adjusted_parent_offset, scale);
         }
     }
-    
+
     println!("==================================================");
 }
 
-fn render_image(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: EntityID, _node: &DiagramTreeNode, pos: (f64, f64), scale: f64) {
+fn render_image(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    _node: &DiagramTreeNode,
+    pos: (f64, f64),
+    scale: f64,
+) {
     // Get image properties
     let image_shape = session.get_image(entity_id);
     let size = session.get_size(entity_id);
-    
+
     // Apply scaling factor to dimensions
     let width = (size.0 * scale).ceil() as u32;
     let height = (size.1 * scale).ceil() as u32;
     let x = pos.0.round() as i32;
     let y = pos.1.round() as i32;
-    
+
     // Skip if outside bounds
-    if x < 0 || y < 0 || width == 0 || height == 0 || 
-       x + width as i32 > imgbuf.width() as i32 || 
-       y + height as i32 > imgbuf.height() as i32 {
+    if x < 0
+        || y < 0
+        || width == 0
+        || height == 0
+        || x + width as i32 > imgbuf.width() as i32
+        || y + height as i32 > imgbuf.height() as i32
+    {
         println!("Image outside bounds, skipping");
         return;
     }
-    
+
     // Load the image either from file or base64 data
     let loaded_img = if let Some(file_path) = &image_shape.file_path {
         // Load image from file
@@ -891,25 +931,28 @@ fn render_image(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Ent
         draw_placeholder_image(imgbuf, x, y, width, height);
         return;
     };
-    
+
     // Resize the image to fit the allocated space while maintaining aspect ratio
     let resized_img = loaded_img.resize_exact(width, height, image::imageops::FilterType::Lanczos3);
-    
+
     // Convert the image to an RgbaImage
     let img_rgba = resized_img.to_rgba8();
-    
+
     // Draw the image onto our output buffer at the specified position
     for (ix, iy, pixel) in img_rgba.enumerate_pixels() {
         let dest_x = x + ix as i32;
         let dest_y = y + iy as i32;
-        
+
         // Only draw within bounds
-        if dest_x >= 0 && dest_x < imgbuf.width() as i32 && 
-           dest_y >= 0 && dest_y < imgbuf.height() as i32 {
+        if dest_x >= 0
+            && dest_x < imgbuf.width() as i32
+            && dest_y >= 0
+            && dest_y < imgbuf.height() as i32
+        {
             imgbuf.put_pixel(dest_x as u32, dest_y as u32, *pixel);
         }
     }
-    
+
     // Draw a thin border around the image for visual clarity
     let border_color = Rgba([80, 80, 80, 255]);
     let rect = Rect::at(x, y).of_size(width, height);
@@ -922,7 +965,7 @@ fn load_image_from_file(file_path: &str) -> Result<DynamicImage, String> {
     if !path.exists() {
         return Err(format!("File not found: {}", file_path));
     }
-    
+
     match image::open(path) {
         Ok(img) => Ok(img),
         Err(e) => Err(format!("Failed to load image: {}", e)),
@@ -936,7 +979,7 @@ fn load_image_from_base64(base64_str: &str) -> Result<DynamicImage, String> {
         Ok(data) => data,
         Err(e) => return Err(format!("Failed to decode base64: {}", e)),
     };
-    
+
     // Load image from memory
     match image::load_from_memory(&img_data) {
         Ok(img) => Ok(img),
@@ -950,11 +993,11 @@ fn draw_placeholder_image(imgbuf: &mut RgbaImage, x: i32, y: i32, width: u32, he
     let fill_color = Rgba([220, 220, 220, 255]);
     let rect = Rect::at(x, y).of_size(width, height);
     draw_filled_rect_mut(imgbuf, rect, fill_color);
-    
+
     // Draw border
     let border_color = Rgba([150, 150, 150, 255]);
     draw_hollow_rect_mut(imgbuf, rect, border_color);
-    
+
     // Draw an X from corner to corner
     if width > 10 && height > 10 {
         // Draw diagonal lines for the X
@@ -964,7 +1007,7 @@ fn draw_placeholder_image(imgbuf: &mut RgbaImage, x: i32, y: i32, width: u32, he
             if ix < imgbuf.width() as i32 && iy < imgbuf.height() as i32 {
                 imgbuf.put_pixel(ix as u32, iy as u32, Rgba([100, 100, 100, 255]));
             }
-            
+
             let ix2 = x + i as i32;
             let iy2 = y + (height - i - 1) as i32;
             if ix2 < imgbuf.width() as i32 && iy2 >= 0 && iy2 < imgbuf.height() as i32 {
@@ -1007,7 +1050,10 @@ fn parse_color(color_str: &str) -> Rgba<u8> {
                 Rgba([r, g, b, a])
             } else {
                 // Return a visible color for unknown colors - use pink to make it obvious
-                println!("WARNING: Unrecognized color '{}', defaulting to pink", color_str);
+                println!(
+                    "WARNING: Unrecognized color '{}', defaulting to pink",
+                    color_str
+                );
                 Rgba([255, 0, 255, 255])
             }
         }
@@ -1026,21 +1072,21 @@ fn blend_pixel(imgbuf: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>, alpha: f
     if x < 0 || x >= imgbuf.width() as i32 || y < 0 || y >= imgbuf.height() as i32 {
         return;
     }
-    
+
     // Get the existing pixel color
     let existing = imgbuf.get_pixel(x as u32, y as u32);
-    
+
     // Alpha blending formula: new = alpha * src + (1 - alpha) * dst
     let blend_alpha = alpha.max(0.0).min(1.0);
     let inv_alpha = 1.0 - blend_alpha;
-    
+
     let r = (color[0] as f32 * blend_alpha + existing[0] as f32 * inv_alpha) as u8;
     let g = (color[1] as f32 * blend_alpha + existing[1] as f32 * inv_alpha) as u8;
     let b = (color[2] as f32 * blend_alpha + existing[2] as f32 * inv_alpha) as u8;
-    
+
     // Final alpha is combined alpha from both sources
     let a = (color[3] as f32 * blend_alpha + existing[3] as f32 * inv_alpha) as u8;
-    
+
     imgbuf.put_pixel(x as u32, y as u32, Rgba([r, g, b, a]));
 }
 
@@ -1059,7 +1105,7 @@ fn draw_anti_aliased_line(
     x1: i32,
     y1: i32,
     color: Rgba<u8>,
-    thickness: f32
+    thickness: f32,
 ) {
     // Use Bresenham's algorithm for the core line
     // Convert i32 to isize for the Bresenham algorithm
@@ -1067,12 +1113,12 @@ fn draw_anti_aliased_line(
     let y0_isize = y0 as isize;
     let x1_isize = x1 as isize;
     let y1_isize = y1 as isize;
-    
+
     for (x_isize, y_isize) in Bresenham::new((x0_isize, y0_isize), (x1_isize, y1_isize)) {
         // Convert back to i32 for our drawing functions
         let x = x_isize as i32;
         let y = y_isize as i32;
-        
+
         // Draw a "thick" point at each position along the line
         let radius = (thickness / 2.0).ceil() as i32;
         for dx in -radius..=radius {
@@ -1089,7 +1135,7 @@ fn draw_anti_aliased_line(
                     // Outside the line's radius
                     0.0
                 };
-                
+
                 // Only draw if there's some opacity
                 if alpha > 0.0 {
                     // Use blend_pixel for smoother edges
@@ -1101,29 +1147,30 @@ fn draw_anti_aliased_line(
 }
 
 // Helper function to calculate the exact rendered width of a text string
+// Esta funcionaba, es la misma que se usa en measure text?
 fn get_text_width(text: &str, font: &Font, scale: Scale) -> f32 {
     // Calculate the width using font metrics with kerning
     let mut caret = 0.0f32;
     let mut prev_glyph_id = None;
-    
+
     for c in text.chars() {
         // Get the glyph
         let base_glyph = font.glyph(c);
         let glyph_id = base_glyph.id();
-        
+
         // Add kerning if we have a previous glyph
         if let Some(prev_id) = prev_glyph_id {
             caret += font.pair_kerning(scale, prev_id, glyph_id);
         }
-        
+
         // Get metrics for this glyph and add its advance width
         let advance_width = font.glyph(c).scaled(scale).h_metrics().advance_width;
         caret += advance_width;
-        
+
         // Track previous glyph for kerning
         prev_glyph_id = Some(glyph_id);
     }
-    
+
     // Return the final width
     caret
 }
@@ -1136,7 +1183,7 @@ fn draw_anti_aliased_ellipse(
     a: i32,
     b: i32,
     color: Rgba<u8>,
-    thickness: f32
+    thickness: f32,
 ) {
     // For very small ellipses, use a simple algorithm
     if a <= 2 || b <= 2 {
@@ -1152,28 +1199,28 @@ fn draw_anti_aliased_ellipse(
     // Improved ellipse drawing using line segments
     // Using more segments for smoother appearance - scale with radius for higher quality
     let num_segments = (a.max(b) * 8).max(120);
-    
+
     // Calculate first point
     let first_angle: f64 = 0.0;
     let first_x = cx + (a as f64 * first_angle.cos()).round() as i32;
     let first_y = cy + (b as f64 * first_angle.sin()).round() as i32;
-    
+
     let mut prev_x = first_x;
     let mut prev_y = first_y;
-    
+
     // Draw segments connecting points along the ellipse
     for i in 1..=num_segments {
         let angle = 2.0 * std::f64::consts::PI * (i as f64 / num_segments as f64);
         let x = cx + (a as f64 * angle.cos()).round() as i32;
         let y = cy + (b as f64 * angle.sin()).round() as i32;
-        
+
         // Draw anti-aliased line segment between consecutive points
         draw_anti_aliased_line(imgbuf, prev_x, prev_y, x, y, color, thickness);
-        
+
         prev_x = x;
         prev_y = y;
     }
-    
+
     // Close the ellipse by connecting back to the first point
     draw_anti_aliased_line(imgbuf, prev_x, prev_y, first_x, first_y, color, thickness);
 }

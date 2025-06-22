@@ -519,6 +519,7 @@ pub struct TextOptions {
     pub text_color: String,
     // (number of max characters per line)used to know when to insert breaks
     pub line_width: usize,
+    pub line_spacing: f32, // spacing between lines
 }
 
 impl Clone for TextOptions {
@@ -528,6 +529,7 @@ impl Clone for TextOptions {
             font_size: self.font_size,
             text_color: self.text_color.clone(),
             line_width: self.line_width,
+            line_spacing: self.line_spacing,
         }
     }
 }
@@ -539,6 +541,7 @@ impl TextOptions {
             font_size: 12.0,
             text_color: String::from("black"),
             line_width: 20,
+            line_spacing: 0.0,
         }
     }
 }

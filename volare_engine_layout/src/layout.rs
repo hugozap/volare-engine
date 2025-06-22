@@ -76,8 +76,9 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
             }
             session.set_position(*line, 0.0, y);
             session.set_size(*line, line_size.0, line_size.1);
-            y += line_size.1;
+            y += line_size.1 + shape_text.text_options.line_spacing as f64;
         }
+        y-= shape_text.text_options.line_spacing as f64; // Adjust for the last line spacing
 
         println!("max_line_width: {}", max_line_width);
         //set the size of the text element
