@@ -4,7 +4,8 @@
 use image_renderer::PNGRenderer;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
-use demo::measure_text::measure_text_svg;
+use demo::measure_text::{debug_text_measurement, measure_text_svg, measure_text_ultra_tight};
+use demo::measure_text::{measure_text, measure_text_no_scaling, measure_text_pure_bounds,measure_text_tight_advance};
 
 //import layout
 use volare_engine_layout::{
@@ -20,36 +21,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
   
-    session.set_measure_text_fn(measure_text_svg);
+    session.set_measure_text_fn(measure_text_ultra_tight);
 
     let mut table_items = Vec::new();
 
-    let thetext =  br#"
-    The adjustment factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
-    text appear more naturally centered to the human eye, rather than strictly mathematically centered.
-  
-    Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
-    with certain fonts or at larger font sizes.
+    let thetext =  br#""Lorem ipsum dolor sit amet, consectetur adipiscing elit.""#;
 
-    In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
-    positioning."#;
-    
-    let blue_text = session.new_text(
-        std::str::from_utf8(thetext).unwrap(),
-        TextOptions {
-            font_family: "Roboto".to_string(),
+    let textOpts =  TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 16.0,
             line_width: 100,
             text_color: "white".to_string(),  // white text
-        },
+        };
+
+    let blue_text = session.new_text(
+        std::str::from_utf8(thetext).unwrap(),
+       textOpts.clone(),
     );
+
+    debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
+
 
     let box_options = BoxOptions {
         fill_color: Fill::Color("#0000FF".to_string()),  // blue background
         stroke_color: "#000066".to_string(),  // dark blue border
-        stroke_width: 2.0,
+        stroke_width: 1.0,
         padding: 0.0,
-        border_radius: 3.0,
+        border_radius: 0.0,
     };
 
     let box1 = session.new_box(blue_text, box_options);
@@ -73,6 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
+  
+    /* 
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -83,6 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
+    */
 
     // Render PNG
     let mut png_path = temp_dir.clone();

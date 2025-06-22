@@ -36,7 +36,7 @@ impl<W: Write> Renderer<W> for PNGRenderer {
         
         // Use a scaling factor for higher resolution output but don't scale too much
         // 1.5 is a good balance between quality and maintaining layout proportions
-        let scaling_factor = 1.5; 
+        let scaling_factor = 2.0; 
         
         // Calculate image dimensions with scaling
         let width = ((root_size.0 * scaling_factor).ceil() as u32).max(200);
@@ -350,7 +350,9 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
             EntityType::TextShape => {
                 // Get the text and render it directly
                 let text_shape = session.get_text(child_id);
-                let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
+                //TODO: dynamically load the font data!
+                //let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
+                let font_data = include_bytes!("../../demo/assets/AnonymiceProNerdFont-Regular.ttf");
                 let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
                 
                 // Convert text color string to RGBA
@@ -359,10 +361,14 @@ fn render_box(session: &DiagramBuilder, imgbuf: &mut RgbaImage, entity_id: Entit
                     text_shape.text, text_shape.text_options.text_color, abs_x, abs_y);
                 
                 // Render text directly
-                let dpi = 120.0;
-                let dpi_scale_factor = dpi / 72.0;
-                let font_size = text_shape.text_options.font_size * dpi_scale_factor;
-                let font_scale = Scale::uniform(font_size);
+                // let dpi = 120.0;
+                // let dpi_scale_factor = dpi / 72.0;
+                // let font_size = text_shape.text_options.font_size * dpi_scale_factor;
+
+                // TODO: for SVG should we use scaling?
+                let font_size = text_shape.text_options.font_size;
+                let font_scale = Scale::uniform(font_size * scale as f32);
+
                 
                 // Render each line - use position data from layout engine
                 // but adjust line spacing if needed for better aesthetics
