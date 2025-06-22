@@ -98,177 +98,46 @@ pub fn measure_text(text: &str, options: &TextOptions) -> (f64, f64) {
 }
 
 
-// Method 1: Advance width minus last character's trailing space
-pub fn measure_text_tight_advance(text: &str, options: &TextOptions) -> (f64, f64) {
+/**
+ * Measure text using SVG character advance method
+ * This method calculates the width based on the advance width of each character,
+ * taking into account kerning between characters.
+ * It provides a more accurate width for SVG rendering, especially for variable-width fonts.
+ */
+pub fn measure_text_svg_character_advance(text: &str, options: &TextOptions) -> (f64, f64) {
     let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
     let scale = Scale::uniform(options.font_size);
-    let v_metrics = font.v_metrics(scale);
-
-    if text.is_empty() {
-        return (0.0, (v_metrics.ascent - v_metrics.descent) as f64);
-    }
-
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return (0.0, (v_metrics.ascent - v_metrics.descent) as f64);
-    }
-
-    let mut total_width = 0.0f32;
+    
+    let mut total_width = 0.0;
     let mut prev_glyph_id = None;
-
-    // Process all characters except the last one with full advance width
-    for (i, &c) in chars.iter().enumerate() {
-        let base_glyph = font.glyph(c);
-        let glyph_id = base_glyph.id();
+    
+    for ch in text.chars() {
+        let glyph = font.glyph(ch).scaled(scale);
         
+        // Use horizontal advance instead of bounding box
+        let advance_width = glyph.h_metrics().advance_width;
+        
+        // Add kerning if available
         if let Some(prev_id) = prev_glyph_id {
-            total_width += font.pair_kerning(scale, prev_id, glyph_id);
+            total_width += font.pair_kerning(scale, prev_id, glyph.id());
         }
         
-        if i == chars.len() - 1 {
-            // For the last character, use actual glyph width instead of advance width
-            let scaled_glyph = base_glyph.scaled(scale);
-            if let Some(bb) = scaled_glyph.positioned(point(0.0, 0.0)).pixel_bounding_box() {
-                total_width += bb.width() as f32;
-            } else {
-                // Fallback for whitespace characters - create a fresh glyph for metrics
-                let scaled_glyph_for_metrics = font.glyph(c).scaled(scale);
-                total_width += scaled_glyph_for_metrics.h_metrics().advance_width;
-            }
-        } else {
-            // Get advance width before using the glyph
-            total_width += base_glyph.scaled(scale).h_metrics().advance_width;
-        }
-        
-        prev_glyph_id = Some(glyph_id);
+        total_width += advance_width;
+        prev_glyph_id = Some(glyph.id());
     }
-
+    
+    // Use font metrics for height instead of glyph bounds
+    let v_metrics = font.v_metrics(scale);
     let height = v_metrics.ascent - v_metrics.descent;
     
-    println!("TIGHT ADVANCE: '{}' -> {:.2}x{:.2}", text, total_width, height);
     (total_width as f64, height as f64)
 }
 
-pub fn debug_text_measurement(text: &str, options: &TextOptions) -> (f64, f64) {
-    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
-    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
-    let scale = Scale::uniform(options.font_size);
-    let v_metrics = font.v_metrics(scale);
-
-    if text.is_empty() {
-        return (0.0, (v_metrics.ascent - v_metrics.descent) as f64);
-    }
-
-    // Method 1: Advance width approach (your current method)
-    let chars: Vec<char> = text.chars().collect();
-    let mut total_advance_width = 0.0f32;
-    let mut prev_glyph_id = None;
-
-    println!("=== ADVANCE WIDTH DEBUG ===");
-    for (i, &c) in chars.iter().enumerate() {
-        let base_glyph = font.glyph(c);
-        let glyph_id = base_glyph.id();
-        
-        let kerning = if let Some(prev_id) = prev_glyph_id {
-            font.pair_kerning(scale, prev_id, glyph_id)
-        } else {
-            0.0
-        };
-        
-        total_advance_width += kerning;
-        
-        if i == chars.len() - 1 {
-            // Last character - use pixel width
-            let scaled_glyph = base_glyph.scaled(scale);
-            if let Some(bb) = scaled_glyph.positioned(point(0.0, 0.0)).pixel_bounding_box() {
-                let char_width = bb.width() as f32;
-                total_advance_width += char_width;
-                println!("  Char '{}' (LAST): kerning={:.2}, pixel_width={:.2}", c, kerning, char_width);
-            } else {
-                let char_advance = font.glyph(c).scaled(scale).h_metrics().advance_width;
-                total_advance_width += char_advance;
-                println!("  Char '{}' (LAST, no pixels): kerning={:.2}, advance={:.2}", c, kerning, char_advance);
-            }
-        } else {
-            let char_advance = base_glyph.scaled(scale).h_metrics().advance_width;
-            total_advance_width += char_advance;
-            println!("  Char '{}': kerning={:.2}, advance={:.2}", c, kerning, char_advance);
-        }
-        
-        prev_glyph_id = Some(glyph_id);
-    }
-    
-    println!("Total advance width: {:.2}", total_advance_width);
-
-    // Method 2: Pure pixel bounds approach
-    println!("\n=== PIXEL BOUNDS DEBUG ===");
-    let mut positioned_glyphs = Vec::new();
-    let mut caret = point(0.0, 0.0);
-    let mut prev_glyph_id = None;
-
-    for c in text.chars() {
-        let base_glyph = font.glyph(c);
-        let glyph_id = base_glyph.id();
-        
-        if let Some(prev_id) = prev_glyph_id {
-            caret.x += font.pair_kerning(scale, prev_id, glyph_id);
-        }
-        
-        let positioned_glyph = base_glyph.scaled(scale).positioned(caret);
-        let advance_width = positioned_glyph.unpositioned().h_metrics().advance_width;
-        
-        if let Some(bb) = positioned_glyph.pixel_bounding_box() {
-            println!("  Char '{}' at x={:.2}: bounds=({}, {}) to ({}, {}), width={}", 
-                     c, caret.x, bb.min.x, bb.min.y, bb.max.x, bb.max.y, bb.width());
-        } else {
-            println!("  Char '{}' at x={:.2}: no pixel bounds, advance={:.2}", c, caret.x, advance_width);
-        }
-        
-        positioned_glyphs.push(positioned_glyph);
-        caret.x += advance_width;
-        prev_glyph_id = Some(glyph_id);
-    }
-
-    // Calculate exact visual bounds
-    let mut min_x = f32::INFINITY;
-    let mut max_x = f32::NEG_INFINITY;
-
-    for glyph in &positioned_glyphs {
-        if let Some(bb) = glyph.pixel_bounding_box() {
-            min_x = min_x.min(bb.min.x as f32);
-            max_x = max_x.max(bb.max.x as f32);
-        }
-    }
-
-    let pixel_bounds_width = if min_x.is_finite() && max_x.is_finite() {
-        max_x - min_x
-    } else {
-        total_advance_width
-    };
-
-    println!("Pixel bounds: min_x={:.2}, max_x={:.2}, width={:.2}", min_x, max_x, pixel_bounds_width);
-    println!("Left padding from bounds: {:.2}", min_x);
-    println!("Right padding potential: {:.2}", total_advance_width - max_x);
-    
-    // Method 3: Tightest possible measurement
-    let tightest_width = pixel_bounds_width;
-    
-    println!("\n=== COMPARISON ===");
-    println!("Advance method: {:.2}", total_advance_width);
-    println!("Pixel bounds: {:.2}", pixel_bounds_width);
-    println!("Difference: {:.2}", total_advance_width - pixel_bounds_width);
-
-    let height = v_metrics.ascent - v_metrics.descent;
-    
-    // Return the pixel bounds width (tightest)
-    (tightest_width as f64, height as f64)
-}
-
-
-// Ultra-tight measurement that accounts for actual glyph positioning
+// tight measurement that accounts for actual glyph positioning
+// Used for PNG rendering
 pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (f64, f64) {
     let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
@@ -281,6 +150,7 @@ pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (f64, f64)
     }
 
     // Use rusttype's layout function which handles everything correctly
+    // TODO: Needs unicode normalization for proper glyph handling, see comments of `layout` function
     let glyphs: Vec<_> = font.layout(text, scale, point(0.0, 0.0)).collect();
     
     // Find the actual visual bounds

@@ -10,10 +10,15 @@ use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, Li
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions, Fill,
+    Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
-use measure_text::measure_text;
+use measure_text::{
+    measure_text,
+    measure_text_ultra_tight,
+    measure_text_svg_character_advance,
+}; // Use the ultra-tight measurement for text
+
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         text_color: "black".to_string(),
         line_spacing: 0.0,
     };
-    session.set_measure_text_fn(measure_text);
+    session.set_measure_text_fn(measure_text_svg_character_advance);
 
     //Create a polyline for a star
     let mut points = Vec::new();
@@ -50,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             stroke_width: 1.0,
         },
     );
-    
+
     // Create a more visible polyline - hexagon
     let mut hex_points = Vec::new();
     let hex_size = 50.0;
@@ -62,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Close the shape
     hex_points.push(hex_points[0]);
-    
+
     let hexagon = session.new_polyline(
         hex_points,
         LineOptions {
@@ -88,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
 
     //Create a list of 10 texts
-     let mut table_items = Vec::new();
+    let mut table_items = Vec::new();
     // table_items.push(tableEllipses);
     // table_items.push(polyline);
     // table_items.push(hexagon);
@@ -126,7 +131,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 stroke_width: 1.0,
             },
         );
-       // table_items.push(ellipse);
+        // table_items.push(ellipse);
     }
 
     //create a paragraph of lorem ipsum
@@ -150,14 +155,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Add sample image from file (first instance)
     let sampleImage = session.new_image_from_file("demo/assets/sample.png", (200.0, 200.0));
     table_items.push(sampleImage);
-    
+
     //Add sample image from file
     // The path is relative to where the binary is run
     let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
     table_items.push(file_image);
-    
+
     // Create a FreeContainer with multiple visual elements at specific positions using the new method
-    
+
     // Create all elements first
     let title_text = session.new_text(
         "FreeContainer Demo",
@@ -169,18 +174,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_spacing: 0.0,
         },
     );
-    
+
     let red_circle = session.new_elipse(
-        (0.0, 0.0),  // center position (will be positioned by container)
-        (15.0, 15.0),  // radius
+        (0.0, 0.0),   // center position (will be positioned by container)
+        (15.0, 15.0), // radius
         EllipseOptions {
-            fill_color: "#FF0000".to_string(),  // bright red
+            fill_color: "#FF0000".to_string(), // bright red
             stroke_color: "black".to_string(),
             stroke_width: 2.0,
-        }
+        },
     );
 
-    let thetext =  format!(r#"
+    let thetext = format!(
+        r#"
     The adjustment factor {} (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
     text appear more naturally centered to the human eye, rather than strictly mathematically centered.
   
@@ -188,50 +194,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     with certain fonts or at larger font sizes.
   
     In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
-    positioning."#, "\u{f1878}");
-    
+    positioning."#,
+        "\u{f1878}"
+    );
+
     let blue_text = session.new_text(
         &thetext,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 16.0,
             line_width: 100,
-            text_color: "white".to_string(),  // white text
+            text_color: "white".to_string(), // white text
             line_spacing: 0.0,
         },
     );
-    
+
     // Create a box around the blue text
     let box_options = BoxOptions {
-        fill_color: Fill::Color("#0000FF".to_string()),  // blue background
-        stroke_color: "green".to_string(),  // dark blue border
+        fill_color: Fill::Color("#0000FF".to_string()), // blue background
+        stroke_color: "green".to_string(),              // dark blue border
         stroke_width: 1.0,
-        padding: 0.0,
+        padding: 10.0,
         border_radius: 3.0,
     };
     let blue_box = session.new_box(blue_text, box_options);
-    
+
     let green_ellipse = session.new_elipse(
         (0.0, 0.0),
         (30.0, 20.0),
         EllipseOptions {
-            fill_color: "#00CC00".to_string(),  // green
-            stroke_color: "#006600".to_string(),  // dark green
+            fill_color: "#00CC00".to_string(),   // green
+            stroke_color: "#006600".to_string(), // dark green
             stroke_width: 2.0,
-        }
+        },
     );
-    
+
     let subtitle = session.new_text(
         "Absolute positioning of elements",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
             font_size: 12.0,
             line_width: 100,
-            text_color: "#555555".to_string(),  // dark gray
+            text_color: "#555555".to_string(), // dark gray
             line_spacing: 0.0,
         },
     );
-    
+
     // Create a container with all children at once
     let container_with_elements = session.new_free_container_with_children(vec![
         (title_text, (30.0, 10.0)),
@@ -240,13 +248,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (green_ellipse, (150.0, 70.0)),
         (subtitle, (30.0, 120.0)),
     ]);
-    
+
     // Add styling to the container with more vibrant colors
     let free_container = session.get_free_container_mut(container_with_elements.entity_id);
     free_container.background_color = Some("#FFDDDD".to_string()); // Light red background (more visible)
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
-    
+
     // Add the FreeContainer to the table
     table_items.push(container_with_elements);
     //texts.push(get_test_table(&mut session));
@@ -300,6 +308,7 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
         font_size: 12.0,
         line_width: 100,
         text_color: "black".to_string(),
+        line_spacing: 5.0,
     };
     //Create a list of 10 texts
     let mut texts = Vec::new();

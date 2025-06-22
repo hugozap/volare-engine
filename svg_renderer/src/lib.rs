@@ -343,6 +343,7 @@ fn render_table(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,
 fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let box_shape = session.get_box(node.entity_id);
+   
     let pos = session.get_position(entity_id);
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
@@ -375,84 +376,33 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
         },
         Fill::RadialGradient(_) => todo!(),
     }
-
-
-
-    //Paint the inner node
-    for child in node.children.iter() {
-        // If child is text, we'll center it in the box
-        if child.entity_type == EntityType::TextShape {
-            // Center the text in the box - no need to get size separately
-            
-            // Calculate centering position
-            let centered_text = render_text_in_box(session, child.entity_id, box_shape, size);
-            svg.push_str(&centered_text);
-        } else {
-            // For non-text children, render normally
-            svg.push_str(render_node(child, session).as_str())
-        }
+     if node.children.len() > 0 {
+        // we only render the first child for now
+        // Create a group for handling the padding
+        svg.push_str(&format!(r#"<g transform="translate({} {} )" >"#,
+            box_shape.box_options.padding, box_shape.box_options.padding));
+        let first_child = &node.children[0];
+        svg.push_str(render_node(&first_child, session).as_str());
+        svg.push_str("</g>"); // Close the padding group
+        
     }
-
     svg.push_str("</g>");
 }
-fn render_text_in_box(session: &DiagramBuilder, text_id: EntityID, box_shape: &ShapeBox, box_size: (f64, f64)) -> String {
-    let mut svg = String::new();
-    let text_shape = session.get_text(text_id);
-    let text_size = session.get_size(text_id);
-    let line_count = text_shape.lines.len() as f64;
-    let font_size = f64::from(text_shape.text_options.font_size);
-
-    // Calculate center position
-    let center_x = box_size.0 / 2.0;
-    let center_y = box_size.1 / 2.0;
-    
-    // SVG text rendering approach - use text-anchor="middle" with tspan elements
-    svg.push_str(&format!(
-        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" fill="{}" font-size="{}" font-family="{}">"#,
-        center_x,
-        center_y,  // Position at the exact center of the box
-        text_shape.text_options.text_color,
-        text_shape.text_options.font_size,
-        text_shape.text_options.font_family
-    ));
-    
-    // Now position each line relative to the center
-    for (_i, line_id) in text_shape.lines.iter().enumerate() {
-        let line = session.get_text_line(*line_id);
-
-        let txt = if line.text.trim().is_empty() {
-            "&#8203;".to_string()  // Create a new String directly
-        } else {
-            line.text.clone()  // Clone the original
-        };
-
-        let posline = session.get_position(*line_id);
-        
-        svg.push_str(&format!(
-            r#"<tspan x="{}" y="{}" fill="{}">{}</tspan>"#,
-            center_x,
-            posline.1,
-            text_shape.text_options.text_color,
-            txt
-        ));
-    }
-    
-    svg.push_str("</text>");
-    svg
-}
-//Same as box but with support for fill gradients
-
 
 fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let text_shape = session.get_text(node.entity_id);
     let pos = session.get_position(entity_id);
+    let size = session.get_size(entity_id);
     svg.push_str(&format!(
-        r#"<g transform="translate({} {})" >"#,
-        pos.0, pos.1
+        r#"<g transform="translate({} {})" data-debug="{}" >"#,
+        pos.0, pos.1,
+        format!("size: {}, {}, pos: {}, {}", 
+            size.0, size.1,
+            pos.0, pos.1)
     ));
 
     //render parent text container
-    svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}" font-family="{}" >"#,
+    svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}px" font-family="{}" >"#,
         0,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
@@ -462,12 +412,18 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
     for line_id in text_shape.lines.iter() {
         let line = session.get_text_line(*line_id);
         let pos = session.get_position(line.entity);
-        svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}" font-family="{}" alignment-baseline="middle" >"#,
+        let lineSize = session.get_size(line.entity);
+        svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}px" font-family="{}" alignment-baseline="middle" data-debug="{}" >"#,
         pos.0,
         pos.1,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
-        text_shape.text_options.font_family));
+        text_shape.text_options.font_family,
+        //debug info
+        format!("size: {}, {}, pos: {}, {}",
+            lineSize.0, lineSize.1,
+            pos.0, pos.1)
+        ));
         let txt = if line.text.trim().is_empty() {
             "&#8203;".to_string()  // Create a new String directly
         } else {
@@ -590,4 +546,16 @@ fn test_render_box_rounded_corners_with_group() {
         node,
         r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" /><g transform="translate(0 0)" ></g></g>"#
     );
+}
+
+/*
+ Function to get the SVG correction factor based on the font family.
+ The factor was determined by comparing rendered text width with expected width
+ TODO: Obtain for more fonts
+*/
+fn get_svg_correction_factor(font_family: &str) -> f64 {
+    match font_family {
+        "AnonymicePro Nerd Font" => 0.62,
+        _ => 0.65 // Default approximation
+    }
 }

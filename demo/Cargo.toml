@@ -17,3 +17,7 @@ rusttype = "0.9.3"
 [[bin]]
 name = "textdemo"
 path = "src/bin/text.rs"
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"

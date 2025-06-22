@@ -4,8 +4,7 @@
 use image_renderer::PNGRenderer;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
-use demo::measure_text::{debug_text_measurement, measure_text_svg, measure_text_ultra_tight};
-use demo::measure_text::{measure_text, measure_text_no_scaling, measure_text_pure_bounds,measure_text_tight_advance};
+use demo::measure_text::{ measure_text_ultra_tight};
 
 //import layout
 use volare_engine_layout::{
@@ -46,14 +45,15 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
        textOpts.clone(),
     );
 
-    debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
+   // debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
 
 
     let box_options = BoxOptions {
         fill_color: Fill::Color("#0000FF".to_string()),  // blue background
         stroke_color: "#000066".to_string(),  // dark blue border
         stroke_width: 1.0,
-        padding: 2.0,
+        //TODO: falta tener en cuenta padding al momento de hacer layout de elementos de box
+        padding: 10.0,
         border_radius: 0.0,
     };
 
@@ -79,7 +79,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
   
-    /* 
+    
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -90,7 +90,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
-    */
+    
 
     // Render PNG
     let mut png_path = temp_dir.clone();
