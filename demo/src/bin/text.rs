@@ -53,7 +53,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         stroke_color: "#000066".to_string(),  // dark blue border
         stroke_width: 1.0,
         //TODO: falta tener en cuenta padding al momento de hacer layout de elementos de box
-        padding: 10.0,
+        padding: 50.0,
         border_radius: 0.0,
     };
 

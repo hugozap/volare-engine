@@ -379,7 +379,7 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
      if node.children.len() > 0 {
         // we only render the first child for now
         // Create a group for handling the padding
-        svg.push_str(&format!(r#"<g transform="translate({} {} )" >"#,
+        svg.push_str(&format!(r#"<g transform="translate({} {})" >"#,
             box_shape.box_options.padding, box_shape.box_options.padding));
         let first_child = &node.children[0];
         svg.push_str(render_node(&first_child, session).as_str());
@@ -491,7 +491,7 @@ fn test_render_box_with_group() {
     let node = render_node(&box_, &session);
     assert_eq!(
         node,
-        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" /><g transform="translate(0 0)" ></g></g>"#
+        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" /><g transform="translate(0 0)" ><g transform="translate(0 0)" ></g></g></g>"#
     );
 }
 
@@ -544,18 +544,7 @@ fn test_render_box_rounded_corners_with_group() {
     let node = render_node(&box_, &session);
     assert_eq!(
         node,
-        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" /><g transform="translate(0 0)" ></g></g>"#
+        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" /><g transform="translate(0 0)" ><g transform="translate(0 0)" ></g></g></g>"#
     );
 }
 
-/*
- Function to get the SVG correction factor based on the font family.
- The factor was determined by comparing rendered text width with expected width
- TODO: Obtain for more fonts
-*/
-fn get_svg_correction_factor(font_family: &str) -> f64 {
-    match font_family {
-        "AnonymicePro Nerd Font" => 0.62,
-        _ => 0.65 // Default approximation
-    }
-}
