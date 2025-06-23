@@ -139,6 +139,12 @@ pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse
     session.set_size(shape_ellipse.entity, w, h);
 }
 
+pub fn layout_rect(session: &mut DiagramBuilder, entity: EntityID, width: f64, height: f64) {
+    //set the size of the rect
+    session.set_size(entity, width, height);
+
+}
+
 /**
  * Sets the image entity size to the preferred size
  */
@@ -411,7 +417,9 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::RectShape => {
-            //Do nothing, the rect is already laid out
+            //get the Rect entity
+            let rect = session.get_rectangle(root.entity_id);
+            layout_rect(session, root.entity_id, rect.rect_options.width, rect.rect_options.height);
         }
         
         EntityType::LineShape => {
@@ -466,6 +474,7 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             let container = session.get_free_container(root.entity_id).clone();
             layout_free_container(session, &container);
         }
+
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
     }

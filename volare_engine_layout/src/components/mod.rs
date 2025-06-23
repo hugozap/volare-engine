@@ -339,7 +339,9 @@ impl BoxOptions {
 //RectOptions
 #[derive(Default, Debug)]
 pub struct RectOptions {
-    pub fill_color: String,
+    pub width: f64,
+    pub height: f64,
+    pub fill_color: Fill,
     pub stroke_color: String,
     pub stroke_width: f64,
     pub border_radius: f64,
@@ -348,6 +350,8 @@ pub struct RectOptions {
 impl Clone for RectOptions {
     fn clone(&self) -> Self {
         RectOptions {
+            width: self.width,
+            height: self.height,
             fill_color: self.fill_color.clone(),
             stroke_color: self.stroke_color.clone(),
             stroke_width: self.stroke_width,
@@ -359,7 +363,9 @@ impl Clone for RectOptions {
 impl RectOptions {
     pub fn new() -> RectOptions {
         RectOptions {
-            fill_color: String::from("white"),
+            width: 100.0,
+            height: 100.0,
+            fill_color: Fill::Color(String::from("white")),
             stroke_color: String::from("black"),
             stroke_width: 1.0,
             border_radius: 0.0,

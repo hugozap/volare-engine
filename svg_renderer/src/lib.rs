@@ -93,6 +93,10 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
             render_free_container(session, &mut svg, entity_id, node);
         }
 
+        EntityType::RectShape => {
+            render_rectangle(session, &mut svg, entity_id, node);
+        }
+
         _ => {}
         
     }
@@ -252,6 +256,26 @@ fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
      line_shape.line_options.stroke_width));
     svg.push_str("</g>");
 }
+
+fn render_rectangle(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let rect_shape = session.get_rectangle(node.entity_id);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+     size.0, 
+     size.1, 
+     rect_shape.rect_options.fill_color,
+     rect_shape.rect_options.stroke_color,
+     rect_shape.rect_options.stroke_width,
+     rect_shape.rect_options.border_radius,
+     rect_shape.rect_options.border_radius));
+    svg.push_str("</g>");
+}
+
 fn render_arrow(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id);
     let arrow_shape = session.get_arrow(node.entity_id);
@@ -378,12 +402,9 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     }
      if node.children.len() > 0 {
         // we only render the first child for now
-        // Create a group for handling the padding
-        svg.push_str(&format!(r#"<g transform="translate({} {})" >"#,
-            box_shape.box_options.padding, box_shape.box_options.padding));
+        // The layout phase already positions the wrapped entity with padding, so no need to add extra translate
         let first_child = &node.children[0];
         svg.push_str(render_node(&first_child, session).as_str());
-        svg.push_str("</g>"); // Close the padding group
         
     }
     svg.push_str("</g>");
@@ -478,21 +499,44 @@ fn test_render_group() {
 
 //test that BoxShape with wrapped group is rendered correctly
 #[test]
-fn test_render_box_with_group() {
+fn test_render_box_with_rect_in_group() {
     let mut session = DiagramBuilder::new();
-    let group = session.new_group(Vec::new());
+
+    let rect = session.new_rectangle(RectOptions {
+         width: 100.0, height: 50.0,
+         fill_color:Fill::Color("black".to_string()), 
+         stroke_color: String::from("magenta"), 
+         stroke_width: 1.0, border_radius: 1.0 });
+    
+    let group = session.new_group(vec![rect]);
+
     let box_ = session.new_box(group, BoxOptions{
         fill_color:Fill::Color("white".to_string()),
         stroke_color: "black".to_string(),
         stroke_width: 1.0,
-        padding: 0.0,
+        padding: 2.0,
         border_radius: 0.0,
     });
+
+    layout_tree_node(&mut session, &box_);
+
     let node = render_node(&box_, &session);
-    assert_eq!(
-        node,
-        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" /><g transform="translate(0 0)" ><g transform="translate(0 0)" ></g></g></g>"#
-    );
+    assertIsSameSVG(&node, r#"
+    <g transform="translate(0 0)" >
+        <rect x="0" y="0" width="104" height="54" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" />
+            <g transform="translate(2 2)" >
+                <g transform="translate(0 0)">
+                    <rect x="0" y="0" width="100" height="50" fill="black" stroke="magenta" stroke-width="1" rx="1" ry="1" />
+                </g>
+            </g>
+     </g>"#);
+}
+
+fn assertIsSameSVG(a: &str, b: &str) {
+    // Normalize whitespace and compare
+    let strA = a.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    let strB = b.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    assert_eq!(strA.replace('\n', "").replace('\r', ""),  strB.replace('\n', "").replace('\r', ""));
 }
 
 //test line
@@ -524,9 +568,12 @@ fn test_render_ellipse() {
     let ellipse = session.new_elipse((0.0, 0.0), (0.0, 0.0), options);
     
     let node = render_node(&ellipse, &session);
-    assert_eq!(
-        node,
-        r#"<g transform="translate(0 0)" ><ellipse cx="0" cy="0" rx="0" ry="0" stroke="black" stroke-width="1" fill="white" /></g>"#
+    assertIsSameSVG(
+        &node,
+        r#"
+        <g transform="translate(0 0)" >
+            <ellipse cx="0" cy="0" rx="0" ry="0" stroke="black" stroke-width="1" fill="white" />
+        </g>"#
     );
 }
 
@@ -542,9 +589,13 @@ fn test_render_box_rounded_corners_with_group() {
         border_radius: 5.5,
     });
     let node = render_node(&box_, &session);
-    assert_eq!(
-        node,
-        r#"<g transform="translate(0 0)" ><rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" /><g transform="translate(0 0)" ><g transform="translate(0 0)" ></g></g></g>"#
+    assertIsSameSVG(
+        &node,
+        r#"<g transform="translate(0 0)" >
+            <rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" />
+            <g transform="translate(0 0)" >
+            </g>
+        </g>"#
     );
 }
 

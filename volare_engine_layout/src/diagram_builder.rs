@@ -171,6 +171,13 @@ impl DiagramBuilder {
         node
     }
 
+    pub fn new_rectangle(&mut self, options: RectOptions) -> DiagramTreeNode {
+        let rect_id = self.new_entity(EntityType::RectShape);
+        let rect = ShapeRect::new(rect_id, options);
+        self.rectangles.insert(rect_id, rect);
+        DiagramTreeNode::new(EntityType::RectShape, rect_id)
+    }
+
     // Creates a new Text element
     // text: the text to display
     // options: the options for the text
@@ -287,7 +294,7 @@ impl DiagramBuilder {
         //Add a rectangle for the header row
         let header_id = self.new_entity(EntityType::BoxShape);
         let rect_options = RectOptions{
-            fill_color:"red".to_string(),
+            fill_color:Fill::Color(String::from("red")),
             ..Default::default()
         };
         let header_rect = ShapeRect::new(header_id, rect_options);
@@ -416,6 +423,10 @@ impl DiagramBuilder {
 
     pub fn get_line(&self, id: EntityID) -> &ShapeLine {
         &self.lines[&id]
+    }
+
+    pub fn get_rectangle(&self, id: EntityID) -> &ShapeRect {
+        &self.rectangles[&id]
     }
 
     pub fn get_text_line(&self, id: EntityID) -> &TextLine {
