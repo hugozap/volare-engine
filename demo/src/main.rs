@@ -14,7 +14,6 @@ use volare_engine_layout::{
 };
 //import io modules to write to file
 use measure_text::{
-    measure_text,
     measure_text_ultra_tight,
     measure_text_svg_character_advance,
 }; // Use the ultra-tight measurement for text
@@ -283,6 +282,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
 
     // Render PNG
+    // Use other  measure function for PNG rendering
     // let mut png_path = temp_dir.clone();
     // png_path.push("png-render-test.png");
     // let png_renderer = PNGRenderer {};
