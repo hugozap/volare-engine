@@ -94,17 +94,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create a list of 10 texts
     let mut table_items = Vec::new();
-    // table_items.push(tableEllipses);
-    // table_items.push(polyline);
-    // table_items.push(hexagon);
-    // for i in 0..10 {
-    //     let text = session.new_text(
-    //         &format!("Text hey ☣ {} \nthis is a multiline text", i),
-    //         text_options.clone(),
-    //     );
-    //     table_items.push(text);
-    //     //texts.push(get_test_table(&mut session));
-    // }
+    table_items.push(tableEllipses);
+    table_items.push(polyline);
+    table_items.push(hexagon);
+    for i in 0..10 {
+        let text = session.new_text(
+            &format!("Text hey ☣ {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
+        table_items.push(text);
+        //texts.push(get_test_table(&mut session));
+    }
     //Add a couple of ellipses
 
     //Create an ellipse and wrap it with a box
@@ -154,12 +154,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Add sample image from file (first instance)
     let sampleImage = session.new_image_from_file("demo/assets/sample.png", (200.0, 200.0));
-    table_items.push(sampleImage);
+    //table_items.push(sampleImage);
 
     //Add sample image from file
     // The path is relative to where the binary is run
     let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
-    table_items.push(file_image);
+   // table_items.push(file_image);
 
     // Create a FreeContainer with multiple visual elements at specific positions using the new method
 
@@ -256,7 +256,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     free_container.border_width = 5.0; // Thicker border
 
     // Add the FreeContainer to the table
-    table_items.push(container_with_elements);
+   // table_items.push(container_with_elements);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
@@ -321,7 +321,7 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     }
     //create a table options object with all defaults except the header color
     let table_options = TableOptions {
-        header_fill_color: "red".to_string(),
+        header_fill_color: "blue".to_string(),
         ..Default::default()
     };
     //Create a table for the texts with 2 columns

@@ -290,16 +290,16 @@ impl DiagramBuilder {
             self.lines.insert(line_id, line);
             row_lines.push(line_id);
         }
-
+        
         //Add a rectangle for the header row
-        let header_id = self.new_entity(EntityType::BoxShape);
-        let rect_options = RectOptions{
-            fill_color:Fill::Color(String::from("red")),
-            ..Default::default()
-        };
-        let header_rect = ShapeRect::new(header_id, rect_options);
-        self.rectangles.insert(header_id, header_rect);
-
+        let header = self.new_rectangle(
+            RectOptions {
+                fill_color: Fill::Color(options.header_fill_color.clone()),
+                stroke_color: String::from("black"),
+                stroke_width: 1.0,
+                ..Default::default()
+            }
+        );
 
         let table_id = self.new_entity(EntityType::TableShape);
         let table = Table::new(
@@ -308,7 +308,7 @@ impl DiagramBuilder {
             col_lines.clone(),
             row_lines.clone(),
             cols,
-            header_id,
+            header.entity_id,
             options.clone(),
         );
 
@@ -318,6 +318,10 @@ impl DiagramBuilder {
             entity_id: table_id,
             children: Vec::new(),
         };
+
+        // Add the header before the cells, otherwise it can cover the cells
+        node.add_child(DiagramTreeNode::new(EntityType::RectShape, header.entity_id));
+
         for child in cells {
             node.add_child(child)
         }
@@ -329,7 +333,6 @@ impl DiagramBuilder {
         for line in row_lines {
             node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
         }
-        node.add_child(DiagramTreeNode::new(EntityType::RectShape, header_id));
 
         node
     }

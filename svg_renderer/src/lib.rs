@@ -348,15 +348,7 @@ fn render_table(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,
         table_shape.table_options.border_width
     ));
 
-    //render header element
-    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" />"#,
-        header_size.0, 
-        header_size.1, 
-        table_shape.table_options.header_fill_color,
-        table_shape.table_options.border_color,
-        table_shape.table_options.border_width
-    ));
-
+    // render header, cells, lines, etc. Should have been added to the node
     for child in node.children.iter() {
         svg.push_str(render_node(child, session).as_str());
     }
@@ -434,7 +426,7 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
         let line = session.get_text_line(*line_id);
         let pos = session.get_position(line.entity);
         let lineSize = session.get_size(line.entity);
-        svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}px" font-family="{}" alignment-baseline="middle" data-debug="{}" >"#,
+        svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}px" font-family="{}" alignment-baseline="hanging" data-debug="{}" >"#,
         pos.0,
         pos.1,
         text_shape.text_options.text_color,
