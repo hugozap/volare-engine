@@ -164,6 +164,7 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     let mut y = 0.0;
     let mut width = 0.0;
     for elem in vertical_stack.elements.iter() {
+        println!("DEBUG:::y: {}", y);
         let elem_size = session.get_size(*elem);
         session.set_position(*elem, 0.0, y);
         y += elem_size.1;

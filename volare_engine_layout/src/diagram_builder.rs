@@ -171,6 +171,55 @@ impl DiagramBuilder {
         node
     }
 
+    
+    // Creates a new Vertical stack.
+    pub fn new_vstack(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+        let stack_id = self.new_entity(EntityType::VerticalStackShape);
+        let mut vstack = VerticalStack {
+            entity: stack_id,
+            elements: Vec::new(),
+        };
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::VerticalStackShape,
+            entity_id: stack_id,
+            children: Vec::new(),
+        };
+
+        //set children
+        for child in children {
+            vstack.elements.push(child.entity_id);
+            node.add_child(child)
+        }
+
+        self.vertical_stacks.insert(stack_id, vstack);
+
+        node
+    }
+
+    // Creates a new Vertical stack.
+    pub fn new_hstack(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+        let stack_id = self.new_entity(EntityType::HorizontalStackShape);
+        let mut hstack = HorizontalStack {
+            entity: stack_id,
+            elements: Vec::new(),
+        };
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::HorizontalStackShape,
+            entity_id: stack_id,
+            children: Vec::new(),
+        };
+
+        //set children
+        for child in children {
+            hstack.elements.push(child.entity_id);
+            node.add_child(child)
+        }
+
+        self.horizontal_stacks.insert(stack_id, hstack);
+
+        node
+    }
+
     pub fn new_rectangle(&mut self, options: RectOptions) -> DiagramTreeNode {
         let rect_id = self.new_entity(EntityType::RectShape);
         let rect = ShapeRect::new(rect_id, options);

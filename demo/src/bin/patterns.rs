@@ -1,0 +1,99 @@
+// Create an SVG file with all supported elements
+
+//import svg_renderer
+use image_renderer::PNGRenderer;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+use demo::measure_text::{ measure_text_ultra_tight};
+
+//import layout
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
+    TableOptions, TextOptions, Fill,
+};
+//import io modules to write to file
+use std::fs::File;
+
+struct CardOptions {
+
+}
+
+//componente card
+//la tarjeta tiene contenido y titulo
+fn card_component(session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
+    session.new_vstack(vec![header,content])
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //create session
+    let mut session = DiagramBuilder::new();
+  
+    session.set_measure_text_fn(measure_text_ultra_tight);
+
+    let mut table_items = Vec::new();
+
+    let cardOptions = CardOptions {
+
+    };
+
+      let textOpts =  TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 16.0,
+            line_width: 100,
+            text_color: "black".to_string(),  // white text
+            line_spacing: 5.0,
+        };
+
+    let cheader = session.new_text("card title", textOpts.clone());
+    let ccontent = session.new_text("card contents", textOpts.clone());
+    let card1 = card_component(&mut session, cheader, ccontent, cardOptions);
+
+
+
+    
+    // Add the FreeContainer to the table
+    // table_items.push(container_with_elements);
+
+    table_items.push(card1);
+    //texts.push(get_test_table(&mut session));
+    //Create a table for the texts with 2 columns
+    let mut toptions = TableOptions::default();
+    toptions.cell_padding = 5;
+    let table = session.new_table(table_items, 1, toptions);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &table);
+
+    //create writer to file ~/temp/svg-render-test.svg
+    //get path for ~/temp
+    let temp_dir = std::env::temp_dir();
+    //create path for ~/temp/svg-render-test.svg
+    // Render SVG
+  
+    
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("svg-render-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path).unwrap();
+    let svg_res = svg_renderer.render(&session, &table, &mut svg_file);
+    if svg_res.is_err() {
+        println!("SVG Render Error: {}", svg_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+    
+
+    // Render PNG
+    let mut png_path = temp_dir.clone();
+    png_path.push("png-render-test.png");
+    let png_renderer = PNGRenderer {};
+    let mut png_file = File::create(&png_path).unwrap();
+    let png_res = png_renderer.render(&session, &table, &mut png_file);
+    if png_res.is_err() {
+        println!("PNG Render Error: {}", png_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("PNG file written to: {}", png_path.to_str().unwrap());
+
+    Ok(())
+}
