@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use crate::components::*;
 
 pub struct DiagramBuilder {
-    pub measure_text: Option<fn(&str, &TextOptions) -> (f64, f64)>,
+    pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
     pub entities: Vec<EntityID>,
     pub positions: HashMap<EntityID, Point>,
     pub sizes: HashMap<EntityID, Size>,
@@ -119,18 +119,18 @@ impl DiagramBuilder {
     }
 
     //set the measure_text function
-    pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (f64, f64)) {
+    pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (Float, Float)) {
         println!("Setting measure text function");
         self.measure_text = Option::Some(measure_text);
     }
 
     //get the position of an entity
-    pub fn get_position(&self, entity_id: EntityID) -> (f64, f64) {
+    pub fn get_position(&self, entity_id: EntityID) -> (Float, Float) {
         let pos = self.positions.get(&entity_id).unwrap();
         (pos.x, pos.y)
     }
 
-    pub fn set_position(&mut self, entity_id: EntityID, x: f64, y: f64) {
+    pub fn set_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
         println!("Setting position of entity {} to ({}, {})", entity_id, x, y);
         let pos = self.positions.get_mut(&entity_id).unwrap();
         pos.x = x;
@@ -138,12 +138,12 @@ impl DiagramBuilder {
     }
 
     //get the size of an entity
-    pub fn get_size(&self, entity_id: EntityID) -> (f64, f64) {
+    pub fn get_size(&self, entity_id: EntityID) -> (Float, Float) {
         let size = self.sizes.get(&entity_id).unwrap();
         (size.w, size.h)
     }
 
-    pub fn set_size(&mut self, entity_id: EntityID, width: f64, height: f64) {
+    pub fn set_size(&mut self, entity_id: EntityID, width: Float, height: Float) {
         let size = self.sizes.get_mut(&entity_id).unwrap();
         size.w = width;
         size.h = height;
@@ -255,9 +255,9 @@ impl DiagramBuilder {
         DiagramTreeNode::new(EntityType::TextShape, text_id)
     }
 
-    pub fn new_line(&mut self, options: LineOptions) -> DiagramTreeNode {
+    pub fn new_line(&mut self, start: (Float, Float), end: (Float, Float), options: LineOptions) -> DiagramTreeNode {
         let line_id = self.new_entity(EntityType::LineShape);
-        let line = ShapeLine::new(line_id, options);
+        let line = ShapeLine::new(line_id, start, end, options);
         self.lines.insert(line_id, line);
         println!("Creating new line with id {}", line_id);
         DiagramTreeNode::new(EntityType::LineShape, line_id)
@@ -265,8 +265,8 @@ impl DiagramBuilder {
 
     pub fn new_elipse(
         &mut self,
-        center: (f64, f64),
-        radius: (f64, f64),
+        center: (Float, Float),
+        radius: (Float, Float),
         options: EllipseOptions,
     ) -> DiagramTreeNode {
         let ellipse_id = self.new_entity(EntityType::EllipseShape);
@@ -275,14 +275,14 @@ impl DiagramBuilder {
         DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id)
     }
 
-    pub fn new_image(&mut self, image_data: &str, preferred_size:(f64, f64)) -> DiagramTreeNode {
+    pub fn new_image(&mut self, image_data: &str, preferred_size:(Float, Float)) -> DiagramTreeNode {
         let image_id = self.new_entity(EntityType::ImageShape);
         let image = ShapeImage::new(image_id, image_data.to_string(), preferred_size);
         self.images.insert(image_id, image);
         DiagramTreeNode::new(EntityType::ImageShape, image_id)
     }
     
-    pub fn new_image_from_file(&mut self, file_path: &str, preferred_size:(f64, f64)) -> DiagramTreeNode {
+    pub fn new_image_from_file(&mut self, file_path: &str, preferred_size:(Float, Float)) -> DiagramTreeNode {
         let image_id = self.new_entity(EntityType::ImageShape);
         let image = ShapeImage::from_file(image_id, file_path.to_string(), preferred_size);
         self.images.insert(image_id, image);
@@ -327,7 +327,7 @@ impl DiagramBuilder {
         let mut col_lines = Vec::new();
         for i in 0..cols {
             let line_id = self.new_entity(EntityType::LineShape);
-            let line = ShapeLine::new(line_id, LineOptions::new());
+            let line = ShapeLine::new(line_id, (0.0, 0.0), (0.0, 0.0), LineOptions::new());
             self.lines.insert(line_id, line);
             col_lines.push(line_id);
         }
@@ -335,7 +335,7 @@ impl DiagramBuilder {
         let mut row_lines = Vec::new();
         for i in 0..num_rows + 1 {
             let line_id = self.new_entity(EntityType::LineShape);
-            let line = ShapeLine::new(line_id, LineOptions::new());
+            let line = ShapeLine::new(line_id, (0.0, 0.0), (0.0, 0.0), LineOptions::new());
             self.lines.insert(line_id, line);
             row_lines.push(line_id);
         }
@@ -386,7 +386,7 @@ impl DiagramBuilder {
         node
     }
 
-    pub fn new_polyline(&mut self, points: Vec<(f64, f64)>, options: LineOptions) -> DiagramTreeNode {
+    pub fn new_polyline(&mut self, points: Vec<(Float, Float)>, options: LineOptions) -> DiagramTreeNode {
         let polyline_id = self.new_entity(EntityType::PolyLine);
         let polyline = PolyLine::new(polyline_id, points, options);
         self.polylines.insert(polyline_id, polyline);
@@ -403,7 +403,7 @@ impl DiagramBuilder {
     }
     
     /// Creates a new FreeContainer with all children at once
-    pub fn new_free_container_with_children(&mut self, children_with_positions: Vec<(DiagramTreeNode, (f64, f64))>) -> DiagramTreeNode {
+    pub fn new_free_container_with_children(&mut self, children_with_positions: Vec<(DiagramTreeNode, (Float, Float))>) -> DiagramTreeNode {
         let container_id = self.new_entity(EntityType::FreeContainer);
         
         // Create the free container
@@ -430,7 +430,7 @@ impl DiagramBuilder {
     
     /// Add a child to a FreeContainer at the specified position
     /// The position is relative to the container's top-left corner
-    pub fn add_to_free_container(&mut self, container_id: EntityID, child: DiagramTreeNode, position: (f64, f64)) -> DiagramTreeNode {
+    pub fn add_to_free_container(&mut self, container_id: EntityID, child: DiagramTreeNode, position: (Float, Float)) -> DiagramTreeNode {
         // Get the free container
         let container = self.free_containers.get_mut(&container_id).unwrap();
         
@@ -448,6 +448,18 @@ impl DiagramBuilder {
         node.add_child(child);
         
         node
+    }
+    
+    // Enhanced API convenience methods
+    
+    /// Create a new HStackBuilder for fluent horizontal stack creation
+    pub fn hstack(&mut self) -> HStackBuilder {
+        HStackBuilder::new(self)
+    }
+    
+    /// Create a new BoxBuilder for fluent box creation
+    pub fn box_with(&mut self, child: DiagramTreeNode) -> BoxBuilder {
+        BoxBuilder::new(self, child)
     }
 }
 
@@ -514,6 +526,100 @@ impl DiagramBuilder {
     }
 }
 
+// Enhanced API Builder Structs
+
+/// Builder for creating horizontal stacks with fluent syntax
+pub struct HStackBuilder<'a> {
+    builder: &'a mut DiagramBuilder,
+    children: Vec<DiagramTreeNode>,
+}
+
+impl<'a> HStackBuilder<'a> {
+    fn new(builder: &'a mut DiagramBuilder) -> Self {
+        HStackBuilder {
+            builder,
+            children: Vec::new(),
+        }
+    }
+    
+    /// Add a child element to the horizontal stack
+    pub fn add(mut self, child: DiagramTreeNode) -> Self {
+        self.children.push(child);
+        self
+    }
+    
+    /// Add a text element to the horizontal stack
+    pub fn add_text(mut self, text: &str, options: TextOptions) -> Self {
+        let text_node = self.builder.new_text(text, options);
+        self.children.push(text_node);
+        self
+    }
+    
+    /// Add a text element with default options to the horizontal stack
+    pub fn add_text_default(mut self, text: &str) -> Self {
+        let text_node = self.builder.new_text(text, TextOptions::default());
+        self.children.push(text_node);
+        self
+    }
+    
+    /// Build the horizontal stack
+    pub fn build(self) -> DiagramTreeNode {
+        self.builder.new_hstack(self.children)
+    }
+}
+
+/// Builder for creating boxes with fluent syntax
+pub struct BoxBuilder<'a> {
+    builder: &'a mut DiagramBuilder,
+    child: DiagramTreeNode,
+    options: BoxOptions,
+}
+
+impl<'a> BoxBuilder<'a> {
+    fn new(builder: &'a mut DiagramBuilder, child: DiagramTreeNode) -> Self {
+        BoxBuilder {
+            builder,
+            child,
+            options: BoxOptions::default(),
+        }
+    }
+    
+    /// Set the padding for the box
+    pub fn padding(mut self, padding: Float) -> Self {
+        self.options.padding = padding;
+        self
+    }
+    
+    /// Set the background color for the box
+    pub fn background(mut self, color: &str) -> Self {
+        self.options.fill_color = Fill::Color(color.to_string());
+        self
+    }
+    
+    /// Set the border color for the box
+    pub fn border_color(mut self, color: &str) -> Self {
+        self.options.stroke_color = color.to_string();
+        self
+    }
+    
+    /// Set the border width for the box
+    pub fn border_width(mut self, width: Float) -> Self {
+        self.options.stroke_width = width;
+        self
+    }
+    
+    /// Set the border radius for the box
+    pub fn border_radius(mut self, radius: Float) -> Self {
+        self.options.border_radius = radius;
+        self
+    }
+    
+    /// Build the box
+    pub fn build(self) -> DiagramTreeNode {
+        self.builder.new_box(self.child, self.options)
+    }
+}
+
 //test
 #[cfg(test)]
 mod tests {
@@ -526,7 +632,7 @@ mod tests {
         let mut session = DiagramBuilder::new();
 
         session.set_measure_text_fn(|text, text_options| {
-            let textW: f64 = text.len() as f64 * text_options.font_size as f64;
+            let textW: Float = text.len() as Float * text_options.font_size as Float;
 
             (textW, text_options.font_size.into())
         });

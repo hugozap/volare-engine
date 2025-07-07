@@ -7,6 +7,7 @@ use std::any::Any;
 pub use crate::components::table::*;
 //new type EntityID that is a u64
 pub type EntityID = usize;
+pub type Float = f32;
 
 //Export table and table options
 
@@ -19,8 +20,8 @@ pub trait Entity {
 }
 
 pub struct Point {
-    pub x: f64,
-    pub y: f64,
+    pub x: Float,
+    pub y: Float,
 }
 
 //impl clone
@@ -35,14 +36,14 @@ impl Clone for Point {
 
 //impl new
 impl Point {
-    pub fn new(x: f64, y: f64) -> Self {
+    pub fn new(x: Float, y: Float) -> Self {
         Point { x, y }
     }
 }
 
 pub struct Size {
-    pub w: f64,
-    pub h: f64,
+    pub w: Float,
+    pub h: Float,
 }
 
 //impl clone
@@ -57,51 +58,8 @@ impl Clone for Size {
 
 //impl new
 impl Size {
-    pub fn new(w: f64, h: f64) -> Self {
+    pub fn new(w: Float, h: Float) -> Self {
         Size { w, h }
-    }
-}
-
-//default implementation of Entity
-impl dyn Entity {
-
-    pub fn as_rect(&self) -> Option<&ShapeRect> {
-        self.as_any().downcast_ref::<ShapeRect>()
-    }
-
-    pub fn as_group(&self) -> Option<&ShapeGroup> {
-        self.as_any().downcast_ref::<ShapeGroup>()
-    }
-
-    pub fn as_horizontal_stack(&self) -> Option<&HorizontalStack> {
-        self.as_any().downcast_ref::<HorizontalStack>()
-    }
-
-    pub fn as_vertical_stack(&self) -> Option<&VerticalStack> {
-        self.as_any().downcast_ref::<VerticalStack>()
-    }
-
-    pub fn as_text(&self) -> Option<&ShapeText> {
-        self.as_any().downcast_ref::<ShapeText>()
-    }
-
-    pub fn as_line(&self) -> Option<&ShapeLine> {
-        self.as_any().downcast_ref::<ShapeLine>()
-    }
-
-    pub fn as_arrow(&self) -> Option<&ShapeArrow> {
-        self.as_any().downcast_ref::<ShapeArrow>()
-    }
-
-    pub fn as_ellipse(&self) -> Option<&ShapeEllipse> {
-        self.as_any().downcast_ref::<ShapeEllipse>()
-    }
-
-    pub fn as_image(&self) -> Option<&ShapeImage> {
-        self.as_any().downcast_ref::<ShapeImage>()
-    }
-    pub fn as_table(&self) -> Option<&Table> {
-        self.as_any().downcast_ref::<Table>()
     }
 }
 
@@ -191,21 +149,21 @@ impl ShapeBox {
 
 #[derive(Debug)]
 pub enum GradientStop {
-    ColorStop { offset: f64, color: String },
-    OpacityStop { offset: f64, opacity: f64 },
+    ColorStop { offset: Float, color: String },
+    OpacityStop { offset: Float, opacity: Float },
 }
 
 #[derive(Debug)]
 pub struct LinearGradient {
-    pub x1: f64,
-    pub y1: f64,
-    pub x2: f64,
-    pub y2: f64,
+    pub x1: Float,
+    pub y1: Float,
+    pub x2: Float,
+    pub y2: Float,
     pub stops: Vec<GradientStop>,
 }
 
 impl LinearGradient {
-    pub fn new(x1: f64, y1: f64, x2: f64, y2: f64, stops: Vec<GradientStop>) -> Self {
+    pub fn new(x1: Float, y1: Float, x2: Float, y2: Float, stops: Vec<GradientStop>) -> Self {
         LinearGradient {
             x1,
             y1,
@@ -233,9 +191,9 @@ impl Clone for GradientStop {
 
 #[derive(Debug)]
 pub struct RadialGradient {
-    pub cx: f64,
-    pub cy: f64,
-    pub r: f64,
+    pub cx: Float,
+    pub cy: Float,
+    pub r: Float,
     pub stops: Vec<GradientStop>,
 }
 
@@ -302,9 +260,9 @@ impl fmt::Display for Fill {
 pub struct BoxOptions {
     pub fill_color: Fill,
     pub stroke_color: String,
-    pub stroke_width: f64,
-    pub padding: f64,
-    pub border_radius: f64,
+    pub stroke_width: Float,
+    pub padding: Float,
+    pub border_radius: Float,
 }
 
 impl Clone for BoxOptions {
@@ -339,12 +297,12 @@ impl BoxOptions {
 //RectOptions
 #[derive(Default, Debug)]
 pub struct RectOptions {
-    pub width: f64,
-    pub height: f64,
+    pub width: Float,
+    pub height: Float,
     pub fill_color: Fill,
     pub stroke_color: String,
-    pub stroke_width: f64,
-    pub border_radius: f64,
+    pub stroke_width: Float,
+    pub border_radius: Float,
 }
 
 impl Clone for RectOptions {
@@ -613,8 +571,8 @@ impl Entity for HorizontalStack {
 
 pub struct ShapeLine {
     pub entity: EntityID,
-    pub start: (f64, f64),
-    pub end: (f64, f64),
+    pub start: (Float, Float),
+    pub end: (Float, Float),
     pub line_options: LineOptions,
 }
 
@@ -630,11 +588,11 @@ impl Clone for ShapeLine {
 }
 
 impl ShapeLine {
-    pub fn new(line_id: EntityID, options: LineOptions) -> ShapeLine {
+    pub fn new(line_id: EntityID, start: (Float, Float), end: (Float, Float), options: LineOptions) -> ShapeLine {
         ShapeLine {
             entity: line_id,
-            start: (0.0, 0.0),
-            end: (0.0, 0.0),
+            start,
+            end,
             line_options: options,
         }
     }
@@ -658,7 +616,7 @@ impl Entity for ShapeLine {
 #[derive(Default)]
 pub struct LineOptions {
     pub stroke_color: String,
-    pub stroke_width: f64,
+    pub stroke_width: Float,
 }
 
 impl Clone for LineOptions {
@@ -681,12 +639,12 @@ impl LineOptions {
 
 pub struct PolyLine {
     pub entity: EntityID,
-    pub points: Vec<(f64, f64)>,
+    pub points: Vec<(Float, Float)>,
     pub line_options: LineOptions,
 }
 
 impl PolyLine {
-    pub fn new(entity: EntityID, points: Vec<(f64, f64)>, line_options: LineOptions) -> PolyLine {
+    pub fn new(entity: EntityID, points: Vec<(Float, Float)>, line_options: LineOptions) -> PolyLine {
         PolyLine {
             entity,
             points,
@@ -721,8 +679,8 @@ impl Clone for PolyLine {
 
 pub struct ShapeArrow {
     pub entity: EntityID,
-    pub start: (f64, f64),
-    pub end: (f64, f64),
+    pub start: (Float, Float),
+    pub end: (Float, Float),
     pub arrow_options: ArrowOptions,
 }
 
@@ -754,8 +712,8 @@ impl Entity for ShapeArrow {
 #[derive(Default)]
 pub struct ArrowOptions {
     pub stroke_color: String,
-    pub stroke_width: f64,
-    pub arrow_size: f64,
+    pub stroke_width: Float,
+    pub arrow_size: Float,
 }
 
 impl Clone for ArrowOptions {
@@ -780,8 +738,8 @@ impl ArrowOptions {
 
 pub struct ShapeEllipse {
     pub entity: EntityID,
-    pub center: (f64, f64),
-    pub radius: (f64, f64),
+    pub center: (Float, Float),
+    pub radius: (Float, Float),
     pub ellipse_options: EllipseOptions,
 }
 
@@ -797,7 +755,7 @@ impl Clone for ShapeEllipse {
 }
 
 impl ShapeEllipse {
-    pub fn new(entity: EntityID, center: (f64, f64), radius: (f64, f64), ellipse_options: EllipseOptions) -> ShapeEllipse {
+    pub fn new(entity: EntityID, center: (Float, Float), radius: (Float, Float), ellipse_options: EllipseOptions) -> ShapeEllipse {
         ShapeEllipse {
             entity,
             center,
@@ -823,9 +781,10 @@ impl Entity for ShapeEllipse {
 
 #[derive(Default)]
 pub struct EllipseOptions {
+    //TODO: convert to Fill
     pub fill_color: String,
     pub stroke_color: String,
-    pub stroke_width: f64,
+    pub stroke_width: Float,
 }
 
 impl Clone for EllipseOptions {
@@ -856,7 +815,7 @@ pub struct ShapeImage {
     pub image: String,
     //path to image file on disk (optional)
     pub file_path: Option<String>,
-    pub preferred_size: (f64, f64),
+    pub preferred_size: (Float, Float),
 }
 
 impl Clone for ShapeImage {
@@ -885,7 +844,7 @@ impl Entity for ShapeImage {
 }
 
 impl ShapeImage {
-    pub fn new(entity: EntityID, image: String, preferred_size: (f64, f64)) -> ShapeImage {
+    pub fn new(entity: EntityID, image: String, preferred_size: (Float, Float)) -> ShapeImage {
         ShapeImage {
             entity,
             image,
@@ -894,7 +853,7 @@ impl ShapeImage {
         }
     }
     
-    pub fn from_file(entity: EntityID, file_path: String, preferred_size: (f64, f64)) -> ShapeImage {
+    pub fn from_file(entity: EntityID, file_path: String, preferred_size: (Float, Float)) -> ShapeImage {
         ShapeImage {
             entity,
             image: String::new(), // Empty as we're using file_path instead
@@ -908,10 +867,10 @@ impl ShapeImage {
 /// Children's positions are relative to the container's top-left corner
 pub struct FreeContainer {
     pub entity: EntityID,
-    pub children: Vec<(EntityID, (f64, f64))>, // Each child has a position relative to the container
+    pub children: Vec<(EntityID, (Float, Float))>, // Each child has a position relative to the container
     pub background_color: Option<String>,      // Optional background color
     pub border_color: Option<String>,          // Optional border color
-    pub border_width: f64,                    // Border width (0 for no border)
+    pub border_width: Float,                    // Border width (0 for no border)
 }
 
 impl Clone for FreeContainer {
@@ -953,12 +912,12 @@ impl FreeContainer {
     }
     
     /// Add a child to the container at the specified position
-    pub fn add_child(&mut self, child_id: EntityID, position: (f64, f64)) {
+    pub fn add_child(&mut self, child_id: EntityID, position: (Float, Float)) {
         self.children.push((child_id, position));
     }
     
     /// Add multiple children at once with their positions
-    pub fn with_children(mut self, children_with_positions: Vec<(EntityID, (f64, f64))>) -> Self {
+    pub fn with_children(mut self, children_with_positions: Vec<(EntityID, (Float, Float))>) -> Self {
         self.children.extend(children_with_positions);
         self
     }
@@ -970,7 +929,7 @@ impl FreeContainer {
     }
     
     /// Set border properties
-    pub fn with_border(mut self, color: &str, width: f64) -> Self {
+    pub fn with_border(mut self, color: &str, width: Float) -> Self {
         self.border_color = Some(color.to_string());
         self.border_width = width;
         self

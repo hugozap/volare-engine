@@ -1,5 +1,6 @@
 /* Layout calculation for each type of entity */
 
+use crate::components::Float;
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, HorizontalStack,
     ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table,
@@ -66,7 +67,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
     {
         println!("Text: {:?}", shape_text);
         let mut y = 0.0;
-        let mut max_line_width = 0f64;
+        let mut max_line_width = 0.0;
         for line in shape_text.lines.iter() {
             println!("Line: {:?}", line);
             let textLine = session.get_text_line(*line);
@@ -76,9 +77,9 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
             }
             session.set_position(*line, 0.0, y);
             session.set_size(*line, line_size.0, line_size.1);
-            y += line_size.1 + shape_text.text_options.line_spacing as f64;
+            y += line_size.1 + shape_text.text_options.line_spacing as Float;
         }
-        y-= shape_text.text_options.line_spacing as f64; // Adjust for the last line spacing
+        y-= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
 
         println!("max_line_width: {}", max_line_width);
         //set the size of the text element
@@ -139,7 +140,7 @@ pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse
     session.set_size(shape_ellipse.entity, w, h);
 }
 
-pub fn layout_rect(session: &mut DiagramBuilder, entity: EntityID, width: f64, height: f64) {
+pub fn layout_rect(session: &mut DiagramBuilder, entity: EntityID, width: Float, height: Float) {
     //set the size of the rect
     session.set_size(entity, width, height);
 
@@ -202,12 +203,12 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     //natural sizes and then update their rows and columns
     let mut rows: Vec<Vec<EntityID>> = Vec::new();
     let mut cols: Vec<Vec<EntityID>> = Vec::new();
-    let mut row_heights: Vec<f64> = Vec::new();
-    let mut col_widths: Vec<f64> = Vec::new();
+    let mut row_heights: Vec<Float> = Vec::new();
+    let mut col_widths: Vec<Float> = Vec::new();
 
     // Add variables to store line positions
-    let mut horizontal_line_positions: Vec<f64> = Vec::new();
-    let mut vertical_line_positions: Vec<f64> = Vec::new();
+    let mut horizontal_line_positions: Vec<Float> = Vec::new();
+    let mut vertical_line_positions: Vec<Float> = Vec::new();
 
     //initialize rows and cols
     for (i, elem) in table.cells.iter().enumerate() {
@@ -228,10 +229,10 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         //update the row and col sizes
         let elem_size = session.get_size(*elem);
         if elem_size.0 > col_widths[col] {
-            col_widths[col] = elem_size.0 + table.table_options.cell_padding as f64 * 2.0;
+            col_widths[col] = elem_size.0 + table.table_options.cell_padding as Float * 2.0;
         }
         if elem_size.1 > row_heights[row] {
-            row_heights[row] = elem_size.1 + table.table_options.cell_padding as f64 * 2.0;
+            row_heights[row] = elem_size.1 + table.table_options.cell_padding as Float * 2.0;
         }
     }
 
@@ -250,8 +251,8 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         for (j, elem) in col.iter().enumerate() {
             session.set_position(
                 *elem,
-                x + table.table_options.cell_padding as f64,
-                y + table.table_options.cell_padding as f64,
+                x + table.table_options.cell_padding as Float,
+                y + table.table_options.cell_padding as Float,
             );
             y += row_heights[j];
         }
@@ -382,10 +383,10 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
 
 
 pub struct BoundingBox {
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
+    x: Float,
+    y: Float,
+    width: Float,
+    height: Float,
 }
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {

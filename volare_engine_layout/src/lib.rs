@@ -10,4 +10,5 @@ pub mod utils;
 pub mod components;
 pub mod layout;
 pub mod renderer_base;
+pub mod parser;
 
