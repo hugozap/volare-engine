@@ -510,10 +510,27 @@ impl TextOptions {
     }
 }
 
+pub enum HorizontalAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+impl Clone for HorizontalAlignment {
+    fn clone(&self) -> Self {
+        match self {
+            HorizontalAlignment::Left => HorizontalAlignment::Left,
+            HorizontalAlignment::Center => HorizontalAlignment::Center,
+            HorizontalAlignment::Right => HorizontalAlignment::Right,
+        }
+    }
+}   
+
 pub struct VerticalStack {
     pub entity: EntityID,
     //List of entity ids
     pub elements: Vec<EntityID>,
+    pub horizontal_alignment: HorizontalAlignment
 }
 
 impl Clone for VerticalStack {
@@ -521,6 +538,7 @@ impl Clone for VerticalStack {
         VerticalStack {
             entity: self.entity,
             elements: self.elements.clone(),
+            horizontal_alignment: self.horizontal_alignment.clone()
         }
     }
 }
@@ -539,11 +557,37 @@ impl Entity for VerticalStack {
     }
 }
     
+pub enum VerticalAlignment {
+    Top,
+    Center,
+    Bottom,
+}
+
+impl Clone for VerticalAlignment {
+    fn clone(&self) -> Self {
+        match self {
+            VerticalAlignment::Top => VerticalAlignment::Top,
+            VerticalAlignment::Center => VerticalAlignment::Center,
+            VerticalAlignment::Bottom => VerticalAlignment::Bottom,
+        }
+    }
+}   
+impl fmt::Display for VerticalAlignment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerticalAlignment::Top => write!(f, "Top"),
+            VerticalAlignment::Center => write!(f, "Center"),
+            VerticalAlignment::Bottom => write!(f, "Bottom"),
+        }
+    }
+}
+//enum for horizontal stack
 
 pub struct HorizontalStack {
     pub entity: EntityID,
     //List of entity ids
     pub elements: Vec<EntityID>,
+    pub vertical_alignment: VerticalAlignment, // Optional vertical alignment (e.g., "top", "center", "bottom")
 }
 
 impl Clone for HorizontalStack {
@@ -551,6 +595,7 @@ impl Clone for HorizontalStack {
         HorizontalStack {
             entity: self.entity,
             elements: self.elements.clone(),
+            vertical_alignment: self.vertical_alignment.clone(),
         }
     }
 }

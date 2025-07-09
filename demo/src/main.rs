@@ -4,7 +4,9 @@ pub mod measure_text;
 
 //import svg_renderer
 use image_renderer::PNGRenderer;
+use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
+use volare_engine_layout::RectOptions;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
 
 //import layout
@@ -55,11 +57,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
+    //Create horizontal stack with 2 rects and one text, set vertical align to center 
+    let mut rectOpts = RectOptions::default();
+    rectOpts.height = 150.0;
+    rectOpts.width = 150.0;
+    rectOpts.stroke_color = "black".to_string();
+    rectOpts.stroke_width = 1.0;
+    let rect = session.new_rectangle(rectOpts.clone());
+    let rect2 = session.new_rectangle(rectOpts.clone());
+
+
+    let label = session.new_text(
+        "Center",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 14.0,
+            line_width: 60,
+            text_color: "#333333".to_string(),
+            line_spacing: 0.0,
+        },
+    );
+
+    let hstack_centered = session.new_hstack(
+        vec![rect, label, rect2],
+        volare_engine_layout::VerticalAlignment::Center
+    );
+
+
+    
+
     // Create a more visible polyline - hexagon
     let mut hex_points = Vec::new();
     let hex_size = 50.0;
     for i in 0..6 {
-        let angle = (i as f64) * std::f64::consts::PI / 3.0;
+        let angle = (i as f32) * std::f32::consts::PI / 3.0;
         let x = hex_size * angle.cos() + hex_size;
         let y = hex_size * angle.sin() + hex_size;
         hex_points.push((x, y));
@@ -93,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create a list of 10 texts
     let mut table_items = Vec::new();
+    table_items.push(hstack_centered);
     table_items.push(tableEllipses);
     table_items.push(polyline);
     table_items.push(hexagon);

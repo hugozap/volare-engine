@@ -261,6 +261,19 @@ impl JsonLinesParser {
             }
 
             "vstack" => {
+                
+                let halign = entity
+                    .extra
+                    .get("h-align")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "left" => Some(HorizontalAlignment::Left),
+                        "center" => Some(HorizontalAlignment::Center),
+                        "right" => Some(HorizontalAlignment::Right),
+                        _ => None,
+                    })
+                    .unwrap_or(HorizontalAlignment::Center);
+
                 let children = entity
                     .children
                     .as_ref()
@@ -271,10 +284,21 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_vstack(child_nodes?))
+                Ok(builder.new_vstack(child_nodes?, halign))
             }
 
             "hstack" => {
+                let valign = entity
+                    .extra
+                    .get("v-align")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "top" => Some(VerticalAlignment::Top),
+                        "center" => Some(VerticalAlignment::Center),
+                        "bottom" => Some(VerticalAlignment::Bottom),
+                        _ => None,
+                    })
+                    .unwrap_or(VerticalAlignment::Center);
                 let children = entity
                     .children
                     .as_ref()
@@ -285,7 +309,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_hstack(child_nodes?))
+                Ok(builder.new_hstack(child_nodes?,valign ))
             }
 
             "group" => {

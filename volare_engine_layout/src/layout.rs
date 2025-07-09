@@ -1,10 +1,11 @@
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
+use crate::{HorizontalAlignment, VerticalAlignment};
 use crate::{
-    diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, HorizontalStack,
-    ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage, ShapeLine, ShapeText, Table,
-    VerticalStack, PolyLine, FreeContainer,
+    diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
+    HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
+    ShapeLine, ShapeText, Table, VerticalStack,
 };
 
 /* The box layout includes the padding and the dimensions
@@ -36,8 +37,6 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
         shape_box.box_options.padding,
     );
 }
-
-
 
 /**
  * Update the group size based on the size of the elements.
@@ -79,7 +78,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
             session.set_size(*line, line_size.0, line_size.1);
             y += line_size.1 + shape_text.text_options.line_spacing as Float;
         }
-        y-= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
+        y -= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
 
         println!("max_line_width: {}", max_line_width);
         //set the size of the text element
@@ -143,7 +142,6 @@ pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse
 pub fn layout_rect(session: &mut DiagramBuilder, entity: EntityID, width: Float, height: Float) {
     //set the size of the rect
     session.set_size(entity, width, height);
-
 }
 
 /**
@@ -174,6 +172,18 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
         }
     }
     session.set_size(vertical_stack.entity, width, y);
+
+      // Second pass: only adjust x positions if alignment is specified
+        for elem in vertical_stack.elements.iter() {
+            let elem_size = session.get_size(*elem);
+            let current_pos = session.get_position(*elem);
+            let x = match vertical_stack.horizontal_alignment {
+                HorizontalAlignment::Left => 0.0,
+                HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
+                HorizontalAlignment::Right => width - elem_size.0,
+            };
+            session.set_position(*elem, x, current_pos.1); // Update x, keep y
+        }
 }
 
 pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
@@ -188,6 +198,18 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
         }
     }
     session.set_size(horizontal_stack.entity, x, height);
+
+    // Second pass: only adjust y positions, keep existing x positions
+        for elem in horizontal_stack.elements.iter() {
+            let elem_size = session.get_size(*elem);
+            let current_pos = session.get_position(*elem); // Get the x we already set
+            let y = match horizontal_stack.vertical_alignment {
+                VerticalAlignment::Top => 0.0,
+                VerticalAlignment::Center => (height - elem_size.1) / 2.0,
+                VerticalAlignment::Bottom => height - elem_size.1,
+            };
+            session.set_position(*elem, current_pos.0, y); // Keep x, update y
+        }
 }
 
 /**
@@ -350,19 +372,19 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     // We need to determine the size of the container based on the positions and sizes of its children
     let mut max_width = 0.0;
     let mut max_height = 0.0;
-    
+
     // Iterate through all children and find the maximum extent
     for (child_id, position) in &container.children {
         // Get the child's size
         let child_size = session.get_size(*child_id);
-        
+
         // Set the child's position relative to the container
         session.set_position(*child_id, position.0, position.1);
-        
+
         // Calculate the right and bottom edges of this child
         let right = position.0 + child_size.0;
         let bottom = position.1 + child_size.1;
-        
+
         // Update the maximum extent
         if right > max_width {
             max_width = right;
@@ -371,16 +393,15 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
             max_height = bottom;
         }
     }
-    
+
     // Add a small margin to ensure we have enough space
     let margin = 2.0;
     max_width += margin;
     max_height += margin;
-    
+
     // Set the container's size
     session.set_size(container.entity, max_width, max_height);
 }
-
 
 pub struct BoundingBox {
     x: Float,
@@ -421,9 +442,14 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::RectShape => {
             //get the Rect entity
             let rect = session.get_rectangle(root.entity_id);
-            layout_rect(session, root.entity_id, rect.rect_options.width, rect.rect_options.height);
+            layout_rect(
+                session,
+                root.entity_id,
+                rect.rect_options.width,
+                rect.rect_options.height,
+            );
         }
-        
+
         EntityType::LineShape => {
             //get the Shape line entity
             let line = session.get_line(root.entity_id).clone();

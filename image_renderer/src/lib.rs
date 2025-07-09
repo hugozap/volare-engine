@@ -4,6 +4,7 @@ use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use rusttype::{Font, Scale};
+use volare_engine_layout::Float;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -84,8 +85,8 @@ fn render_node(
     node: &DiagramTreeNode,
     session: &DiagramBuilder,
     imgbuf: &mut RgbaImage,
-    parent_offset: (f64, f64),
-    scale: f64,
+    parent_offset: (Float, Float),
+    scale: Float,
 ) {
     let entity_id = node.entity_id;
     let pos = session.get_position(entity_id);
@@ -142,7 +143,7 @@ fn render_node(
             {
                 // Draw table outer border with specified color
                 let border_color = parse_color(&table_shape.table_options.border_color);
-                let border_width = (table_shape.table_options.border_width as f64 * scale) as u32;
+                let border_width = (table_shape.table_options.border_width as f32 * scale) as u32;
 
                 // Draw outer border (make it thicker for visibility)
                 let rect = Rect::at(x, y).of_size(width, height);
@@ -185,7 +186,7 @@ fn render_node(
                     let line_size = session.get_size(*col_line_id);
 
                     // Calculate the absolute x position with scaling
-                    let line_x = (abs_pos.0 + line_pos.0 * scale as f64).round() as i32;
+                    let line_x = (abs_pos.0 + line_pos.0 * scale as f32).round() as i32;
 
                     // Only draw if the line is within the image bounds
                     if line_x >= 0 && line_x < imgbuf.width() as i32 {
@@ -206,7 +207,7 @@ fn render_node(
                     let line_size = session.get_size(*row_line_id);
 
                     // Calculate the absolute y position with scaling
-                    let line_y = (abs_pos.1 + line_pos.1 * scale as f64).round() as i32;
+                    let line_y = (abs_pos.1 + line_pos.1 * scale as f32).round() as i32;
 
                     // Only draw if the line is within the image bounds
                     if line_y >= 0 && line_y < imgbuf.height() as i32 {
@@ -267,10 +268,10 @@ fn render_node(
 
                         // Calculate if this pixel is inside the ellipse using floating point
                         // for higher precision: (x/a)² + (y/b)² <= 1
-                        let dx = (px - center_x) as f64;
-                        let dy = (py - center_y) as f64;
-                        let rx = radius_x as f64;
-                        let ry = radius_y as f64;
+                        let dx = (px - center_x) as f32;
+                        let dy = (py - center_y) as f32;
+                        let rx = radius_x as f32;
+                        let ry = radius_y as f32;
 
                         let eq_value = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
 
@@ -289,7 +290,7 @@ fn render_node(
                     radius_x,
                     radius_y,
                     stroke_color,
-                    (ellipse_shape.ellipse_options.stroke_width * scale as f64) as f32,
+                    (ellipse_shape.ellipse_options.stroke_width * scale as f32) as f32,
                 );
             }
         }
@@ -309,8 +310,8 @@ fn render_group(
     imgbuf: &mut RgbaImage,
     _entity_id: EntityID,
     node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     for child in node.children.iter() {
         render_node(child, session, imgbuf, pos, scale);
@@ -322,8 +323,8 @@ fn render_box(
     imgbuf: &mut RgbaImage,
     entity_id: EntityID,
     node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     let size = session.get_size(entity_id);
     let box_shape = session.get_box(node.entity_id);
@@ -411,8 +412,8 @@ fn render_text(
     imgbuf: &mut RgbaImage,
     entity_id: EntityID,
     node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     // Get the text and render it directly
     let text_shape = session.get_text(entity_id);
@@ -571,8 +572,8 @@ fn render_vertical_stack(
     imgbuf: &mut RgbaImage,
     _entity_id: EntityID,
     node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     // Draw a debug rectangle to show the stack bounds
     let size = session.get_size(_entity_id);
@@ -603,8 +604,8 @@ fn render_horizontal_stack(
     imgbuf: &mut RgbaImage,
     _entity_id: EntityID,
     node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     // Draw a debug rectangle to show the stack bounds
     let size = session.get_size(_entity_id);
@@ -635,8 +636,8 @@ fn render_polyline(
     imgbuf: &mut RgbaImage,
     entity_id: EntityID,
     _node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     // Get polyline properties
     let polyline = session.get_polyline(entity_id);
@@ -712,8 +713,8 @@ fn render_free_container(
     imgbuf: &mut RgbaImage,
     entity_id: EntityID,
     node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     // Log debug information
     println!("==================================================");
@@ -875,8 +876,8 @@ fn render_image(
     imgbuf: &mut RgbaImage,
     entity_id: EntityID,
     _node: &DiagramTreeNode,
-    pos: (f64, f64),
-    scale: f64,
+    pos: (Float, Float),
+    scale: Float,
 ) {
     // Get image properties
     let image_shape = session.get_image(entity_id);
@@ -1188,9 +1189,9 @@ fn draw_anti_aliased_ellipse(
     // For very small ellipses, use a simple algorithm
     if a <= 2 || b <= 2 {
         for angle_deg in 0..360 {
-            let rad = angle_deg as f64 * std::f64::consts::PI / 180.0;
-            let x = cx + (a as f64 * rad.cos()).round() as i32;
-            let y = cy + (b as f64 * rad.sin()).round() as i32;
+            let rad = angle_deg as Float * std::f32::consts::PI / 180.0;
+            let x = cx + (a as f32 * rad.cos()).round() as i32;
+            let y = cy + (b as f32 * rad.sin()).round() as i32;
             safe_put_pixel(imgbuf, x, y, color);
         }
         return;
@@ -1201,18 +1202,18 @@ fn draw_anti_aliased_ellipse(
     let num_segments = (a.max(b) * 8).max(120);
 
     // Calculate first point
-    let first_angle: f64 = 0.0;
-    let first_x = cx + (a as f64 * first_angle.cos()).round() as i32;
-    let first_y = cy + (b as f64 * first_angle.sin()).round() as i32;
+    let first_angle: Float = 0.0;
+    let first_x = cx + (a as f32 * first_angle.cos()).round() as i32;
+    let first_y = cy + (b as f32 * first_angle.sin()).round() as i32;
 
     let mut prev_x = first_x;
     let mut prev_y = first_y;
 
     // Draw segments connecting points along the ellipse
     for i in 1..=num_segments {
-        let angle = 2.0 * std::f64::consts::PI * (i as f64 / num_segments as f64);
-        let x = cx + (a as f64 * angle.cos()).round() as i32;
-        let y = cy + (b as f64 * angle.sin()).round() as i32;
+        let angle = 2.0 * std::f32::consts::PI * (i as f32 / num_segments as f32);
+        let x = cx + (a as f32 * angle.cos()).round() as i32;
+        let y = cy + (b as f32 * angle.sin()).round() as i32;
 
         // Draw anti-aliased line segment between consecutive points
         draw_anti_aliased_line(imgbuf, prev_x, prev_y, x, y, color, thickness);

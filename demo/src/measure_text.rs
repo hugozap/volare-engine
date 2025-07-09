@@ -1,5 +1,5 @@
 use rusttype::{point, Font, Scale};
-use volare_engine_layout::TextOptions;
+use volare_engine_layout::{Float, TextOptions};
 
 /**
  * Measure text using SVG character advance method
@@ -7,7 +7,7 @@ use volare_engine_layout::TextOptions;
  * taking into account kerning between characters.
  * It provides a more accurate width for SVG rendering, especially for variable-width fonts.
  */
-pub fn measure_text_svg_character_advance(text: &str, options: &TextOptions) -> (f64, f64) {
+pub fn measure_text_svg_character_advance(text: &str, options: &TextOptions) -> (Float, Float) {
     let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
@@ -35,12 +35,12 @@ pub fn measure_text_svg_character_advance(text: &str, options: &TextOptions) -> 
     let v_metrics = font.v_metrics(scale);
     let height = v_metrics.ascent - v_metrics.descent;
 
-    (total_width as f64, height as f64)
+    (total_width as Float, height as Float)
 }
 
 // tight measurement that accounts for actual glyph positioning
 // Used for PNG rendering
-pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (f64, f64) {
+pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (Float, Float) {
     let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
@@ -48,7 +48,7 @@ pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (f64, f64)
     let v_metrics = font.v_metrics(scale);
 
     if text.is_empty() {
-        return (0.0, (v_metrics.ascent - v_metrics.descent) as f64);
+        return (0.0, (v_metrics.ascent - v_metrics.descent) as Float);
     }
 
     // Use rusttype's layout function which handles everything correctly
@@ -79,5 +79,5 @@ pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (f64, f64)
     let height = v_metrics.ascent - v_metrics.descent;
 
     println!("ULTRA TIGHT: '{}' -> {:.2}x{:.2}", text, width, height);
-    (width as f64, height as f64)
+    (width as Float, height as Float)
 }
