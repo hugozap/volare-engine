@@ -1,0 +1,643 @@
+===/Cargo.toml===
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+#add dep to crate in local workspace
+volare_engine_layout = { path = "../volare_engine_layout" }
+svg_renderer = { path = "../svg_renderer" }
+image_renderer = { path = "../image_renderer" }
+resvg = "0.25.0"
+rusttype = "0.9.3"
+
+[[bin]]
+name = "textdemo"
+path = "src/bin/text.rs"
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
+
+[[bin]]
+name = "patterns"
+path = "src/bin/patterns.rs"
+
+===/.gitignore===
+/target
+
+===/src/measure_text.rs===
+use rusttype::{point, Font, Scale};
+use volare_engine_layout::{Float, TextOptions};
+
+/**
+ * Measure text using SVG character advance method
+ * This method calculates the width based on the advance width of each character,
+ * taking into account kerning between characters.
+ * It provides a more accurate width for SVG rendering, especially for variable-width fonts.
+ */
+pub fn measure_text_svg_character_advance(text: &str, options: &TextOptions) -> (Float, Float) {
+    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
+    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+
+    let scale = Scale::uniform(options.font_size);
+
+    let mut total_width = 0.0;
+    let mut prev_glyph_id = None;
+
+    for ch in text.chars() {
+        let glyph = font.glyph(ch).scaled(scale);
+
+        // Use horizontal advance instead of bounding box
+        let advance_width = glyph.h_metrics().advance_width;
+
+        // Add kerning if available
+        if let Some(prev_id) = prev_glyph_id {
+            total_width += font.pair_kerning(scale, prev_id, glyph.id());
+        }
+
+        total_width += advance_width;
+        prev_glyph_id = Some(glyph.id());
+    }
+
+    // Use font metrics for height instead of glyph bounds
+    let v_metrics = font.v_metrics(scale);
+    let height = v_metrics.ascent - v_metrics.descent;
+
+    (total_width as Float, height as Float)
+}
+
+// tight measurement that accounts for actual glyph positioning
+// Used for PNG rendering
+pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (Float, Float) {
+    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
+    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+
+    let scale = Scale::uniform(options.font_size);
+    let v_metrics = font.v_metrics(scale);
+
+    if text.is_empty() {
+        return (0.0, (v_metrics.ascent - v_metrics.descent) as Float);
+    }
+
+    // Use rusttype's layout function which handles everything correctly
+    // TODO: Needs unicode normalization for proper glyph handling, see comments of `layout` function
+    let glyphs: Vec<_> = font.layout(text, scale, point(0.0, 0.0)).collect();
+
+    // Find the actual visual bounds
+    let mut min_x = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+
+    for glyph in &glyphs {
+        if let Some(bb) = glyph.pixel_bounding_box() {
+            min_x = min_x.min(bb.min.x as f32);
+            max_x = max_x.max(bb.max.x as f32);
+        }
+    }
+
+    let width = if min_x.is_finite() && max_x.is_finite() {
+        max_x - min_x // Pure visual width, no padding
+    } else {
+        // Fallback for whitespace
+        glyphs
+            .iter()
+            .map(|g| g.unpositioned().h_metrics().advance_width)
+            .sum()
+    };
+
+    let height = v_metrics.ascent - v_metrics.descent;
+
+    println!("ULTRA TIGHT: '{}' -> {:.2}x{:.2}", text, width, height);
+    (width as Float, height as Float)
+}
+
+===/src/lib.rs===
+pub mod measure_text; 
+
+===/src/text_renderer_comparison.rs===
+// Text Renderer Comparison Test
+// This file demonstrates the differences in text positioning and spacing
+// between the SVG and PNG renderers
+
+use image_renderer::PNGRenderer;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::{
+    renderer_base::Renderer,
+    BoxOptions,
+    TextOptions,
+    Fill,
+    DiagramBuilder,
+    layout::layout_tree_node,
+};
+
+// Import measurement function
+use crate::measure_text::measure_text;
+use std::fs::File;
+
+pub fn run_comparison_test() -> Result<(), Box<dyn std::error::Error>> {
+    // Create session
+    let mut session = DiagramBuilder::new();
+    session.set_measure_text_fn(measure_text);
+
+    // Create options for the test
+    let title_text_options = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 18.0,
+        line_width: 500,
+        text_color: "black".to_string(),
+    };
+
+    let regular_text_options = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 14.0,
+        line_width: 500,
+        text_color: "black".to_string(),
+    };
+
+    let small_text_options = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 12.0,
+        line_width: 500,
+        text_color: "black".to_string(),
+    };
+
+    let box_options = BoxOptions {
+        fill_color: Fill::Color("#EEEEEE".to_string()),
+        stroke_color: "#999999".to_string(),
+        stroke_width: 1.0,
+        padding: 10.0,
+        border_radius: 0.0,
+    };
+
+    let box_options_no_padding = BoxOptions {
+        fill_color: Fill::Color("#EEEEEE".to_string()),
+        stroke_color: "#999999".to_string(),
+        stroke_width: 1.0,
+        padding: 0.0,
+        border_radius: 0.0,
+    };
+
+    // Create title
+    let title = session.new_text(
+        "Text Rendering Comparison",
+        title_text_options,
+    );
+
+    // Create a simple single-line text
+    let single_line_text = session.new_text(
+        "This is a single line of text.",
+        regular_text_options.clone(),
+    );
+    
+    // Create a simple single-line text with a box around it
+    let single_line_text_boxed = session.new_text(
+        "This is a single line with a box.",
+        regular_text_options.clone(),
+    );
+    let single_line_box = session.new_box(single_line_text_boxed, box_options.clone());
+
+    // Create a simple single-line text with a box around it (no padding)
+    let single_line_text_boxed_no_padding = session.new_text(
+        "Single line box without padding.",
+        regular_text_options.clone(),
+    );
+    let single_line_box_no_padding = session.new_box(single_line_text_boxed_no_padding, box_options_no_padding.clone());
+
+    // Create a multi-line text example
+    let multi_line_text = session.new_text(
+        "This is a multi-line text example.\nSecond line of text.\nThird line for testing purposes.",
+        regular_text_options.clone(),
+    );
+
+    // Create a multi-line text with a box around it
+    let multi_line_text_boxed = session.new_text(
+        "This is a multi-line text with a box.\nSecond line of text.\nThird line demonstrates the gap.",
+        regular_text_options.clone(),
+    );
+    let multi_line_box = session.new_box(multi_line_text_boxed, box_options.clone());
+
+    // Create a multi-line text with a box (no padding) around it
+    let multi_line_text_boxed_no_padding = session.new_text(
+        "This is a multi-line text box no padding.\nSecond line without padding.\nThird line gap is more pronounced.",
+        regular_text_options.clone(),
+    );
+    let multi_line_box_no_padding = session.new_box(multi_line_text_boxed_no_padding, box_options_no_padding.clone());
+
+    // Text with linebreaking that causes varying line widths
+    let varying_width_text = session.new_text(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam eget ligula eu lectus lobortis condimentum. Aliquam nonummy auctor massa.",
+        small_text_options.clone(),
+    );
+    let varying_width_box = session.new_box(varying_width_text, box_options.clone());
+
+    // Create explanation text
+    let explanation = session.new_text(
+        "The images above demonstrate differences in text positioning between SVG and PNG renderers. Key issues to observe:\n\n1. Vertical spacing between lines in multi-line text\n2. Text centering in boxes with and without padding\n3. Vertical alignment issues with text baseline",
+        small_text_options,
+    );
+
+    // Arrange all elements in a vertical stack
+    let elements = vec![
+        title,
+        single_line_text,
+        single_line_box,
+        single_line_box_no_padding,
+        multi_line_text,
+        multi_line_box,
+        multi_line_box_no_padding,
+        varying_width_box,
+        explanation,
+    ];
+
+    let stack = session.ne(elements);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &stack);
+
+    // Render to SVG
+    let temp_dir = std::env::temp_dir();
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("text-comparison-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path)?;
+    svg_renderer.render(&session, &stack, &mut svg_file)?;
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+
+    // Render to PNG
+    let mut png_path = temp_dir.clone();
+    png_path.push("text-comparison-test.png");
+    let png_renderer = PNGRenderer {};
+    let mut png_file = File::create(&png_path)?;
+    png_renderer.render(&session, &stack, &mut png_file)?;
+    println!("PNG file written to: {}", png_path.to_str().unwrap());
+
+    Ok(())
+}
+===/src/main.rs===
+// Create an SVG file with all supported elements
+
+pub mod measure_text;
+
+//import svg_renderer
+use image_renderer::PNGRenderer;
+use resvg::tiny_skia::Rect;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::RectOptions;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+
+//import layout
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
+    Fill, TableOptions, TextOptions,
+};
+//import io modules to write to file
+use measure_text::{
+    measure_text_ultra_tight,
+    measure_text_svg_character_advance,
+}; // Use the ultra-tight measurement for text
+
+use std::fs::File;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //create session
+    let mut session = DiagramBuilder::new();
+    let text_options = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 12.0,
+        line_width: 100,
+        text_color: "black".to_string(),
+        line_spacing: 0.0,
+    };
+    session.set_measure_text_fn(measure_text_svg_character_advance);
+
+    //Create a polyline for a star
+    let mut points = Vec::new();
+    // Outer vertex
+    points.push((10.0, 0.0));
+    // Inner vertex
+    points.push((16.0, 16.0));
+    // Outer vertex
+    points.push((0.0, 6.0));
+    // Inner vertex
+    points.push((20.0, 6.0));
+    // Outer vertex
+    points.push((4.0, 16.0));
+    // Closing the shape by returning to the first point
+    points.push((10.0, 0.0));
+
+    let polyline = session.new_polyline(
+        points,
+        LineOptions {
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+        },
+    );
+
+    //Create horizontal stack with 2 rects and one text, set vertical align to center 
+    let mut rectOpts = RectOptions::default();
+    rectOpts.height = 150.0;
+    rectOpts.width = 150.0;
+    rectOpts.stroke_color = "black".to_string();
+    rectOpts.stroke_width = 1.0;
+    let rect = session.new_rectangle(rectOpts.clone());
+    let rect2 = session.new_rectangle(rectOpts.clone());
+
+
+    let label = session.new_text(
+        "Center",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 14.0,
+            line_width: 60,
+            text_color: "#333333".to_string(),
+            line_spacing: 0.0,
+        },
+    );
+
+    let hstack_centered = session.new_hstack(
+        vec![rect, label, rect2],
+        volare_engine_layout::VerticalAlignment::Center
+    );
+
+
+    
+
+    // Create a more visible polyline - hexagon
+    let mut hex_points = Vec::new();
+    let hex_size = 50.0;
+    for i in 0..6 {
+        let angle = (i as f32) * std::f32::consts::PI / 3.0;
+        let x = hex_size * angle.cos() + hex_size;
+        let y = hex_size * angle.sin() + hex_size;
+        hex_points.push((x, y));
+    }
+    // Close the shape
+    hex_points.push(hex_points[0]);
+
+    let hexagon = session.new_polyline(
+        hex_points,
+        LineOptions {
+            stroke_color: "blue".to_string(),
+            stroke_width: 2.0,
+        },
+    );
+
+    //Create a table with 10 ellipses
+    let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
+    for i in 0..10 {
+        let ellipse = session.new_elipse(
+            (0.0, 0.0),
+            (10.0, 10.0),
+            EllipseOptions {
+                fill_color: "red".to_string(),
+                stroke_color: "black".to_string(),
+                stroke_width: 1.0,
+            },
+        );
+        table_items_ellipses.push(ellipse);
+    }
+    let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
+
+    //Create a list of 10 texts
+    let mut table_items = Vec::new();
+    table_items.push(hstack_centered);
+    table_items.push(tableEllipses);
+    table_items.push(polyline);
+    table_items.push(hexagon);
+    for i in 0..10 {
+        let text = session.new_text(
+            &format!("Text hey ☣ {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
+        table_items.push(text);
+        //texts.push(get_test_table(&mut session));
+    }
+    //Add a couple of ellipses
+
+    //Create an ellipse and wrap it with a box
+    let ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (10.0, 10.0),
+        EllipseOptions {
+            fill_color: "red".to_string(),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+        },
+    );
+
+    //table_items.push(ellipse);
+
+    //Now add 10 ellipses
+    for i in 0..10 {
+        let ellipse = session.new_elipse(
+            (0.0, 0.0),
+            (10.0, 10.0),
+            EllipseOptions {
+                fill_color: "red".to_string(),
+                stroke_color: "black".to_string(),
+                stroke_width: 1.0,
+            },
+        );
+        // table_items.push(ellipse);
+    }
+
+    //create a paragraph of lorem ipsum
+    let lorem_ipsum = br#"
+  THE adjustment \u{f1878} factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+  text appear more naturally centered to the human eye, rather than strictly mathematically centered.
+
+  Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
+  with certain fonts or at larger font sizes.
+
+  In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
+  positioning."#;
+
+    //create text shape
+    let text = session.new_text(
+        std::str::from_utf8(lorem_ipsum).unwrap(),
+        text_options.clone(),
+    );
+    table_items.push(text);
+
+    //Add sample image from file (first instance)
+    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (200.0, 200.0));
+    //table_items.push(sampleImage);
+
+    //Add sample image from file
+    // The path is relative to where the binary is run
+    let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
+   // table_items.push(file_image);
+
+    // Create a FreeContainer with multiple visual elements at specific positions using the new method
+
+    // Create all elements first
+    let title_text = session.new_text(
+        "FreeContainer Demo",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 18.0,
+            line_width: 100,
+            text_color: "#000000".to_string(),
+            line_spacing: 0.0,
+        },
+    );
+
+    let red_circle = session.new_elipse(
+        (0.0, 0.0),   // center position (will be positioned by container)
+        (15.0, 15.0), // radius
+        EllipseOptions {
+            fill_color: "#FF0000".to_string(), // bright red
+            stroke_color: "black".to_string(),
+            stroke_width: 2.0,
+        },
+    );
+
+    let thetext = format!(
+        r#"
+    The adjustment factor {} (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+    text appear more naturally centered to the human eye, rather than strictly mathematically centered.
+  
+    Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
+    with certain fonts or at larger font sizes.
+  
+    In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
+    positioning."#,
+        "\u{f1878}"
+    );
+
+    let blue_text = session.new_text(
+        &thetext,
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 16.0,
+            line_width: 100,
+            text_color: "white".to_string(), // white text
+            line_spacing: 0.0,
+        },
+    );
+
+    // Create a box around the blue text
+    let box_options = BoxOptions {
+        fill_color: Fill::Color("#0000FF".to_string()), // blue background
+        stroke_color: "green".to_string(),              // dark blue border
+        stroke_width: 1.0,
+        padding: 10.0,
+        border_radius: 3.0,
+    };
+    let blue_box = session.new_box(blue_text, box_options);
+
+    let green_ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (30.0, 20.0),
+        EllipseOptions {
+            fill_color: "#00CC00".to_string(),   // green
+            stroke_color: "#006600".to_string(), // dark green
+            stroke_width: 2.0,
+        },
+    );
+
+    let subtitle = session.new_text(
+        "Absolute positioning of elements",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 12.0,
+            line_width: 100,
+            text_color: "#555555".to_string(), // dark gray
+            line_spacing: 0.0,
+        },
+    );
+
+    // Create a container with all children at once
+    let container_with_elements = session.new_free_container_with_children(vec![
+        (title_text, (30.0, 10.0)),
+        (red_circle, (40.0, 50.0)),
+        (blue_box, (80.0, 40.0)),
+        (green_ellipse, (150.0, 70.0)),
+        (subtitle, (30.0, 120.0)),
+    ]);
+
+    // Add styling to the container with more vibrant colors
+    let free_container = session.get_free_container_mut(container_with_elements.entity_id);
+    free_container.background_color = Some("#FFDDDD".to_string()); // Light red background (more visible)
+    free_container.border_color = Some("#FF0000".to_string()); // Bright red border
+    free_container.border_width = 5.0; // Thicker border
+
+    // Add the FreeContainer to the table
+   // table_items.push(container_with_elements);
+    //texts.push(get_test_table(&mut session));
+    //Create a table for the texts with 2 columns
+    let mut toptions = TableOptions::default();
+    toptions.cell_padding = 2;
+    let table = session.new_table(table_items, 5, toptions);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &table);
+
+    //create writer to file ~/temp/svg-render-test.svg
+    //get path for ~/temp
+    let temp_dir = std::env::temp_dir();
+    //create path for ~/temp/svg-render-test.svg
+    // Render SVG
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("svg-render-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path).unwrap();
+    let svg_res = svg_renderer.render(&session, &table, &mut svg_file);
+    if svg_res.is_err() {
+        println!("SVG Render Error: {}", svg_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+
+    // Render PNG
+    // Use other  measure function for PNG rendering
+    // let mut png_path = temp_dir.clone();
+    // png_path.push("png-render-test.png");
+    // let png_renderer = PNGRenderer {};
+    // let mut png_file = File::create(&png_path).unwrap();
+    // let png_res = png_renderer.render(&session, &table, &mut png_file);
+    // if png_res.is_err() {
+    //     println!("PNG Render Error: {}", png_res.err().unwrap());
+    //     std::process::exit(1);
+    // }
+    // println!("PNG file written to: {}", png_path.to_str().unwrap());
+
+    Ok(())
+}
+
+// Sample image loading is now handled directly through file loading
+
+//function that returns a sample table with 10 elements and 3 columns
+
+/// .
+fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
+    let text_options = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 12.0,
+        line_width: 100,
+        text_color: "black".to_string(),
+        line_spacing: 5.0,
+    };
+    //Create a list of 10 texts
+    let mut texts = Vec::new();
+    for i in 0..10 {
+        let text = session.new_text(
+            &format!("Text hey {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
+        texts.push(text);
+    }
+    //create a table options object with all defaults except the header color
+    let table_options = TableOptions {
+        header_fill_color: "blue".to_string(),
+        ..Default::default()
+    };
+    //Create a table for the texts with 2 columns
+    let table = session.new_table(texts, 3, table_options);
+    table
+}
+

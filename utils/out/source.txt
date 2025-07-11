@@ -1,0 +1,5820 @@
+===/image_renderer.txt===
+===/cargo.toml===
+[package]
+name = "image_renderer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+volare_engine_layout = { path = "../volare_engine_layout" }
+image = "0.23"
+imageproc = "0.22"
+rusttype = "0.9"
+bresenham = "0.1.1"
+base64 = "0.21"
+
+[lib]
+name = "image_renderer"
+path = "src/lib.rs"
+===/src/lib.rs===
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use bresenham::Bresenham;
+use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
+use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
+use imageproc::rect::Rect;
+use rusttype::{Font, Scale};
+use volare_engine_layout::Float;
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
+use std::path::Path;
+
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, Fill, Renderer,
+    RendererError,
+};
+
+/**
+ * This is the PNG renderer. It will render the diagram to a PNG stream.
+ */
+
+pub struct PNGRenderer;
+
+impl<W: Write> Renderer<W> for PNGRenderer {
+    fn render(
+        &self,
+        session: &DiagramBuilder,
+        diagram_node: &DiagramTreeNode,
+        stream: &mut W,
+    ) -> Result<(), RendererError> {
+        let root_size = session.get_size(diagram_node.entity_id);
+
+        // Use a scaling factor for higher resolution output but don't scale too much
+        // 1.5 is a good balance between quality and maintaining layout proportions
+        // TODO: Esto debe ser un parametro?
+        let scaling_factor = 1.5;
+
+        // Calculate image dimensions with scaling
+        let width = ((root_size.0 * scaling_factor).ceil() as u32).max(200);
+        let height = ((root_size.1 * scaling_factor).ceil() as u32).max(200);
+
+        // Debug output
+        println!("Creating PNG image with dimensions: {}x{}", width, height);
+
+        // Create an image with a white background
+        let mut imgbuf = RgbaImage::from_fn(width, height, |_, _| Rgba([255, 255, 255, 255]));
+
+        // Draw a border to see image bounds (for debugging)
+        let border_color = Rgba([200, 200, 200, 255]);
+        for x in 0..width {
+            imgbuf.put_pixel(x, 0, border_color);
+            imgbuf.put_pixel(x, height - 1, border_color);
+        }
+        for y in 0..height {
+            imgbuf.put_pixel(0, y, border_color);
+            imgbuf.put_pixel(width - 1, y, border_color);
+        }
+
+        // Pass scaling factor to the render function
+        render_node(
+            diagram_node,
+            session,
+            &mut imgbuf,
+            (0.0, 0.0),
+            scaling_factor,
+        );
+
+        // Write the PNG image to the stream
+        let encoder = image::png::PngEncoder::new(stream);
+        encoder
+            .encode(
+                imgbuf.as_raw(),
+                imgbuf.width(),
+                imgbuf.height(),
+                image::ColorType::Rgba8,
+            )
+            .map_err(|e| RendererError::new(&e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+// Render a node and its children
+fn render_node(
+    node: &DiagramTreeNode,
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    parent_offset: (Float, Float),
+    scale: Float,
+) {
+    let entity_id = node.entity_id;
+    let pos = session.get_position(entity_id);
+
+    // Calculate absolute position by adding parent offset, then apply scaling
+    let abs_pos = (
+        (parent_offset.0 + pos.0) * scale,
+        (parent_offset.1 + pos.1) * scale,
+    );
+
+    // Debug output to track node positioning
+    let size = session.get_size(entity_id);
+    println!(
+        "Rendering node type: {:?}, id: {}, pos: ({:.1}, {:.1}), size: ({:.1}, {:.1})",
+        node.entity_type, entity_id, abs_pos.0, abs_pos.1, size.0, size.1
+    );
+
+    match node.entity_type {
+        EntityType::GroupShape => {
+            render_group(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::BoxShape => {
+            render_box(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::TextShape => {
+            render_text(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::VerticalStackShape => {
+            render_vertical_stack(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::HorizontalStackShape => {
+            render_horizontal_stack(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::ImageShape => {
+            render_image(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::TableShape => {
+            // Get table properties
+            let table_shape = session.get_table(entity_id);
+            let size = session.get_size(entity_id);
+
+            // Apply scaling factor to dimensions
+            let width = (size.0 * scale).ceil() as u32;
+            let height = (size.1 * scale).ceil() as u32;
+            let x = abs_pos.0.round() as i32;
+            let y = abs_pos.1.round() as i32;
+
+            if x >= 0
+                && y >= 0
+                && width > 0
+                && height > 0
+                && x + width as i32 <= imgbuf.width() as i32
+                && y + height as i32 <= imgbuf.height() as i32
+            {
+                // Draw table outer border with specified color
+                let border_color = parse_color(&table_shape.table_options.border_color);
+                let border_width = (table_shape.table_options.border_width as f32 * scale) as u32;
+
+                // Draw outer border (make it thicker for visibility)
+                let rect = Rect::at(x, y).of_size(width, height);
+                for i in 0..border_width {
+                    if i < border_width {
+                        let inner_rect = Rect::at(x + i as i32, y + i as i32)
+                            .of_size(width - 2 * i, height - 2 * i);
+                        draw_hollow_rect_mut(imgbuf, inner_rect, border_color);
+                    }
+                }
+
+                // Draw header area
+                let header_rect = session.get_size(table_shape.header_rect);
+                let header_height = (header_rect.1 * scale).ceil() as u32;
+                if header_height > 0 {
+                    // Get the exact header color from the options
+                    let header_fill_color =
+                        parse_color(&table_shape.table_options.header_fill_color);
+
+                    // Debug print the header color
+                    println!(
+                        "Table header color: {}",
+                        table_shape.table_options.header_fill_color
+                    );
+
+                    // Fill the header area
+                    let header_rect = Rect::at(x, y).of_size(width, header_height);
+                    draw_filled_rect_mut(imgbuf, header_rect, header_fill_color);
+                    draw_hollow_rect_mut(imgbuf, header_rect, border_color);
+                }
+
+                // Use the predefined grid lines from the table
+                // This uses the actual table_shape.col_lines and table_shape.row_lines
+                // instead of trying to infer them from child positions
+
+                // Draw column lines (vertical dividers)
+                for col_line_id in &table_shape.col_lines {
+                    // Get the position of this column line
+                    let line_pos = session.get_position(*col_line_id);
+                    let line_size = session.get_size(*col_line_id);
+
+                    // Calculate the absolute x position with scaling
+                    let line_x = (abs_pos.0 + line_pos.0 * scale as f32).round() as i32;
+
+                    // Only draw if the line is within the image bounds
+                    if line_x >= 0 && line_x < imgbuf.width() as i32 {
+                        // Draw a vertical line from top to bottom of table
+                        for i in 0..height {
+                            let y_pos = y + i as i32;
+                            if y_pos >= 0 && y_pos < imgbuf.height() as i32 {
+                                imgbuf.put_pixel(line_x as u32, y_pos as u32, border_color);
+                            }
+                        }
+                    }
+                }
+
+                // Draw row lines (horizontal dividers)
+                for row_line_id in &table_shape.row_lines {
+                    // Get the position of this row line
+                    let line_pos = session.get_position(*row_line_id);
+                    let line_size = session.get_size(*row_line_id);
+
+                    // Calculate the absolute y position with scaling
+                    let line_y = (abs_pos.1 + line_pos.1 * scale as f32).round() as i32;
+
+                    // Only draw if the line is within the image bounds
+                    if line_y >= 0 && line_y < imgbuf.height() as i32 {
+                        // Draw a horizontal line from left to right of table
+                        for i in 0..width {
+                            let x_pos = x + i as i32;
+                            if x_pos >= 0 && x_pos < imgbuf.width() as i32 {
+                                imgbuf.put_pixel(x_pos as u32, line_y as u32, border_color);
+                            }
+                        }
+                    }
+                }
+
+                // Render children (cells)
+                for child in node.children.iter() {
+                    render_node(child, session, imgbuf, abs_pos, scale);
+                }
+            }
+        }
+        EntityType::EllipseShape => {
+            // Get ellipse properties
+            let ellipse_shape = session.get_ellipse(entity_id);
+            let size = session.get_size(entity_id);
+
+            // Apply scaling factor to dimensions
+            let width = (size.0 * scale).ceil() as u32;
+            let height = (size.1 * scale).ceil() as u32;
+            let x = abs_pos.0.round() as i32;
+            let y = abs_pos.1.round() as i32;
+
+            if x >= 0
+                && y >= 0
+                && width > 0
+                && height > 0
+                && x + width as i32 <= imgbuf.width() as i32
+                && y + height as i32 <= imgbuf.height() as i32
+            {
+                // Get colors from the ellipse properties
+                let fill_color = parse_color(&ellipse_shape.ellipse_options.fill_color);
+                let stroke_color = parse_color(&ellipse_shape.ellipse_options.stroke_color);
+
+                // Calculate center coordinates
+                let center_x = x + (width / 2) as i32;
+                let center_y = y + (height / 2) as i32;
+                let radius_x = (width / 2) as i32;
+                let radius_y = (height / 2) as i32;
+
+                // Draw filled ellipse first, using floating point for more accurate ellipse equation
+                for py in y..y + height as i32 {
+                    if py < 0 || py >= imgbuf.height() as i32 {
+                        continue; // Skip if outside vertical bounds
+                    }
+
+                    for px in x..x + width as i32 {
+                        if px < 0 || px >= imgbuf.width() as i32 {
+                            continue; // Skip if outside horizontal bounds
+                        }
+
+                        // Calculate if this pixel is inside the ellipse using floating point
+                        // for higher precision: (x/a)² + (y/b)² <= 1
+                        let dx = (px - center_x) as f32;
+                        let dy = (py - center_y) as f32;
+                        let rx = radius_x as f32;
+                        let ry = radius_y as f32;
+
+                        let eq_value = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+
+                        if eq_value <= 1.0 {
+                            imgbuf.put_pixel(px as u32, py as u32, fill_color);
+                        }
+                    }
+                }
+
+                // Draw the ellipse border using a modified Bresenham algorithm for smoother outlines
+                // This implementation gives much higher quality anti-aliased edges
+                draw_anti_aliased_ellipse(
+                    imgbuf,
+                    center_x,
+                    center_y,
+                    radius_x,
+                    radius_y,
+                    stroke_color,
+                    (ellipse_shape.ellipse_options.stroke_width * scale as f32) as f32,
+                );
+            }
+        }
+        EntityType::PolyLine => {
+            render_polyline(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        EntityType::FreeContainer => {
+            render_free_container(session, imgbuf, entity_id, node, abs_pos, scale);
+        }
+        // For this initial implementation, we'll skip other shapes
+        _ => {}
+    }
+}
+
+fn render_group(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    _entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    for child in node.children.iter() {
+        render_node(child, session, imgbuf, pos, scale);
+    }
+}
+
+fn render_box(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    let size = session.get_size(entity_id);
+    let box_shape = session.get_box(node.entity_id);
+
+    // Convert to i32 for drawing functions with scaling
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+
+    // Safety check to avoid drawing outside the image bounds
+    if x < 0
+        || y < 0
+        || width == 0
+        || height == 0
+        || x + width as i32 > imgbuf.width() as i32
+        || y + height as i32 > imgbuf.height() as i32
+    {
+        // Skip this box if it's outside the bounds
+        return;
+    }
+
+    let rect = Rect::at(x, y).of_size(width, height);
+
+    // Handle fill color
+    match &box_shape.box_options.fill_color {
+        Fill::Color(color) => {
+            let rgba = parse_color(color);
+            draw_filled_rect_mut(imgbuf, rect, rgba);
+        }
+        // For now, we'll just use a default color for gradients
+        _ => {
+            draw_filled_rect_mut(imgbuf, rect, Rgba([255, 255, 255, 255]));
+        }
+    }
+
+    // Draw border/stroke with scaled width
+    let stroke_color = parse_color(&box_shape.box_options.stroke_color);
+    let stroke_width = (box_shape.box_options.stroke_width * scale).ceil() as u32;
+
+    // Draw border with proper thickness
+    for i in 0..stroke_width {
+        if i < stroke_width {
+            let inner_rect =
+                Rect::at(x + i as i32, y + i as i32).of_size(width - 2 * i, height - 2 * i);
+            draw_hollow_rect_mut(imgbuf, inner_rect, stroke_color);
+        }
+    }
+
+    // Render children inside the box, accounting for padding
+    for child in node.children.iter() {
+        let child_id = child.entity_id;
+        let child_pos = session.get_position(child_id);
+
+        // Instead of trying to be clever about nested transforms, let's use the simplest
+        // and most direct approach: manually handle rendering the text here
+
+        // Log child details
+        println!(
+            "Rendering box child: id={}, type={:?}, box_pos=({:.1},{:.1}), child_pos=({:.1},{:.1})",
+            child_id, child.entity_type, pos.0, pos.1, child_pos.0, child_pos.1
+        );
+
+        // Get absolute position for child relative to box
+        let abs_x = (pos.0 + child_pos.0 * scale).round() as i32;
+        let abs_y = (pos.1 + child_pos.1 * scale).round() as i32;
+
+        // Calculate absolute position without any scaling
+        let adjusted_parent_offset = (pos.0 / scale, pos.1 / scale);
+
+        // Log the adjusted values
+        println!(
+            "  Using adjusted_parent_offset=({:.1},{:.1})",
+            adjusted_parent_offset.0, adjusted_parent_offset.1
+        );
+
+        // Render the child with the adjusted parent offset
+        // TODO: Centering logic for elems inside box
+        render_node(child, session, imgbuf, adjusted_parent_offset, scale);
+    }
+}
+
+fn render_text(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    // Get the text and render it directly
+    let text_shape = session.get_text(entity_id);
+    //get size
+    let size = session.get_size(entity_id);
+    //TODO: dynamically load the font data!
+    //let font_data = include_bytes!("../../demo/assets/Roboto-Regular.ttf");
+    let font_data = include_bytes!("../../demo/assets/AnonymiceProNerdFont-Regular.ttf");
+    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+
+    // Convert text color string to RGBA
+    let text_color = parse_color(&text_shape.text_options.text_color);
+    println!(
+        "  Text: '{}', color: {}, pos: ({}, {})",
+        text_shape.text, text_shape.text_options.text_color, pos.0, pos.1
+    );
+
+    // Render text directly
+    // let dpi = 120.0;
+    // let dpi_scale_factor = dpi / 72.0;
+    // let font_size = text_shape.text_options.font_size * dpi_scale_factor;
+
+    let font_size = text_shape.text_options.font_size;
+    let font_scale = Scale::uniform(font_size * scale as f32);
+
+    // Render each line - use position data from layout engine
+    // but adjust line spacing if needed for better aesthetics
+    let line_count = text_shape.lines.len();
+    let line_spacing_factor = if line_count > 1 { 0.6 } else { 1.0 }; // Further reduce spacing for multi-line text in boxes
+
+    for (i, line_id) in text_shape.lines.iter().enumerate() {
+        let line = session.get_text_line(*line_id);
+        let lineSize = session.get_size(line.entity);
+        let line_pos = session.get_position(line.entity);
+
+        // Calculate base position without any margins yet
+        let base_x = (pos.0 * scale) as i32 + (line_pos.0 * scale).round() as i32;
+
+        // For multi-line text, calculate position with adjusted spacing
+        let y_pos = if i == 0 {
+            // First line uses original position
+            line_pos.1
+        } else {
+            // Subsequent lines use compressed spacing
+            let prev_line_pos = session.get_position(text_shape.lines[i - 1]);
+            prev_line_pos.1 + (line_pos.1 - prev_line_pos.1) * line_spacing_factor
+        };
+
+        let line_y = pos.0 as i32 + (y_pos * scale).round() as i32;
+
+        // Calculate the actual rendered text width using font metrics
+        // for precise centering
+        //let rendered_width = get_text_width(&line.text, &font, font_scale);
+        let rendered_width = lineSize.0;
+        // Calculate the left-side bearing (space before the first glyph)
+        // This is needed because RustType positioning doesn't always start exactly at the x position we provide
+        let first_char_glyph = font
+            .glyph(line.text.chars().next().unwrap_or(' '))
+            .scaled(font_scale)
+            .positioned(rusttype::point(0.0, 0.0));
+
+        let left_bearing = if let Some(bb) = first_char_glyph.pixel_bounding_box() {
+            bb.min.x
+        } else {
+            0
+        };
+
+        // Center the text horizontally within the box
+        // Adjust for the bounding box left side offset
+        let centered_x =
+            base_x + ((lineSize.0 as f32 - rendered_width as f32) / 2.0) as i32 - left_bearing;
+
+        // Draw the text with centered position
+        draw_high_quality_text(
+            imgbuf,
+            &line.text,
+            centered_x,
+            line_y,
+            &font,
+            font_scale,
+            text_color,
+            size.0 as i32, // Use box width as max width
+        );
+    }
+}
+
+// Draw text with higher quality anti-aliasing
+fn draw_high_quality_text(
+    imgbuf: &mut RgbaImage,
+    text: &str,
+    x: i32,
+    y: i32,
+    font: &Font,
+    scale: Scale,
+    color: Rgba<u8>,
+    _max_width: i32, // We keep this parameter for API compatibility but don't use it
+) {
+    // Calculate the vertical metrics once
+    let v_metrics = font.v_metrics(scale);
+    let offset_y = v_metrics.ascent;
+
+    // Layout the glyphs in the text with proper positioning
+    let mut caret = rusttype::point(0.0, offset_y);
+    let mut last_glyph_id = None;
+    let mut glyphs: Vec<rusttype::PositionedGlyph> = Vec::new();
+
+    // Process each character for proper kerning and positioning
+    for c in text.chars() {
+        // Create the glyph
+        let base_glyph = font.glyph(c);
+
+        // Apply kerning if we have a previous glyph
+        if let Some(previous) = last_glyph_id {
+            caret.x += font.pair_kerning(scale, previous, base_glyph.id());
+        }
+
+        last_glyph_id = Some(base_glyph.id());
+
+        // Get the advance width before we consume the glyph with scaled()
+        let advance_width = base_glyph.scaled(scale).h_metrics().advance_width;
+
+        // Position the glyph and add it to our collection
+        // We need to create the glyph again since scaled() consumes it
+        let positioned_glyph = font.glyph(c).scaled(scale).positioned(caret);
+        glyphs.push(positioned_glyph);
+
+        // Advance the caret using our saved advance_width
+        caret.x += advance_width;
+    }
+
+    // Draw each glyph with anti-aliasing
+    for glyph in &glyphs {
+        if let Some(bounding_box) = glyph.pixel_bounding_box() {
+            // Draw the glyph into the image
+            glyph.draw(|gx, gy, glyph_opacity| {
+                // Map to actual screen position
+                let px = x + bounding_box.min.x + gx as i32;
+                let py = y + bounding_box.min.y + gy as i32;
+
+                // Only draw if inside image bounds
+                if px >= 0 && px < imgbuf.width() as i32 && py >= 0 && py < imgbuf.height() as i32 {
+                    // Create a color with adjusted alpha for anti-aliasing
+                    let alpha = (glyph_opacity * color[3] as f32) as u8;
+                    let antialiased_color = Rgba([color[0], color[1], color[2], alpha]);
+
+                    // Blend with existing pixels for smoother rendering
+                    blend_pixel(imgbuf, px, py, antialiased_color, glyph_opacity);
+                }
+            });
+        }
+    }
+}
+
+fn render_vertical_stack(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    _entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    // Draw a debug rectangle to show the stack bounds
+    let size = session.get_size(_entity_id);
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+
+    if x >= 0
+        && y >= 0
+        && width > 0
+        && height > 0
+        && x + width as i32 <= imgbuf.width() as i32
+        && y + height as i32 <= imgbuf.height() as i32
+    {
+        let rect = Rect::at(x, y).of_size(width, height);
+        draw_hollow_rect_mut(imgbuf, rect, Rgba([0, 0, 255, 128]));
+    }
+
+    // Render children
+    for child in node.children.iter() {
+        render_node(child, session, imgbuf, pos, scale);
+    }
+}
+
+fn render_horizontal_stack(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    _entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    // Draw a debug rectangle to show the stack bounds
+    let size = session.get_size(_entity_id);
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+
+    if x >= 0
+        && y >= 0
+        && width > 0
+        && height > 0
+        && x + width as i32 <= imgbuf.width() as i32
+        && y + height as i32 <= imgbuf.height() as i32
+    {
+        let rect = Rect::at(x, y).of_size(width, height);
+        draw_hollow_rect_mut(imgbuf, rect, Rgba([0, 255, 0, 128]));
+    }
+
+    // Render children
+    for child in node.children.iter() {
+        render_node(child, session, imgbuf, pos, scale);
+    }
+}
+
+fn render_polyline(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    _node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    // Get polyline properties
+    let polyline = session.get_polyline(entity_id);
+    let stroke_color = parse_color(&polyline.line_options.stroke_color);
+    let stroke_width = (polyline.line_options.stroke_width * scale) as f32;
+
+    // Need at least 2 points to draw a line
+    if polyline.points.len() < 2 {
+        return;
+    }
+
+    // Calculate absolute position with scaling
+    let abs_x = pos.0;
+    let abs_y = pos.1;
+
+    // Draw line segments connecting all points
+    for i in 0..polyline.points.len() - 1 {
+        let (x1, y1) = polyline.points[i];
+        let (x2, y2) = polyline.points[i + 1];
+
+        // Apply scaling and offset
+        let x1_scaled = (abs_x + x1 * scale) as i32;
+        let y1_scaled = (abs_y + y1 * scale) as i32;
+        let x2_scaled = (abs_x + x2 * scale) as i32;
+        let y2_scaled = (abs_y + y2 * scale) as i32;
+
+        // Draw an anti-aliased line with proper thickness
+        draw_anti_aliased_line(
+            imgbuf,
+            x1_scaled,
+            y1_scaled,
+            x2_scaled,
+            y2_scaled,
+            stroke_color,
+            stroke_width,
+        );
+    }
+
+    // If it's a closed path (first point == last point), we're already done
+    // Otherwise, check if the polyline should be closed by connecting last point to first
+    if polyline.points.len() > 2 && polyline.points[0] != polyline.points[polyline.points.len() - 1]
+    {
+        // If user wants a closed shape (determined by checking if the first and last points are close enough)
+        // This is just a heuristic - future implementations could add an explicit "closed" property
+        let first = polyline.points[0];
+        let last = polyline.points[polyline.points.len() - 1];
+        let distance = ((first.0 - last.0).powi(2) + (first.1 - last.1).powi(2)).sqrt();
+
+        // If points are very close, consider it a closed shape (like a polygon)
+        if distance < 5.0 {
+            // Apply scaling and offset
+            let x1_scaled = (abs_x + last.0 * scale) as i32;
+            let y1_scaled = (abs_y + last.1 * scale) as i32;
+            let x2_scaled = (abs_x + first.0 * scale) as i32;
+            let y2_scaled = (abs_y + first.1 * scale) as i32;
+
+            // Draw the closing line
+            draw_anti_aliased_line(
+                imgbuf,
+                x1_scaled,
+                y1_scaled,
+                x2_scaled,
+                y2_scaled,
+                stroke_color,
+                stroke_width,
+            );
+        }
+    }
+}
+
+fn render_free_container(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    // Log debug information
+    println!("==================================================");
+    println!(
+        "Rendering FreeContainer: id={}, pos=({:.1}, {:.1})",
+        entity_id, pos.0, pos.1
+    );
+
+    // Unscale the position (since render_node applies scaling for us)
+    let container_pos = session.get_position(entity_id);
+    let size = session.get_size(entity_id);
+
+    // Convert to i32 for drawing functions with scaling
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+
+    println!("FreeContainer size: {}x{}", width, height);
+    println!("FreeContainer absolute position: x={}, y={}", x, y);
+
+    // Get the container object
+    let container = session.get_free_container(entity_id);
+
+    // Draw the container background first if specified
+    if let Some(bg_color) = &container.background_color {
+        let fill_color = parse_color(bg_color);
+        let rect = Rect::at(x, y).of_size(width, height);
+        draw_filled_rect_mut(imgbuf, rect, fill_color);
+        println!("Drew container background with color: {}", bg_color);
+    }
+
+    // Draw the container border if specified
+    if let Some(border_color) = &container.border_color {
+        if container.border_width > 0.0 {
+            let stroke_color = parse_color(border_color);
+            let stroke_width = (container.border_width * scale).ceil() as u32;
+
+            // Draw border with proper thickness
+            for i in 0..stroke_width {
+                if i < stroke_width {
+                    let inner_rect =
+                        Rect::at(x + i as i32, y + i as i32).of_size(width - 2 * i, height - 2 * i);
+                    draw_hollow_rect_mut(imgbuf, inner_rect, stroke_color);
+                }
+            }
+            println!("Drew container border with color: {}", border_color);
+        }
+    }
+
+    // Log the children counts
+    println!(
+        "Container has {} stored positions and {} children in tree",
+        container.children.len(),
+        node.children.len()
+    );
+
+    // Create a mapping from child entity IDs to their positions
+    let mut child_positions = std::collections::HashMap::new();
+    for (child_id, position) in &container.children {
+        child_positions.insert(*child_id, *position);
+    }
+
+    // Debug output of all children
+    for (i, child) in node.children.iter().enumerate() {
+        let child_id = child.entity_id;
+        if let Some(rel_pos) = child_positions.get(&child_id) {
+            println!(
+                "Child[{}]: id={}, type={:?}, stored_pos=({:.1},{:.1})",
+                i, child_id, child.entity_type, rel_pos.0, rel_pos.1
+            );
+        } else {
+            println!(
+                "Child[{}]: id={}, type={:?}, NO STORED POSITION",
+                i, child_id, child.entity_type
+            );
+        }
+    }
+
+    // Render each child with its calculated position
+    for (i, child_node) in node.children.iter().enumerate() {
+        let child_id = child_node.entity_id;
+
+        // Get the child's position relative to the container from the stored mapping
+        if let Some(rel_pos) = child_positions.get(&child_id) {
+            // Child is in the FreeContainer's children map
+
+            // For debugging, get the child's size
+            let child_size = session.get_size(child_id);
+            println!(
+                "Child[{}]: id={}, size=({:.1},{:.1})",
+                i, child_id, child_size.0, child_size.1
+            );
+
+            // The key fix: since render_node applies pos and scaling again,
+            // we need to provide a corrected parent_offset that when combined with
+            // the child's position and scaled will result in the correct absolute position
+
+            // Get the child's original position in the session
+            let original_child_pos = session.get_position(child_id);
+
+            // Calculate the expected final position we want
+            let desired_final_pos = (pos.0 + rel_pos.0 * scale, pos.1 + rel_pos.1 * scale);
+
+            // Calculate the parent_offset that will give us this position after render_node applies
+            // its own calculation: abs_pos = (parent_offset + pos) * scale
+            // So we need: parent_offset = desired_final_pos / scale - pos
+            let adjusted_parent_offset = (
+                desired_final_pos.0 / scale - original_child_pos.0,
+                desired_final_pos.1 / scale - original_child_pos.1,
+            );
+
+            println!("Rendering child[{}]: desired_pos=({:.1},{:.1}), original_pos=({:.1},{:.1}), rel_pos=({:.1},{:.1})", 
+                i, desired_final_pos.0, desired_final_pos.1, original_child_pos.0, original_child_pos.1, rel_pos.0, rel_pos.1);
+            println!(
+                "  Using adjusted_parent_offset=({:.1},{:.1})",
+                adjusted_parent_offset.0, adjusted_parent_offset.1
+            );
+
+            render_node(child_node, session, imgbuf, adjusted_parent_offset, scale);
+        } else {
+            // Child doesn't have a stored position
+            println!(
+                "WARNING: Child[{}] id={} has no stored position in FreeContainer!",
+                i, child_id
+            );
+
+            // For children without explicit positions in the container, we'll use their
+            // original positions from the session, which might be relative to the container
+            let child_pos = session.get_position(child_id);
+
+            // Calculate the desired final position
+            let desired_final_pos = (pos.0 + child_pos.0 * scale, pos.1 + child_pos.1 * scale);
+
+            // The same adjustment as above for children with stored positions
+            let adjusted_parent_offset = (
+                desired_final_pos.0 / scale - child_pos.0,
+                desired_final_pos.1 / scale - child_pos.1,
+            );
+
+            // Log the calculated position
+            println!("Child[{}] with no stored position: desired_pos=({:.1},{:.1}), original_pos=({:.1},{:.1})", 
+                     i, desired_final_pos.0, desired_final_pos.1, child_pos.0, child_pos.1);
+            println!(
+                "  Using adjusted_parent_offset=({:.1},{:.1})",
+                adjusted_parent_offset.0, adjusted_parent_offset.1
+            );
+
+            // Render the child with the adjusted parent offset
+            render_node(child_node, session, imgbuf, adjusted_parent_offset, scale);
+        }
+    }
+
+    println!("==================================================");
+}
+
+fn render_image(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    _node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    // Get image properties
+    let image_shape = session.get_image(entity_id);
+    let size = session.get_size(entity_id);
+
+    // Apply scaling factor to dimensions
+    let width = (size.0 * scale).ceil() as u32;
+    let height = (size.1 * scale).ceil() as u32;
+    let x = pos.0.round() as i32;
+    let y = pos.1.round() as i32;
+
+    // Skip if outside bounds
+    if x < 0
+        || y < 0
+        || width == 0
+        || height == 0
+        || x + width as i32 > imgbuf.width() as i32
+        || y + height as i32 > imgbuf.height() as i32
+    {
+        println!("Image outside bounds, skipping");
+        return;
+    }
+
+    // Load the image either from file or base64 data
+    let loaded_img = if let Some(file_path) = &image_shape.file_path {
+        // Load image from file
+        println!("Loading image from file: {}", file_path);
+        match load_image_from_file(file_path) {
+            Ok(img) => img,
+            Err(e) => {
+                println!("Error loading image from file: {}", e);
+                // Return with a placeholder or error indicator
+                draw_placeholder_image(imgbuf, x, y, width, height);
+                return;
+            }
+        }
+    } else if !image_shape.image.is_empty() {
+        // Load image from base64 data
+        println!("Loading image from base64 data");
+        match load_image_from_base64(&image_shape.image) {
+            Ok(img) => img,
+            Err(e) => {
+                println!("Error loading image from base64: {}", e);
+                // Return with a placeholder or error indicator
+                draw_placeholder_image(imgbuf, x, y, width, height);
+                return;
+            }
+        }
+    } else {
+        println!("No image data or file path provided");
+        // Draw an empty placeholder if no source is provided
+        draw_placeholder_image(imgbuf, x, y, width, height);
+        return;
+    };
+
+    // Resize the image to fit the allocated space while maintaining aspect ratio
+    let resized_img = loaded_img.resize_exact(width, height, image::imageops::FilterType::Lanczos3);
+
+    // Convert the image to an RgbaImage
+    let img_rgba = resized_img.to_rgba8();
+
+    // Draw the image onto our output buffer at the specified position
+    for (ix, iy, pixel) in img_rgba.enumerate_pixels() {
+        let dest_x = x + ix as i32;
+        let dest_y = y + iy as i32;
+
+        // Only draw within bounds
+        if dest_x >= 0
+            && dest_x < imgbuf.width() as i32
+            && dest_y >= 0
+            && dest_y < imgbuf.height() as i32
+        {
+            imgbuf.put_pixel(dest_x as u32, dest_y as u32, *pixel);
+        }
+    }
+
+    // Draw a thin border around the image for visual clarity
+    let border_color = Rgba([80, 80, 80, 255]);
+    let rect = Rect::at(x, y).of_size(width, height);
+    draw_hollow_rect_mut(imgbuf, rect, border_color);
+}
+
+// Helper function to load an image from a file
+fn load_image_from_file(file_path: &str) -> Result<DynamicImage, String> {
+    let path = Path::new(file_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+
+    match image::open(path) {
+        Ok(img) => Ok(img),
+        Err(e) => Err(format!("Failed to load image: {}", e)),
+    }
+}
+
+// Helper function to load an image from base64 data
+fn load_image_from_base64(base64_str: &str) -> Result<DynamicImage, String> {
+    // Decode base64 string to bytes
+    let img_data = match BASE64.decode(base64_str) {
+        Ok(data) => data,
+        Err(e) => return Err(format!("Failed to decode base64: {}", e)),
+    };
+
+    // Load image from memory
+    match image::load_from_memory(&img_data) {
+        Ok(img) => Ok(img),
+        Err(e) => Err(format!("Failed to load image from memory: {}", e)),
+    }
+}
+
+// Draw a placeholder for missing or error images
+fn draw_placeholder_image(imgbuf: &mut RgbaImage, x: i32, y: i32, width: u32, height: u32) {
+    // Fill with light gray
+    let fill_color = Rgba([220, 220, 220, 255]);
+    let rect = Rect::at(x, y).of_size(width, height);
+    draw_filled_rect_mut(imgbuf, rect, fill_color);
+
+    // Draw border
+    let border_color = Rgba([150, 150, 150, 255]);
+    draw_hollow_rect_mut(imgbuf, rect, border_color);
+
+    // Draw an X from corner to corner
+    if width > 10 && height > 10 {
+        // Draw diagonal lines for the X
+        for i in 0..width.min(height) {
+            let ix = x + i as i32;
+            let iy = y + i as i32;
+            if ix < imgbuf.width() as i32 && iy < imgbuf.height() as i32 {
+                imgbuf.put_pixel(ix as u32, iy as u32, Rgba([100, 100, 100, 255]));
+            }
+
+            let ix2 = x + i as i32;
+            let iy2 = y + (height - i - 1) as i32;
+            if ix2 < imgbuf.width() as i32 && iy2 >= 0 && iy2 < imgbuf.height() as i32 {
+                imgbuf.put_pixel(ix2 as u32, iy2 as u32, Rgba([100, 100, 100, 255]));
+            }
+        }
+    }
+}
+
+// Helper function to convert color string to Rgba
+fn parse_color(color_str: &str) -> Rgba<u8> {
+    match color_str.to_lowercase().as_str() {
+        "black" => Rgba([0, 0, 0, 255]),
+        "white" => Rgba([255, 255, 255, 255]),
+        "red" => Rgba([255, 0, 0, 255]),
+        "green" => Rgba([0, 255, 0, 255]),
+        "blue" => Rgba([0, 0, 255, 255]),
+        "yellow" => Rgba([255, 255, 0, 255]),
+        "gray" | "grey" => Rgba([128, 128, 128, 255]),
+        "lightgray" | "lightgrey" | "light gray" | "light grey" => Rgba([200, 200, 200, 255]),
+        "darkgray" | "darkgrey" | "dark gray" | "dark grey" => Rgba([80, 80, 80, 255]),
+        "orange" => Rgba([255, 165, 0, 255]),
+        "purple" => Rgba([128, 0, 128, 255]),
+        "brown" => Rgba([165, 42, 42, 255]),
+        "cyan" => Rgba([0, 255, 255, 255]),
+        "magenta" | "pink" => Rgba([255, 0, 255, 255]),
+        _ => {
+            println!("Parsing color: {}", color_str);
+            // Handle hex color strings like "#RRGGBB" or "#RRGGBBAA"
+            if color_str.starts_with('#') && (color_str.len() == 7 || color_str.len() == 9) {
+                let r = u8::from_str_radix(&color_str[1..3], 16).unwrap_or(0);
+                let g = u8::from_str_radix(&color_str[3..5], 16).unwrap_or(0);
+                let b = u8::from_str_radix(&color_str[5..7], 16).unwrap_or(0);
+                let a = if color_str.len() == 9 {
+                    u8::from_str_radix(&color_str[7..9], 16).unwrap_or(255)
+                } else {
+                    255
+                };
+                println!("Parsed hex color to RGBA: [{}, {}, {}, {}]", r, g, b, a);
+                Rgba([r, g, b, a])
+            } else {
+                // Return a visible color for unknown colors - use pink to make it obvious
+                println!(
+                    "WARNING: Unrecognized color '{}', defaulting to pink",
+                    color_str
+                );
+                Rgba([255, 0, 255, 255])
+            }
+        }
+    }
+}
+
+// Create an anti-aliased version of a color with adjustable alpha
+fn blend_color(color: Rgba<u8>, intensity: f32) -> Rgba<u8> {
+    // Calculate new alpha based on the original alpha and the intensity factor
+    let alpha = (color[3] as f32 * intensity) as u8;
+    Rgba([color[0], color[1], color[2], alpha])
+}
+
+// Blend a pixel with existing content for smooth anti-aliasing
+fn blend_pixel(imgbuf: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>, alpha: f32) {
+    if x < 0 || x >= imgbuf.width() as i32 || y < 0 || y >= imgbuf.height() as i32 {
+        return;
+    }
+
+    // Get the existing pixel color
+    let existing = imgbuf.get_pixel(x as u32, y as u32);
+
+    // Alpha blending formula: new = alpha * src + (1 - alpha) * dst
+    let blend_alpha = alpha.max(0.0).min(1.0);
+    let inv_alpha = 1.0 - blend_alpha;
+
+    let r = (color[0] as f32 * blend_alpha + existing[0] as f32 * inv_alpha) as u8;
+    let g = (color[1] as f32 * blend_alpha + existing[1] as f32 * inv_alpha) as u8;
+    let b = (color[2] as f32 * blend_alpha + existing[2] as f32 * inv_alpha) as u8;
+
+    // Final alpha is combined alpha from both sources
+    let a = (color[3] as f32 * blend_alpha + existing[3] as f32 * inv_alpha) as u8;
+
+    imgbuf.put_pixel(x as u32, y as u32, Rgba([r, g, b, a]));
+}
+
+// Draw a pixel with bounds checking
+fn safe_put_pixel(imgbuf: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>) {
+    if x >= 0 && x < imgbuf.width() as i32 && y >= 0 && y < imgbuf.height() as i32 {
+        imgbuf.put_pixel(x as u32, y as u32, color);
+    }
+}
+
+// Draw an anti-aliased line between two points with a given thickness
+fn draw_anti_aliased_line(
+    imgbuf: &mut RgbaImage,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
+    color: Rgba<u8>,
+    thickness: f32,
+) {
+    // Use Bresenham's algorithm for the core line
+    // Convert i32 to isize for the Bresenham algorithm
+    let x0_isize = x0 as isize;
+    let y0_isize = y0 as isize;
+    let x1_isize = x1 as isize;
+    let y1_isize = y1 as isize;
+
+    for (x_isize, y_isize) in Bresenham::new((x0_isize, y0_isize), (x1_isize, y1_isize)) {
+        // Convert back to i32 for our drawing functions
+        let x = x_isize as i32;
+        let y = y_isize as i32;
+
+        // Draw a "thick" point at each position along the line
+        let radius = (thickness / 2.0).ceil() as i32;
+        for dx in -radius..=radius {
+            for dy in -radius..=radius {
+                let dist = ((dx * dx + dy * dy) as f32).sqrt();
+                // Calculate alpha based on distance from the line center
+                let alpha = if dist <= thickness / 2.0 {
+                    // Full opacity for inner pixels
+                    1.0
+                } else if dist <= thickness / 2.0 + 1.0 {
+                    // Fade out for anti-aliasing at the edge (smooth transition)
+                    1.0 - (dist - thickness / 2.0)
+                } else {
+                    // Outside the line's radius
+                    0.0
+                };
+
+                // Only draw if there's some opacity
+                if alpha > 0.0 {
+                    // Use blend_pixel for smoother edges
+                    blend_pixel(imgbuf, x + dx, y + dy, color, alpha);
+                }
+            }
+        }
+    }
+}
+
+// Helper function to calculate the exact rendered width of a text string
+// Esta funcionaba, es la misma que se usa en measure text?
+fn get_text_width(text: &str, font: &Font, scale: Scale) -> f32 {
+    // Calculate the width using font metrics with kerning
+    let mut caret = 0.0f32;
+    let mut prev_glyph_id = None;
+
+    for c in text.chars() {
+        // Get the glyph
+        let base_glyph = font.glyph(c);
+        let glyph_id = base_glyph.id();
+
+        // Add kerning if we have a previous glyph
+        if let Some(prev_id) = prev_glyph_id {
+            caret += font.pair_kerning(scale, prev_id, glyph_id);
+        }
+
+        // Get metrics for this glyph and add its advance width
+        let advance_width = font.glyph(c).scaled(scale).h_metrics().advance_width;
+        caret += advance_width;
+
+        // Track previous glyph for kerning
+        prev_glyph_id = Some(glyph_id);
+    }
+
+    // Return the final width
+    caret
+}
+
+// Draw an anti-aliased ellipse with a given thickness
+fn draw_anti_aliased_ellipse(
+    imgbuf: &mut RgbaImage,
+    cx: i32,
+    cy: i32,
+    a: i32,
+    b: i32,
+    color: Rgba<u8>,
+    thickness: f32,
+) {
+    // For very small ellipses, use a simple algorithm
+    if a <= 2 || b <= 2 {
+        for angle_deg in 0..360 {
+            let rad = angle_deg as Float * std::f32::consts::PI / 180.0;
+            let x = cx + (a as f32 * rad.cos()).round() as i32;
+            let y = cy + (b as f32 * rad.sin()).round() as i32;
+            safe_put_pixel(imgbuf, x, y, color);
+        }
+        return;
+    }
+
+    // Improved ellipse drawing using line segments
+    // Using more segments for smoother appearance - scale with radius for higher quality
+    let num_segments = (a.max(b) * 8).max(120);
+
+    // Calculate first point
+    let first_angle: Float = 0.0;
+    let first_x = cx + (a as f32 * first_angle.cos()).round() as i32;
+    let first_y = cy + (b as f32 * first_angle.sin()).round() as i32;
+
+    let mut prev_x = first_x;
+    let mut prev_y = first_y;
+
+    // Draw segments connecting points along the ellipse
+    for i in 1..=num_segments {
+        let angle = 2.0 * std::f32::consts::PI * (i as f32 / num_segments as f32);
+        let x = cx + (a as f32 * angle.cos()).round() as i32;
+        let y = cy + (b as f32 * angle.sin()).round() as i32;
+
+        // Draw anti-aliased line segment between consecutive points
+        draw_anti_aliased_line(imgbuf, prev_x, prev_y, x, y, color, thickness);
+
+        prev_x = x;
+        prev_y = y;
+    }
+
+    // Close the ellipse by connecting back to the first point
+    draw_anti_aliased_line(imgbuf, prev_x, prev_y, first_x, first_y, color, thickness);
+}
+
+
+===/demo.txt===
+===/Cargo.toml===
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+#add dep to crate in local workspace
+volare_engine_layout = { path = "../volare_engine_layout" }
+svg_renderer = { path = "../svg_renderer" }
+image_renderer = { path = "../image_renderer" }
+resvg = "0.25.0"
+rusttype = "0.9.3"
+
+[[bin]]
+name = "textdemo"
+path = "src/bin/text.rs"
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
+
+[[bin]]
+name = "patterns"
+path = "src/bin/patterns.rs"
+
+===/.gitignore===
+/target
+
+===/src/measure_text.rs===
+use rusttype::{point, Font, Scale};
+use volare_engine_layout::{Float, TextOptions};
+
+/**
+ * Measure text using SVG character advance method
+ * This method calculates the width based on the advance width of each character,
+ * taking into account kerning between characters.
+ * It provides a more accurate width for SVG rendering, especially for variable-width fonts.
+ */
+pub fn measure_text_svg_character_advance(text: &str, options: &TextOptions) -> (Float, Float) {
+    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
+    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+
+    let scale = Scale::uniform(options.font_size);
+
+    let mut total_width = 0.0;
+    let mut prev_glyph_id = None;
+
+    for ch in text.chars() {
+        let glyph = font.glyph(ch).scaled(scale);
+
+        // Use horizontal advance instead of bounding box
+        let advance_width = glyph.h_metrics().advance_width;
+
+        // Add kerning if available
+        if let Some(prev_id) = prev_glyph_id {
+            total_width += font.pair_kerning(scale, prev_id, glyph.id());
+        }
+
+        total_width += advance_width;
+        prev_glyph_id = Some(glyph.id());
+    }
+
+    // Use font metrics for height instead of glyph bounds
+    let v_metrics = font.v_metrics(scale);
+    let height = v_metrics.ascent - v_metrics.descent;
+
+    (total_width as Float, height as Float)
+}
+
+// tight measurement that accounts for actual glyph positioning
+// Used for PNG rendering
+pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (Float, Float) {
+    let font_data = include_bytes!("../assets/AnonymiceProNerdFont-Regular.ttf");
+    let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
+
+    let scale = Scale::uniform(options.font_size);
+    let v_metrics = font.v_metrics(scale);
+
+    if text.is_empty() {
+        return (0.0, (v_metrics.ascent - v_metrics.descent) as Float);
+    }
+
+    // Use rusttype's layout function which handles everything correctly
+    // TODO: Needs unicode normalization for proper glyph handling, see comments of `layout` function
+    let glyphs: Vec<_> = font.layout(text, scale, point(0.0, 0.0)).collect();
+
+    // Find the actual visual bounds
+    let mut min_x = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+
+    for glyph in &glyphs {
+        if let Some(bb) = glyph.pixel_bounding_box() {
+            min_x = min_x.min(bb.min.x as f32);
+            max_x = max_x.max(bb.max.x as f32);
+        }
+    }
+
+    let width = if min_x.is_finite() && max_x.is_finite() {
+        max_x - min_x // Pure visual width, no padding
+    } else {
+        // Fallback for whitespace
+        glyphs
+            .iter()
+            .map(|g| g.unpositioned().h_metrics().advance_width)
+            .sum()
+    };
+
+    let height = v_metrics.ascent - v_metrics.descent;
+
+    println!("ULTRA TIGHT: '{}' -> {:.2}x{:.2}", text, width, height);
+    (width as Float, height as Float)
+}
+
+===/src/lib.rs===
+pub mod measure_text; 
+
+===/src/text_renderer_comparison.rs===
+// Text Renderer Comparison Test
+// This file demonstrates the differences in text positioning and spacing
+// between the SVG and PNG renderers
+
+use image_renderer::PNGRenderer;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::{
+    renderer_base::Renderer,
+    BoxOptions,
+    TextOptions,
+    Fill,
+    DiagramBuilder,
+    layout::layout_tree_node,
+};
+
+// Import measurement function
+use crate::measure_text::measure_text;
+use std::fs::File;
+
+pub fn run_comparison_test() -> Result<(), Box<dyn std::error::Error>> {
+    // Create session
+    let mut session = DiagramBuilder::new();
+    session.set_measure_text_fn(measure_text);
+
+    // Create options for the test
+    let title_text_options = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 18.0,
+        line_width: 500,
+        text_color: "black".to_string(),
+    };
+
+    let regular_text_options = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 14.0,
+        line_width: 500,
+        text_color: "black".to_string(),
+    };
+
+    let small_text_options = TextOptions {
+        font_family: "Roboto".to_string(),
+        font_size: 12.0,
+        line_width: 500,
+        text_color: "black".to_string(),
+    };
+
+    let box_options = BoxOptions {
+        fill_color: Fill::Color("#EEEEEE".to_string()),
+        stroke_color: "#999999".to_string(),
+        stroke_width: 1.0,
+        padding: 10.0,
+        border_radius: 0.0,
+    };
+
+    let box_options_no_padding = BoxOptions {
+        fill_color: Fill::Color("#EEEEEE".to_string()),
+        stroke_color: "#999999".to_string(),
+        stroke_width: 1.0,
+        padding: 0.0,
+        border_radius: 0.0,
+    };
+
+    // Create title
+    let title = session.new_text(
+        "Text Rendering Comparison",
+        title_text_options,
+    );
+
+    // Create a simple single-line text
+    let single_line_text = session.new_text(
+        "This is a single line of text.",
+        regular_text_options.clone(),
+    );
+    
+    // Create a simple single-line text with a box around it
+    let single_line_text_boxed = session.new_text(
+        "This is a single line with a box.",
+        regular_text_options.clone(),
+    );
+    let single_line_box = session.new_box(single_line_text_boxed, box_options.clone());
+
+    // Create a simple single-line text with a box around it (no padding)
+    let single_line_text_boxed_no_padding = session.new_text(
+        "Single line box without padding.",
+        regular_text_options.clone(),
+    );
+    let single_line_box_no_padding = session.new_box(single_line_text_boxed_no_padding, box_options_no_padding.clone());
+
+    // Create a multi-line text example
+    let multi_line_text = session.new_text(
+        "This is a multi-line text example.\nSecond line of text.\nThird line for testing purposes.",
+        regular_text_options.clone(),
+    );
+
+    // Create a multi-line text with a box around it
+    let multi_line_text_boxed = session.new_text(
+        "This is a multi-line text with a box.\nSecond line of text.\nThird line demonstrates the gap.",
+        regular_text_options.clone(),
+    );
+    let multi_line_box = session.new_box(multi_line_text_boxed, box_options.clone());
+
+    // Create a multi-line text with a box (no padding) around it
+    let multi_line_text_boxed_no_padding = session.new_text(
+        "This is a multi-line text box no padding.\nSecond line without padding.\nThird line gap is more pronounced.",
+        regular_text_options.clone(),
+    );
+    let multi_line_box_no_padding = session.new_box(multi_line_text_boxed_no_padding, box_options_no_padding.clone());
+
+    // Text with linebreaking that causes varying line widths
+    let varying_width_text = session.new_text(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam eget ligula eu lectus lobortis condimentum. Aliquam nonummy auctor massa.",
+        small_text_options.clone(),
+    );
+    let varying_width_box = session.new_box(varying_width_text, box_options.clone());
+
+    // Create explanation text
+    let explanation = session.new_text(
+        "The images above demonstrate differences in text positioning between SVG and PNG renderers. Key issues to observe:\n\n1. Vertical spacing between lines in multi-line text\n2. Text centering in boxes with and without padding\n3. Vertical alignment issues with text baseline",
+        small_text_options,
+    );
+
+    // Arrange all elements in a vertical stack
+    let elements = vec![
+        title,
+        single_line_text,
+        single_line_box,
+        single_line_box_no_padding,
+        multi_line_text,
+        multi_line_box,
+        multi_line_box_no_padding,
+        varying_width_box,
+        explanation,
+    ];
+
+    let stack = session.ne(elements);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &stack);
+
+    // Render to SVG
+    let temp_dir = std::env::temp_dir();
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("text-comparison-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path)?;
+    svg_renderer.render(&session, &stack, &mut svg_file)?;
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+
+    // Render to PNG
+    let mut png_path = temp_dir.clone();
+    png_path.push("text-comparison-test.png");
+    let png_renderer = PNGRenderer {};
+    let mut png_file = File::create(&png_path)?;
+    png_renderer.render(&session, &stack, &mut png_file)?;
+    println!("PNG file written to: {}", png_path.to_str().unwrap());
+
+    Ok(())
+}
+===/src/main.rs===
+// Create an SVG file with all supported elements
+
+pub mod measure_text;
+
+//import svg_renderer
+use image_renderer::PNGRenderer;
+use resvg::tiny_skia::Rect;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::RectOptions;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+
+//import layout
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
+    Fill, TableOptions, TextOptions,
+};
+//import io modules to write to file
+use measure_text::{
+    measure_text_ultra_tight,
+    measure_text_svg_character_advance,
+}; // Use the ultra-tight measurement for text
+
+use std::fs::File;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //create session
+    let mut session = DiagramBuilder::new();
+    let text_options = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 12.0,
+        line_width: 100,
+        text_color: "black".to_string(),
+        line_spacing: 0.0,
+    };
+    session.set_measure_text_fn(measure_text_svg_character_advance);
+
+    //Create a polyline for a star
+    let mut points = Vec::new();
+    // Outer vertex
+    points.push((10.0, 0.0));
+    // Inner vertex
+    points.push((16.0, 16.0));
+    // Outer vertex
+    points.push((0.0, 6.0));
+    // Inner vertex
+    points.push((20.0, 6.0));
+    // Outer vertex
+    points.push((4.0, 16.0));
+    // Closing the shape by returning to the first point
+    points.push((10.0, 0.0));
+
+    let polyline = session.new_polyline(
+        points,
+        LineOptions {
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+        },
+    );
+
+    //Create horizontal stack with 2 rects and one text, set vertical align to center 
+    let mut rectOpts = RectOptions::default();
+    rectOpts.height = 150.0;
+    rectOpts.width = 150.0;
+    rectOpts.stroke_color = "black".to_string();
+    rectOpts.stroke_width = 1.0;
+    let rect = session.new_rectangle(rectOpts.clone());
+    let rect2 = session.new_rectangle(rectOpts.clone());
+
+
+    let label = session.new_text(
+        "Center",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 14.0,
+            line_width: 60,
+            text_color: "#333333".to_string(),
+            line_spacing: 0.0,
+        },
+    );
+
+    let hstack_centered = session.new_hstack(
+        vec![rect, label, rect2],
+        volare_engine_layout::VerticalAlignment::Center
+    );
+
+
+    
+
+    // Create a more visible polyline - hexagon
+    let mut hex_points = Vec::new();
+    let hex_size = 50.0;
+    for i in 0..6 {
+        let angle = (i as f32) * std::f32::consts::PI / 3.0;
+        let x = hex_size * angle.cos() + hex_size;
+        let y = hex_size * angle.sin() + hex_size;
+        hex_points.push((x, y));
+    }
+    // Close the shape
+    hex_points.push(hex_points[0]);
+
+    let hexagon = session.new_polyline(
+        hex_points,
+        LineOptions {
+            stroke_color: "blue".to_string(),
+            stroke_width: 2.0,
+        },
+    );
+
+    //Create a table with 10 ellipses
+    let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
+    for i in 0..10 {
+        let ellipse = session.new_elipse(
+            (0.0, 0.0),
+            (10.0, 10.0),
+            EllipseOptions {
+                fill_color: "red".to_string(),
+                stroke_color: "black".to_string(),
+                stroke_width: 1.0,
+            },
+        );
+        table_items_ellipses.push(ellipse);
+    }
+    let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
+
+    //Create a list of 10 texts
+    let mut table_items = Vec::new();
+    table_items.push(hstack_centered);
+    table_items.push(tableEllipses);
+    table_items.push(polyline);
+    table_items.push(hexagon);
+    for i in 0..10 {
+        let text = session.new_text(
+            &format!("Text hey ☣ {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
+        table_items.push(text);
+        //texts.push(get_test_table(&mut session));
+    }
+    //Add a couple of ellipses
+
+    //Create an ellipse and wrap it with a box
+    let ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (10.0, 10.0),
+        EllipseOptions {
+            fill_color: "red".to_string(),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+        },
+    );
+
+    //table_items.push(ellipse);
+
+    //Now add 10 ellipses
+    for i in 0..10 {
+        let ellipse = session.new_elipse(
+            (0.0, 0.0),
+            (10.0, 10.0),
+            EllipseOptions {
+                fill_color: "red".to_string(),
+                stroke_color: "black".to_string(),
+                stroke_width: 1.0,
+            },
+        );
+        // table_items.push(ellipse);
+    }
+
+    //create a paragraph of lorem ipsum
+    let lorem_ipsum = br#"
+  THE adjustment \u{f1878} factor (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+  text appear more naturally centered to the human eye, rather than strictly mathematically centered.
+
+  Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
+  with certain fonts or at larger font sizes.
+
+  In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
+  positioning."#;
+
+    //create text shape
+    let text = session.new_text(
+        std::str::from_utf8(lorem_ipsum).unwrap(),
+        text_options.clone(),
+    );
+    table_items.push(text);
+
+    //Add sample image from file (first instance)
+    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (200.0, 200.0));
+    //table_items.push(sampleImage);
+
+    //Add sample image from file
+    // The path is relative to where the binary is run
+    let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
+   // table_items.push(file_image);
+
+    // Create a FreeContainer with multiple visual elements at specific positions using the new method
+
+    // Create all elements first
+    let title_text = session.new_text(
+        "FreeContainer Demo",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 18.0,
+            line_width: 100,
+            text_color: "#000000".to_string(),
+            line_spacing: 0.0,
+        },
+    );
+
+    let red_circle = session.new_elipse(
+        (0.0, 0.0),   // center position (will be positioned by container)
+        (15.0, 15.0), // radius
+        EllipseOptions {
+            fill_color: "#FF0000".to_string(), // bright red
+            stroke_color: "black".to_string(),
+            stroke_width: 2.0,
+        },
+    );
+
+    let thetext = format!(
+        r#"
+    The adjustment factor {} (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
+    text appear more naturally centered to the human eye, rather than strictly mathematically centered.
+  
+    Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
+    with certain fonts or at larger font sizes.
+  
+    In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
+    positioning."#,
+        "\u{f1878}"
+    );
+
+    let blue_text = session.new_text(
+        &thetext,
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 16.0,
+            line_width: 100,
+            text_color: "white".to_string(), // white text
+            line_spacing: 0.0,
+        },
+    );
+
+    // Create a box around the blue text
+    let box_options = BoxOptions {
+        fill_color: Fill::Color("#0000FF".to_string()), // blue background
+        stroke_color: "green".to_string(),              // dark blue border
+        stroke_width: 1.0,
+        padding: 10.0,
+        border_radius: 3.0,
+    };
+    let blue_box = session.new_box(blue_text, box_options);
+
+    let green_ellipse = session.new_elipse(
+        (0.0, 0.0),
+        (30.0, 20.0),
+        EllipseOptions {
+            fill_color: "#00CC00".to_string(),   // green
+            stroke_color: "#006600".to_string(), // dark green
+            stroke_width: 2.0,
+        },
+    );
+
+    let subtitle = session.new_text(
+        "Absolute positioning of elements",
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 12.0,
+            line_width: 100,
+            text_color: "#555555".to_string(), // dark gray
+            line_spacing: 0.0,
+        },
+    );
+
+    // Create a container with all children at once
+    let container_with_elements = session.new_free_container_with_children(vec![
+        (title_text, (30.0, 10.0)),
+        (red_circle, (40.0, 50.0)),
+        (blue_box, (80.0, 40.0)),
+        (green_ellipse, (150.0, 70.0)),
+        (subtitle, (30.0, 120.0)),
+    ]);
+
+    // Add styling to the container with more vibrant colors
+    let free_container = session.get_free_container_mut(container_with_elements.entity_id);
+    free_container.background_color = Some("#FFDDDD".to_string()); // Light red background (more visible)
+    free_container.border_color = Some("#FF0000".to_string()); // Bright red border
+    free_container.border_width = 5.0; // Thicker border
+
+    // Add the FreeContainer to the table
+   // table_items.push(container_with_elements);
+    //texts.push(get_test_table(&mut session));
+    //Create a table for the texts with 2 columns
+    let mut toptions = TableOptions::default();
+    toptions.cell_padding = 2;
+    let table = session.new_table(table_items, 5, toptions);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &table);
+
+    //create writer to file ~/temp/svg-render-test.svg
+    //get path for ~/temp
+    let temp_dir = std::env::temp_dir();
+    //create path for ~/temp/svg-render-test.svg
+    // Render SVG
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("svg-render-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path).unwrap();
+    let svg_res = svg_renderer.render(&session, &table, &mut svg_file);
+    if svg_res.is_err() {
+        println!("SVG Render Error: {}", svg_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+
+    // Render PNG
+    // Use other  measure function for PNG rendering
+    // let mut png_path = temp_dir.clone();
+    // png_path.push("png-render-test.png");
+    // let png_renderer = PNGRenderer {};
+    // let mut png_file = File::create(&png_path).unwrap();
+    // let png_res = png_renderer.render(&session, &table, &mut png_file);
+    // if png_res.is_err() {
+    //     println!("PNG Render Error: {}", png_res.err().unwrap());
+    //     std::process::exit(1);
+    // }
+    // println!("PNG file written to: {}", png_path.to_str().unwrap());
+
+    Ok(())
+}
+
+// Sample image loading is now handled directly through file loading
+
+//function that returns a sample table with 10 elements and 3 columns
+
+/// .
+fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
+    let text_options = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 12.0,
+        line_width: 100,
+        text_color: "black".to_string(),
+        line_spacing: 5.0,
+    };
+    //Create a list of 10 texts
+    let mut texts = Vec::new();
+    for i in 0..10 {
+        let text = session.new_text(
+            &format!("Text hey {} \nthis is a multiline text", i),
+            text_options.clone(),
+        );
+        texts.push(text);
+    }
+    //create a table options object with all defaults except the header color
+    let table_options = TableOptions {
+        header_fill_color: "blue".to_string(),
+        ..Default::default()
+    };
+    //Create a table for the texts with 2 columns
+    let table = session.new_table(texts, 3, table_options);
+    table
+}
+
+
+===/volare_engine_layout.txt===
+===/Cargo.toml===
+[package]
+name = "volare_engine_layout"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+textwrap = "0.16.0"
+
+===/target/CACHEDIR.TAG===
+Signature: 8a477f597d28d172789f06886806bc55
+# This file is a cache directory tag created by cargo.
+# For information about cache directory tags see https://bford.info/cachedir/
+
+===/target/debug/.fingerprint/layout-base-d68186a17e09bb62/lib-layout-base===
+e1fb921afd0324c9
+===/target/debug/.fingerprint/layout-base-d68186a17e09bb62/invoked.timestamp===
+This file has an mtime of when this was started.
+===/target/debug/.fingerprint/layout-base-3046ca7ae66b4c03/test-lib-layout-base===
+c2a4ddc523aefc46
+===/target/debug/.fingerprint/layout-base-3046ca7ae66b4c03/invoked.timestamp===
+This file has an mtime of when this was started.
+===/target/debug/.fingerprint/layout-base-eed9ca7d180c0e5c/lib-layout-base===
+9111b90f7f500e00
+===/target/debug/.fingerprint/layout-base-eed9ca7d180c0e5c/invoked.timestamp===
+This file has an mtime of when this was started.
+===/target/debug/.fingerprint/layout-base-65ec7ba58964b4ee/test-lib-layout-base===
+23f059a2e9751bb5
+===/target/debug/.fingerprint/layout-base-65ec7ba58964b4ee/invoked.timestamp===
+This file has an mtime of when this was started.
+===/target/debug/deps/layout_base-65ec7ba58964b4ee.d===
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-65ec7ba58964b4ee.rmeta: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-65ec7ba58964b4ee.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+src/lib.rs:
+src/diagram_layout.rs:
+src/location.rs:
+src/shape_box.rs:
+src/bounding_box.rs:
+src/shape_text.rs:
+src/shape_group.rs:
+src/session.rs:
+
+===/target/debug/deps/layout_base-eed9ca7d180c0e5c.d===
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-eed9ca7d180c0e5c.rmeta: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/liblayout_base-eed9ca7d180c0e5c.rlib: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-eed9ca7d180c0e5c.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+src/lib.rs:
+src/diagram_layout.rs:
+src/location.rs:
+src/shape_box.rs:
+src/bounding_box.rs:
+src/shape_text.rs:
+src/shape_group.rs:
+src/session.rs:
+
+===/target/debug/deps/layout_base-3046ca7ae66b4c03.d===
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-3046ca7ae66b4c03: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-3046ca7ae66b4c03.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+src/lib.rs:
+src/diagram_layout.rs:
+src/location.rs:
+src/shape_box.rs:
+src/bounding_box.rs:
+src/shape_text.rs:
+src/shape_group.rs:
+src/session.rs:
+
+===/target/debug/deps/layout_base-d68186a17e09bb62.d===
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-d68186a17e09bb62.rmeta: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-d68186a17e09bb62.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
+
+src/lib.rs:
+src/diagram_layout.rs:
+src/location.rs:
+src/shape_box.rs:
+src/bounding_box.rs:
+src/shape_text.rs:
+src/shape_group.rs:
+src/session.rs:
+
+===/Cargo.lock===
+# This file is automatically @generated by Cargo.
+# It is not intended for manual editing.
+version = 3
+
+[[package]]
+name = "layout-base"
+version = "0.1.0"
+
+===/.gitignore===
+/target
+/Cargo.lock
+
+===/.github/workflows/test-and-build.yml===
+# test rust project and build
+
+name: Test and Build
+
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+
+
+
+
+===/src/layout.rs===
+/* Layout calculation for each type of entity */
+
+use crate::components::Float;
+use crate::{HorizontalAlignment, VerticalAlignment};
+use crate::{
+    diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
+    HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
+    ShapeLine, ShapeText, Table, VerticalStack,
+};
+
+/* The box layout includes the padding and the dimensions
+of the wrapped element
+The wrapped element position and size should be updated before calling this function.
+The wrapped element position is relative to the box position.
+*/
+pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
+    println!("Box: {:?}", shape_box);
+    //get the wrapped element dimensions
+    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity);
+    println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
+
+    //print element dimensions
+    println!(
+        "Box: {}, {}, {}, {}",
+        shape_box.entity, wrapped_elem_size.0, wrapped_elem_size.1, shape_box.box_options.padding
+    );
+    //set the box dimensions
+    session.set_size(
+        shape_box.entity,
+        wrapped_elem_size.0 + shape_box.box_options.padding * 2.0,
+        wrapped_elem_size.1 + shape_box.box_options.padding * 2.0,
+    );
+    //Update the wrapped element position
+    session.set_position(
+        shape_box.wrapped_entity,
+        shape_box.box_options.padding,
+        shape_box.box_options.padding,
+    );
+}
+
+/**
+ * Update the group size based on the size of the elements.
+ * Group elements must be positioned before calling this function.
+ * (Doesn't update the position of the elements)
+ */
+pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
+    //update group dimensions
+    let mut width = 0.0;
+    let mut height = 0.0;
+    for elem in shape_group.elements.iter() {
+        let elem_size = session.get_size(*elem);
+        if elem_size.0 > width {
+            width = elem_size.0;
+        }
+        if elem_size.1 > height {
+            height = elem_size.1;
+        }
+    }
+    session.set_size(shape_group.entity, width, height);
+}
+
+pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
+    // let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
+    // session.set_size(shape_text.entity, w, h);
+    /* for each line in lines, get the size and use it to position the next */
+    {
+        println!("Text: {:?}", shape_text);
+        let mut y = 0.0;
+        let mut max_line_width = 0.0;
+        for line in shape_text.lines.iter() {
+            println!("Line: {:?}", line);
+            let textLine = session.get_text_line(*line);
+            let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
+            if line_size.0 > max_line_width {
+                max_line_width = line_size.0;
+            }
+            session.set_position(*line, 0.0, y);
+            session.set_size(*line, line_size.0, line_size.1);
+            y += line_size.1 + shape_text.text_options.line_spacing as Float;
+        }
+        y -= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
+
+        println!("max_line_width: {}", max_line_width);
+        //set the size of the text element
+        println!(
+            "Setting size to text entity: {} - {} {}",
+            shape_text.entity, max_line_width, y
+        );
+        session.set_size(shape_text.entity, max_line_width, y);
+    }
+}
+
+/**
+ * Updates the size of the line entity based on the start and end points
+ */
+pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
+    let start = shape_line.start;
+    let end = shape_line.end;
+    //the line x is the minimum of the start and end x
+    let x = start.0.min(end.0);
+    let y = start.1.min(end.1);
+
+    session.set_size(
+        shape_line.entity,
+        (end.0 - start.0).abs(),
+        (end.1 - start.1).abs(),
+    );
+
+    session.set_position(shape_line.entity, x, y);
+}
+
+/**
+ * Updates the size of the arrow entity based on the start and end points
+ */
+pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
+    let start = shape_arrow.start;
+    let end = shape_arrow.end;
+    //the line x is the minimum of the start and end x
+    let x = start.0.min(end.0);
+    let y = start.1.min(end.1);
+
+    session.set_size(
+        shape_arrow.entity,
+        (end.0 - start.0).abs(),
+        (end.1 - start.1).abs(),
+    );
+
+    session.set_position(shape_arrow.entity, x, y);
+}
+
+/**
+ * Updates the size of the ellipse entity based on the horizontal and vertical radius
+ * radius.0 is the horizontal radius and radius.1 is the vertical radius
+ * The position of the ellipse is the top left corner of the bounding box
+ */
+pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
+    let w = shape_ellipse.radius.0 * 2.0;
+    let h = shape_ellipse.radius.1 * 2.0;
+    session.set_size(shape_ellipse.entity, w, h);
+}
+
+pub fn layout_rect(session: &mut DiagramBuilder, entity: EntityID, width: Float, height: Float) {
+    //set the size of the rect
+    session.set_size(entity, width, height);
+}
+
+/**
+ * Sets the image entity size to the preferred size
+ */
+pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
+    session.set_size(
+        shape_image.entity,
+        shape_image.preferred_size.0,
+        shape_image.preferred_size.1,
+    );
+}
+
+/**
+ * Updates the position of the elements in the vertical stack
+ * and the size of the vertical stack
+ */
+pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &VerticalStack) {
+    let mut y = 0.0;
+    let mut width = 0.0;
+    for elem in vertical_stack.elements.iter() {
+        println!("DEBUG:::y: {}", y);
+        let elem_size = session.get_size(*elem);
+        session.set_position(*elem, 0.0, y);
+        y += elem_size.1;
+        if elem_size.0 > width {
+            width = elem_size.0;
+        }
+    }
+    session.set_size(vertical_stack.entity, width, y);
+
+      // Second pass: only adjust x positions if alignment is specified
+        for elem in vertical_stack.elements.iter() {
+            let elem_size = session.get_size(*elem);
+            let current_pos = session.get_position(*elem);
+            let x = match vertical_stack.horizontal_alignment {
+                HorizontalAlignment::Left => 0.0,
+                HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
+                HorizontalAlignment::Right => width - elem_size.0,
+            };
+            session.set_position(*elem, x, current_pos.1); // Update x, keep y
+        }
+}
+
+pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
+    let mut x = 0.0;
+    let mut height = 0.0;
+    for elem in horizontal_stack.elements.iter() {
+        let elem_size = session.get_size(*elem);
+        session.set_position(*elem, x, 0.0);
+        x += elem_size.0;
+        if elem_size.1 > height {
+            height = elem_size.1;
+        }
+    }
+    session.set_size(horizontal_stack.entity, x, height);
+
+    // Second pass: only adjust y positions, keep existing x positions
+        for elem in horizontal_stack.elements.iter() {
+            let elem_size = session.get_size(*elem);
+            let current_pos = session.get_position(*elem); // Get the x we already set
+            let y = match horizontal_stack.vertical_alignment {
+                VerticalAlignment::Top => 0.0,
+                VerticalAlignment::Center => (height - elem_size.1) / 2.0,
+                VerticalAlignment::Bottom => height - elem_size.1,
+            };
+            session.set_position(*elem, current_pos.0, y); // Keep x, update y
+        }
+}
+
+/**
+ * Calculates the layout for each of the cells according to table rules:
+ * - Cells in the same column have the same width (eq to the max of widths)
+ * - Cells in the same row have the same height (eq to the max of heights)
+ * - Rows on top of each other
+ * - Cols to the right of each other
+ * - The sizes of the internal elements should be previously computed for this to work
+ */
+pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
+    //we need to group elements by row and column, calculate their
+    //natural sizes and then update their rows and columns
+    let mut rows: Vec<Vec<EntityID>> = Vec::new();
+    let mut cols: Vec<Vec<EntityID>> = Vec::new();
+    let mut row_heights: Vec<Float> = Vec::new();
+    let mut col_widths: Vec<Float> = Vec::new();
+
+    // Add variables to store line positions
+    let mut horizontal_line_positions: Vec<Float> = Vec::new();
+    let mut vertical_line_positions: Vec<Float> = Vec::new();
+
+    //initialize rows and cols
+    for (i, elem) in table.cells.iter().enumerate() {
+        let row = i / table.cols;
+        let col = i % table.cols;
+        //add the element to the row and col
+        if row >= rows.len() {
+            rows.push(Vec::new());
+            row_heights.push(0.0);
+        }
+        if col >= cols.len() {
+            cols.push(Vec::new());
+            col_widths.push(0.0);
+        }
+        rows[row].push(*elem);
+        cols[col].push(*elem);
+
+        //update the row and col sizes
+        let elem_size = session.get_size(*elem);
+        if elem_size.0 > col_widths[col] {
+            col_widths[col] = elem_size.0 + table.table_options.cell_padding as Float * 2.0;
+        }
+        if elem_size.1 > row_heights[row] {
+            row_heights[row] = elem_size.1 + table.table_options.cell_padding as Float * 2.0;
+        }
+    }
+
+    //print row heights and col widths
+    println!("row heights: {:?}", row_heights);
+    println!("col widths: {:?}", col_widths);
+
+    //we already have each row and col and their sizes.
+    //Now we have to update the position of each element
+    //and the size of the table
+
+    //iterate through rows and cols and update the position of each element
+    let mut x = 0.0;
+    for (i, col) in cols.iter().enumerate() {
+        let mut y = 0.0;
+        for (j, elem) in col.iter().enumerate() {
+            session.set_position(
+                *elem,
+                x + table.table_options.cell_padding as Float,
+                y + table.table_options.cell_padding as Float,
+            );
+            y += row_heights[j];
+        }
+
+        x += col_widths[i];
+    }
+
+    //Update the position of the horizontal lines
+    let mut y = 0.0;
+    for (i, row) in rows.iter().enumerate() {
+        horizontal_line_positions.push(y);
+        y += row_heights[i];
+    }
+
+    //Update the position of the vertical lines
+    let mut x = 0.0;
+    for (i, col) in cols.iter().enumerate() {
+        vertical_line_positions.push(x);
+        x += col_widths[i];
+    }
+
+    //update the size of the table
+    let mut width = 0.0;
+    let mut height = 0.0;
+
+    for w in col_widths.iter() {
+        width += w;
+    }
+
+    for h in row_heights.iter() {
+        height += h;
+    }
+
+    //Update the size of the table header rect
+    session.set_size(table.header_rect, width, row_heights[0]);
+
+    //print the size of the table
+    println!("Table size: {:?}", (width, height));
+
+    session.set_size(table.entity, width, height);
+
+    //We need to update the position of the horizontal lines and their size
+    for (i, line) in table.row_lines.iter().enumerate() {
+        //get the size of the line (should be 0,0 by default)
+        let line_size = session.get_size(*line);
+        if i < horizontal_line_positions.len() {
+            //set the y position of the horizontal line, x will be 0
+            session.set_position(*line, 0.0, horizontal_line_positions[i]);
+            //update the size, we only need to update the height and leave the width as it is (0 by default)
+            session.set_size(*line, width, line_size.1);
+        }
+    }
+
+    for (i, line) in table.col_lines.iter().enumerate() {
+        //get the size of the line (should be 0,0 by default)
+        let line_size = session.get_size(*line);
+        if i < vertical_line_positions.len() {
+            //set the x position of the vertical line, y will be 0
+            session.set_position(*line, vertical_line_positions[i], 0.0);
+            //update the size, we only need to update the width and leave the height as it is (0 by default)
+            session.set_size(*line, line_size.0, height);
+        }
+    }
+}
+
+pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
+    let mut x = 0.0;
+    let mut y = 0.0;
+    let mut width = 0.0;
+    let mut height = 0.0;
+    for (i, point) in polyline.points.iter().enumerate() {
+        if i == 0 {
+            x = point.0;
+            y = point.1;
+        } else {
+            if point.0 < x {
+                width += x - point.0;
+                x = point.0;
+            }
+            if point.1 < y {
+                height += y - point.1;
+                y = point.1;
+            }
+        }
+    }
+    session.set_size(polyline.entity, width, height);
+}
+
+/**
+ * Layout for the FreeContainer
+ * Children have absolute positions relative to the container
+ * The container size is determined by the maximum extent of its children
+ */
+pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeContainer) {
+    // We need to determine the size of the container based on the positions and sizes of its children
+    let mut max_width = 0.0;
+    let mut max_height = 0.0;
+
+    // Iterate through all children and find the maximum extent
+    for (child_id, position) in &container.children {
+        // Get the child's size
+        let child_size = session.get_size(*child_id);
+
+        // Set the child's position relative to the container
+        session.set_position(*child_id, position.0, position.1);
+
+        // Calculate the right and bottom edges of this child
+        let right = position.0 + child_size.0;
+        let bottom = position.1 + child_size.1;
+
+        // Update the maximum extent
+        if right > max_width {
+            max_width = right;
+        }
+        if bottom > max_height {
+            max_height = bottom;
+        }
+    }
+
+    // Add a small margin to ensure we have enough space
+    let margin = 2.0;
+    max_width += margin;
+    max_height += margin;
+
+    // Set the container's size
+    session.set_size(container.entity, max_width, max_height);
+}
+
+pub struct BoundingBox {
+    x: Float,
+    y: Float,
+    width: Float,
+    height: Float,
+}
+//Calculate the layout for a tree of elements
+pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
+    //start with the bottom elements
+    for child in &root.children {
+        println!("Layout child: {:?}", child);
+        layout_tree_node(session, child);
+        //print size and position of the child
+
+        let child_size = session.get_size(child.entity_id);
+        let child_pos = session.get_position(child.entity_id);
+        println!("Child size: {:?}", child_size);
+        println!("Child pos: {:?}", child_pos);
+    }
+
+    //Once the children are laid out, we can layout the current element
+    //use methods in the layout module
+    match root.entity_type {
+        EntityType::TextShape => {
+            {
+                //get the Shape text entity
+                let text = session.get_text(root.entity_id).clone();
+                layout_text(session, &text);
+            }
+        }
+        EntityType::BoxShape => {
+            //get the Shape box entity
+            let box_shape = session.get_box(root.entity_id).clone();
+            layout_box(session, &box_shape);
+        }
+
+        EntityType::RectShape => {
+            //get the Rect entity
+            let rect = session.get_rectangle(root.entity_id);
+            layout_rect(
+                session,
+                root.entity_id,
+                rect.rect_options.width,
+                rect.rect_options.height,
+            );
+        }
+
+        EntityType::LineShape => {
+            //get the Shape line entity
+            let line = session.get_line(root.entity_id).clone();
+            layout_line(session, &line);
+        }
+        EntityType::ArrowShape => {
+            //get the Shape arrow entity
+            let arrow = session.get_arrow(root.entity_id).clone();
+            layout_arrow(session, &arrow);
+        }
+        EntityType::EllipseShape => {
+            //get the Shape ellipse entity
+            let ellipse = session.get_ellipse(root.entity_id).clone();
+            layout_ellipse(session, &ellipse);
+        }
+        EntityType::ImageShape => {
+            //get the Shape image entity
+            let image = session.get_image(root.entity_id).clone();
+            layout_image(session, &image);
+        }
+        EntityType::VerticalStackShape => {
+            //get the VerticalStack entity
+            let vertical_stack = session.get_vertical_stack(root.entity_id).clone();
+            layout_vertical_stack(session, &vertical_stack);
+        }
+
+        EntityType::HorizontalStackShape => {
+            //get the HorizontalStack entity
+            let horizontal_stack = session.get_horizontal_stack(root.entity_id).clone();
+            layout_horizontal_stack(session, &horizontal_stack);
+        }
+
+        EntityType::TableShape => {
+            //get the Table entity
+            let table = session.get_table(root.entity_id).clone();
+            layout_table(session, &table);
+        }
+
+        EntityType::GroupShape => {
+            //get the Group entity
+            let group = session.get_group(root.entity_id).clone();
+            layout_group(session, &group);
+        }
+
+        EntityType::PolyLine => {
+            let polyline = session.get_polyline(root.entity_id).clone();
+            layout_polyline(session, &polyline);
+        }
+        EntityType::FreeContainer => {
+            let container = session.get_free_container(root.entity_id).clone();
+            layout_free_container(session, &container);
+        }
+
+        //if not recognized, show the name of it in the panic
+        _ => panic!("Unknown entity type: {:?}", root.entity_type),
+    }
+
+    //Return the bounding box for the root element
+    let size = session.get_size(root.entity_id);
+    let position = session.get_position(root.entity_id);
+    BoundingBox {
+        x: position.0,
+        y: position.1,
+        width: size.0,
+        height: size.1,
+    }
+}
+
+//import textoptions defined in src/components/mod.rs
+use crate::components::BoxOptions;
+use crate::components::TextOptions;
+//Test that a box with a text inside is correctly laid out
+#[test]
+fn test_layout_box_with_text() {
+    let mut session = DiagramBuilder::new();
+    session.set_measure_text_fn(|_, _| (10.0, 10.0));
+    let text = session.new_text(
+        "hello",
+        TextOptions {
+            font_size: 20.0,
+            line_width: 200,
+            ..Default::default()
+        },
+    );
+    let box_options = BoxOptions {
+        padding: 10.0,
+        ..Default::default()
+    };
+    let box_shape = session.new_box(text.clone(), box_options.clone());
+
+    //print box options
+    println!("--box options: {:?}", box_options);
+
+    //layout the box
+    layout_tree_node(&mut session, &box_shape);
+
+    let text_position = session.get_position(text.entity_id);
+    let text_size = session.get_size(text.entity_id);
+
+    let box_position = session.get_position(box_shape.entity_id);
+    let box_size = session.get_size(box_shape.entity_id);
+    //assert equal positions
+
+    // assert the box size is greater than the text size
+    println!("box size: {:?}", box_size);
+    println!("text size: {:?}", text_size);
+    // and the text size should not be zero
+    assert!(text_size.0 > 0.0);
+    assert_eq!(box_size.0, 30.0);
+    assert!(box_size.1 > text_size.1);
+}
+
+===/src/lib.rs===
+
+pub use crate::diagram_builder::{DiagramBuilder};
+pub use crate::components::*;
+pub use crate::layout::*;
+pub use crate::utils::*;
+pub use crate::renderer_base::*;
+
+pub mod diagram_builder;
+pub mod utils;
+pub mod components;
+pub mod layout;
+pub mod renderer_base;
+pub mod parser;
+
+
+===/src/components/mod.rs===
+
+pub mod table;
+
+use core::fmt;
+use std::any::Any;
+
+pub use crate::components::table::*;
+//new type EntityID that is a u64
+pub type EntityID = usize;
+pub type Float = f32;
+
+//Export table and table options
+
+
+pub trait Entity {
+    fn get_id(&self) -> EntityID;
+    fn get_type(&self) -> EntityType;
+    //as_any
+    fn as_any(&self) -> &dyn Any;
+}
+
+pub struct Point {
+    pub x: Float,
+    pub y: Float,
+}
+
+//impl clone
+impl Clone for Point {
+    fn clone(&self) -> Self {
+        Point {
+            x: self.x,
+            y: self.y,
+        }
+    }
+}
+
+//impl new
+impl Point {
+    pub fn new(x: Float, y: Float) -> Self {
+        Point { x, y }
+    }
+}
+
+pub struct Size {
+    pub w: Float,
+    pub h: Float,
+}
+
+//impl clone
+impl Clone for Size {
+    fn clone(&self) -> Self {
+        Size {
+            w: self.w,
+            h: self.h,
+        }
+    }
+}
+
+//impl new
+impl Size {
+    pub fn new(w: Float, h: Float) -> Self {
+        Size { w, h }
+    }
+}
+
+//Note: add new items to the end of the enum to avoid breaking the serialization
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntityType {
+    BoxShape,
+    RectShape,
+    TextShape,
+    LineShape,
+    ArrowShape,
+    EllipseShape,
+    ImageShape,
+    GroupShape,
+    VerticalStackShape,
+    HorizontalStackShape,
+    TableShape,
+    TextLine,
+    PolyLine,
+    FreeContainer
+}
+
+pub fn get_entity_type(entity_id: EntityID) -> EntityType {
+    match (entity_id >> 32) as u32 {
+        0 => EntityType::BoxShape,
+        1 => EntityType::TextShape,
+        2 => EntityType::LineShape,
+        3 => EntityType::ArrowShape,
+        4 => EntityType::EllipseShape,
+        5 => EntityType::ImageShape,
+        6 => EntityType::GroupShape,
+        7 => EntityType::VerticalStackShape,
+        8 => EntityType::HorizontalStackShape,
+        9 => EntityType::TableShape,
+        10 => EntityType::TextLine,
+        11 => EntityType::PolyLine,
+        12 => EntityType::FreeContainer,
+        _ => panic!("Invalid entity type"),
+    }
+}
+
+
+/**
+ * Boxes show a rectangle around the wrapped entity
+ */
+#[derive(Debug)]
+pub struct ShapeBox {
+    pub entity: EntityID,
+    //Each box wraps another entity
+    pub wrapped_entity: EntityID,
+    pub box_options: BoxOptions,
+}
+
+impl Clone for ShapeBox {
+    fn clone(&self) -> Self {
+        ShapeBox {
+            entity: self.entity,
+            wrapped_entity: self.wrapped_entity,
+            box_options: self.box_options.clone(),
+        }
+    }
+}
+
+impl Entity for ShapeBox {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::BoxShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ShapeBox {
+    pub fn new(entity: EntityID, wrapped_entity: EntityID, box_options: BoxOptions) -> ShapeBox {
+        ShapeBox {
+            entity,            
+            wrapped_entity,
+            box_options,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum GradientStop {
+    ColorStop { offset: Float, color: String },
+    OpacityStop { offset: Float, opacity: Float },
+}
+
+#[derive(Debug)]
+pub struct LinearGradient {
+    pub x1: Float,
+    pub y1: Float,
+    pub x2: Float,
+    pub y2: Float,
+    pub stops: Vec<GradientStop>,
+}
+
+impl LinearGradient {
+    pub fn new(x1: Float, y1: Float, x2: Float, y2: Float, stops: Vec<GradientStop>) -> Self {
+        LinearGradient {
+            x1,
+            y1,
+            x2,
+            y2,
+            stops,
+        }
+    }
+}
+
+impl Clone for GradientStop {
+    fn clone(&self) -> Self {
+        match self {
+            GradientStop::ColorStop { offset, color } => GradientStop::ColorStop {
+                offset: *offset,
+                color: color.clone(),
+            },
+            GradientStop::OpacityStop { offset, opacity } => GradientStop::OpacityStop {
+                offset: *offset,
+                opacity: *opacity,
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RadialGradient {
+    pub cx: Float,
+    pub cy: Float,
+    pub r: Float,
+    pub stops: Vec<GradientStop>,
+}
+
+impl Clone for RadialGradient {
+    fn clone(&self) -> Self {
+        RadialGradient {
+            cx: self.cx,
+            cy: self.cy,
+            r: self.r,
+            stops: self.stops.clone(),
+        }
+    }
+}
+
+impl Clone for LinearGradient {
+    fn clone(&self) -> Self {
+        LinearGradient {
+            x1: self.x1,
+            y1: self.y1,
+            x2: self.x2,
+            y2: self.y2,
+            stops: self.stops.clone(),
+        }
+    }
+}
+
+
+
+#[derive(Debug)]
+pub enum Fill {
+    Color(String),
+    LinearGradient(LinearGradient),
+    RadialGradient(RadialGradient),
+}
+
+impl Clone for Fill {
+    fn clone(&self) -> Self {
+        match self {
+            Fill::Color(color) => Fill::Color(color.clone()),
+            Fill::LinearGradient(gradient) => Fill::LinearGradient(gradient.clone()),
+            Fill::RadialGradient(gradient) => Fill::RadialGradient(gradient.clone()),
+        }
+    }
+}
+//default trait for fill
+impl Default for Fill {
+    fn default() -> Self {
+        Fill::Color(String::from("white"))
+    }
+}
+
+//display for fill
+impl fmt::Display for Fill {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Fill::Color(color) => write!(f, "{}", color),
+            Fill::LinearGradient(gradient) => write!(f, "{:?}", gradient),
+            Fill::RadialGradient(gradient) => write!(f, "{:?}", gradient),
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct BoxOptions {
+    pub fill_color: Fill,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub padding: Float,
+    pub border_radius: Float,
+}
+
+impl Clone for BoxOptions {
+    fn clone(&self) -> Self {
+        BoxOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            padding: self.padding,
+            border_radius: self.border_radius,
+
+        }
+    }
+}
+
+impl BoxOptions {
+    pub fn new() -> BoxOptions {
+        BoxOptions {
+            fill_color: Fill::Color(String::from("white")),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            padding: 10.0,
+            border_radius: 0.0,
+        }
+    }
+}
+
+
+
+/* A group of entities */
+
+//RectOptions
+#[derive(Default, Debug)]
+pub struct RectOptions {
+    pub width: Float,
+    pub height: Float,
+    pub fill_color: Fill,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub border_radius: Float,
+}
+
+impl Clone for RectOptions {
+    fn clone(&self) -> Self {
+        RectOptions {
+            width: self.width,
+            height: self.height,
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            border_radius: self.border_radius,
+        }
+    }
+}
+
+impl RectOptions {
+    pub fn new() -> RectOptions {
+        RectOptions {
+            width: 100.0,
+            height: 100.0,
+            fill_color: Fill::Color(String::from("white")),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        }
+    }
+}
+
+pub struct ShapeRect {
+    pub entity: EntityID,
+    pub rect_options: RectOptions,
+}
+
+impl ShapeRect {
+    pub fn new(entity: EntityID, rect_options: RectOptions) -> ShapeRect {
+        ShapeRect {
+            entity,
+            rect_options,
+        }
+    }
+}
+
+impl Clone for ShapeRect {
+    fn clone(&self) -> Self {
+        ShapeRect {
+            entity: self.entity,
+            rect_options: self.rect_options.clone(),
+        }
+    }
+}
+
+impl Entity for ShapeRect {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::RectShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+
+/* A group of entities */
+pub struct ShapeGroup {
+    pub entity: EntityID,
+    pub elements: Vec<EntityID>,
+}
+
+impl Clone for ShapeGroup {
+    fn clone(&self) -> Self {
+        ShapeGroup {
+            entity: self.entity,
+            elements: self.elements.clone(),
+        }
+    }
+}
+
+impl Entity for ShapeGroup {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::GroupShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+// Represents a line after adding breaks
+#[derive(Debug)]
+pub struct TextLine {
+    pub entity: EntityID,
+    pub text: String,
+}
+
+impl Clone for TextLine {
+    fn clone(&self) -> Self {
+        TextLine {
+            entity: self.entity,
+            text: self.text.clone(),
+        }
+    }
+}
+
+impl Entity for TextLine {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::TextLine
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+//add copy trait
+#[derive(Debug)]
+pub struct ShapeText {
+    pub entity: EntityID,
+    pub text: String,
+    pub text_options: TextOptions,
+    pub lines: Vec<EntityID>,
+}
+
+impl Clone for ShapeText {
+    fn clone(&self) -> Self {
+        ShapeText {
+            entity: self.entity,
+            text: self.text.clone(),
+            text_options: self.text_options.clone(),
+            lines: self.lines.clone(),
+        }
+    }
+}
+
+
+impl ShapeText {
+    pub fn new(entity: EntityID, text: &str, text_options: TextOptions, lines: &[EntityID]) -> ShapeText {
+        ShapeText {
+            entity,
+            text: text.to_string(),
+            text_options,
+            lines: lines.to_vec(),
+        }
+    }
+}
+
+
+
+impl Entity for ShapeText {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::TextShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+//struct with text options: font family, font size
+#[derive(Default, Debug)]
+pub struct TextOptions {
+    pub font_family: String,
+    pub font_size: f32,
+    pub text_color: String,
+    // (number of max characters per line)used to know when to insert breaks
+    pub line_width: usize,
+    pub line_spacing: f32, // spacing between lines
+}
+
+impl Clone for TextOptions {
+    fn clone(&self) -> Self {
+        TextOptions {
+            font_family: self.font_family.clone(),
+            font_size: self.font_size,
+            text_color: self.text_color.clone(),
+            line_width: self.line_width,
+            line_spacing: self.line_spacing,
+        }
+    }
+}
+
+impl TextOptions {
+    pub fn new() -> TextOptions {
+        TextOptions {
+            font_family: String::from("Roboto"),
+            font_size: 12.0,
+            text_color: String::from("black"),
+            line_width: 20,
+            line_spacing: 0.0,
+        }
+    }
+}
+
+pub enum HorizontalAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+impl Clone for HorizontalAlignment {
+    fn clone(&self) -> Self {
+        match self {
+            HorizontalAlignment::Left => HorizontalAlignment::Left,
+            HorizontalAlignment::Center => HorizontalAlignment::Center,
+            HorizontalAlignment::Right => HorizontalAlignment::Right,
+        }
+    }
+}   
+
+pub struct VerticalStack {
+    pub entity: EntityID,
+    //List of entity ids
+    pub elements: Vec<EntityID>,
+    pub horizontal_alignment: HorizontalAlignment
+}
+
+impl Clone for VerticalStack {
+    fn clone(&self) -> Self {
+        VerticalStack {
+            entity: self.entity,
+            elements: self.elements.clone(),
+            horizontal_alignment: self.horizontal_alignment.clone()
+        }
+    }
+}
+
+impl Entity for VerticalStack {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::VerticalStackShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+    
+pub enum VerticalAlignment {
+    Top,
+    Center,
+    Bottom,
+}
+
+impl Clone for VerticalAlignment {
+    fn clone(&self) -> Self {
+        match self {
+            VerticalAlignment::Top => VerticalAlignment::Top,
+            VerticalAlignment::Center => VerticalAlignment::Center,
+            VerticalAlignment::Bottom => VerticalAlignment::Bottom,
+        }
+    }
+}   
+impl fmt::Display for VerticalAlignment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerticalAlignment::Top => write!(f, "Top"),
+            VerticalAlignment::Center => write!(f, "Center"),
+            VerticalAlignment::Bottom => write!(f, "Bottom"),
+        }
+    }
+}
+//enum for horizontal stack
+
+pub struct HorizontalStack {
+    pub entity: EntityID,
+    //List of entity ids
+    pub elements: Vec<EntityID>,
+    pub vertical_alignment: VerticalAlignment, // Optional vertical alignment (e.g., "top", "center", "bottom")
+}
+
+impl Clone for HorizontalStack {
+    fn clone(&self) -> Self {
+        HorizontalStack {
+            entity: self.entity,
+            elements: self.elements.clone(),
+            vertical_alignment: self.vertical_alignment.clone(),
+        }
+    }
+}
+
+impl Entity for HorizontalStack {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::HorizontalStackShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+pub struct ShapeLine {
+    pub entity: EntityID,
+    pub start: (Float, Float),
+    pub end: (Float, Float),
+    pub line_options: LineOptions,
+}
+
+impl Clone for ShapeLine {
+    fn clone(&self) -> Self {
+        ShapeLine {
+            entity: self.entity,
+            start: self.start,
+            end: self.end,
+            line_options: self.line_options.clone(),
+        }
+    }
+}
+
+impl ShapeLine {
+    pub fn new(line_id: EntityID, start: (Float, Float), end: (Float, Float), options: LineOptions) -> ShapeLine {
+        ShapeLine {
+            entity: line_id,
+            start,
+            end,
+            line_options: options,
+        }
+    }
+}
+
+
+impl Entity for ShapeLine {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::LineShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[derive(Default)]
+pub struct LineOptions {
+    pub stroke_color: String,
+    pub stroke_width: Float,
+}
+
+impl Clone for LineOptions {
+    fn clone(&self) -> Self {
+        LineOptions {
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+        }
+    }
+}
+
+impl LineOptions {
+    pub fn new() -> LineOptions {
+        LineOptions {
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+        }
+    }
+}
+
+pub struct PolyLine {
+    pub entity: EntityID,
+    pub points: Vec<(Float, Float)>,
+    pub line_options: LineOptions,
+}
+
+impl PolyLine {
+    pub fn new(entity: EntityID, points: Vec<(Float, Float)>, line_options: LineOptions) -> PolyLine {
+        PolyLine {
+            entity,
+            points,
+            line_options,
+        }
+    }
+}
+
+impl Entity for PolyLine {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::PolyLine
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Clone for PolyLine {
+    fn clone(&self) -> Self {
+        PolyLine {
+            entity: self.entity,
+            points: self.points.clone(),
+            line_options: self.line_options.clone(),
+        }
+    }
+}
+
+pub struct ShapeArrow {
+    pub entity: EntityID,
+    pub start: (Float, Float),
+    pub end: (Float, Float),
+    pub arrow_options: ArrowOptions,
+}
+
+impl Clone for ShapeArrow {
+    fn clone(&self) -> Self {
+        ShapeArrow {
+            entity: self.entity,
+            start: self.start,
+            end: self.end,
+            arrow_options: self.arrow_options.clone(),
+        }
+    }
+}
+
+impl Entity for ShapeArrow {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ArrowShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[derive(Default)]
+pub struct ArrowOptions {
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub arrow_size: Float,
+}
+
+impl Clone for ArrowOptions {
+    fn clone(&self) -> Self {
+        ArrowOptions {
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            arrow_size: self.arrow_size,
+        }
+    }
+}
+
+impl ArrowOptions {
+    pub fn new() -> ArrowOptions {
+        ArrowOptions {
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            arrow_size: 10.0,
+        }
+    }
+}
+
+pub struct ShapeEllipse {
+    pub entity: EntityID,
+    pub center: (Float, Float),
+    pub radius: (Float, Float),
+    pub ellipse_options: EllipseOptions,
+}
+
+impl Clone for ShapeEllipse {
+    fn clone(&self) -> Self {
+        ShapeEllipse {
+            entity: self.entity,
+            center: self.center,
+            radius: self.radius,
+            ellipse_options: self.ellipse_options.clone(),
+        }
+    }
+}
+
+impl ShapeEllipse {
+    pub fn new(entity: EntityID, center: (Float, Float), radius: (Float, Float), ellipse_options: EllipseOptions) -> ShapeEllipse {
+        ShapeEllipse {
+            entity,
+            center,
+            radius,
+            ellipse_options,
+        }
+    }
+}
+
+impl Entity for ShapeEllipse {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::EllipseShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[derive(Default)]
+pub struct EllipseOptions {
+    //TODO: convert to Fill
+    pub fill_color: String,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+}
+
+impl Clone for EllipseOptions {
+    fn clone(&self) -> Self {
+        EllipseOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+        }
+    }
+}
+
+impl EllipseOptions {
+    pub fn new() -> EllipseOptions {
+        EllipseOptions {
+            fill_color: String::from("white"),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+        }
+    }
+}
+
+
+
+pub struct ShapeImage {
+    pub entity: EntityID,
+    //base64 encoded image or empty if using file_path
+    pub image: String,
+    //path to image file on disk (optional)
+    pub file_path: Option<String>,
+    pub preferred_size: (Float, Float),
+}
+
+impl Clone for ShapeImage {
+    fn clone(&self) -> Self {
+        ShapeImage {
+            entity: self.entity,
+            image: self.image.clone(),
+            file_path: self.file_path.clone(),
+            preferred_size: self.preferred_size,
+        }
+    }
+}
+
+impl Entity for ShapeImage {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ImageShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ShapeImage {
+    pub fn new(entity: EntityID, image: String, preferred_size: (Float, Float)) -> ShapeImage {
+        ShapeImage {
+            entity,
+            image,
+            file_path: None,
+            preferred_size,
+        }
+    }
+    
+    pub fn from_file(entity: EntityID, file_path: String, preferred_size: (Float, Float)) -> ShapeImage {
+        ShapeImage {
+            entity,
+            image: String::new(), // Empty as we're using file_path instead
+            file_path: Some(file_path),
+            preferred_size,
+        }
+    }
+}
+
+/// A container that allows children to be positioned with absolute coordinates
+/// Children's positions are relative to the container's top-left corner
+pub struct FreeContainer {
+    pub entity: EntityID,
+    pub children: Vec<(EntityID, (Float, Float))>, // Each child has a position relative to the container
+    pub background_color: Option<String>,      // Optional background color
+    pub border_color: Option<String>,          // Optional border color
+    pub border_width: Float,                    // Border width (0 for no border)
+}
+
+impl Clone for FreeContainer {
+    fn clone(&self) -> Self {
+        FreeContainer {
+            entity: self.entity,
+            children: self.children.clone(),
+            background_color: self.background_color.clone(),
+            border_color: self.border_color.clone(),
+            border_width: self.border_width,
+        }
+    }
+}
+
+impl Entity for FreeContainer {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::FreeContainer
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl FreeContainer {
+    /// Create a new empty FreeContainer
+    pub fn new(entity: EntityID) -> Self {
+        FreeContainer {
+            entity,
+            children: Vec::new(),
+            background_color: None,
+            border_color: None,
+            border_width: 0.0,
+        }
+    }
+    
+    /// Add a child to the container at the specified position
+    pub fn add_child(&mut self, child_id: EntityID, position: (Float, Float)) {
+        self.children.push((child_id, position));
+    }
+    
+    /// Add multiple children at once with their positions
+    pub fn with_children(mut self, children_with_positions: Vec<(EntityID, (Float, Float))>) -> Self {
+        self.children.extend(children_with_positions);
+        self
+    }
+    
+    /// Set background color
+    pub fn with_background_color(mut self, color: &str) -> Self {
+        self.background_color = Some(color.to_string());
+        self
+    }
+    
+    /// Set border properties
+    pub fn with_border(mut self, color: &str, width: Float) -> Self {
+        self.border_color = Some(color.to_string());
+        self.border_width = width;
+        self
+    }
+}
+
+===/src/components/table.rs===
+
+//use EntityID
+use crate::components::*;
+
+
+pub struct TableOptions {
+    pub fill_color: String,
+    pub header_fill_color: String,
+    pub border_color: String,
+    pub border_width: usize,
+    pub cell_padding: usize,
+}
+
+/* A table contains a list of rows, each row has a cell 
+* which is a group that contains other elements.
+
+Tables are defined with an array of cells and the number of columns
+*/
+pub struct Table {
+    pub entity: EntityID,
+    pub cols: usize, 
+    pub cells: Vec<EntityID>,
+    pub col_lines: Vec<EntityID>,
+    pub row_lines: Vec<EntityID>,
+    pub header_rect: EntityID,
+    pub table_options: TableOptions,
+}
+
+//new
+
+
+impl Clone for Table {
+    fn clone(&self) -> Self {
+        Table {
+            entity: self.entity,
+            cols: self.cols,
+            cells: self.cells.clone(),
+            col_lines: self.col_lines.clone(),
+            row_lines: self.row_lines.clone(),
+            table_options: self.table_options.clone(),
+            header_rect: self.header_rect,
+        }
+    }
+}
+
+//constructor that receives only the table options
+impl Table {
+    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, header_rect: EntityID, table_options: TableOptions) -> Table {
+        Table {
+            entity,
+            cols,
+            cells,
+            col_lines,
+            row_lines ,
+            header_rect, 
+            table_options,
+        }
+    }
+}
+
+impl Entity for Table {
+    fn get_id(&self) -> EntityID {
+        self.entity
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::TableShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+
+
+
+//defaults
+impl Default for TableOptions {
+    fn default() -> Self {
+        TableOptions {
+            fill_color: String::from("white"),
+            border_color: String::from("black"),
+            header_fill_color: String::from("lightgray"),
+            border_width: 1,
+            cell_padding: 20,
+        }
+    }
+}
+
+impl Clone for TableOptions {
+    fn clone(&self) -> Self {
+        TableOptions {
+            fill_color: self.fill_color.clone(),
+            header_fill_color: self.header_fill_color.clone(),
+            border_color: self.border_color.clone(),
+            border_width: self.border_width,
+            cell_padding: self.cell_padding,
+        }
+    }
+}
+
+===/src/renderer_base.rs===
+use std::{error::Error, fmt, io::Write};
+
+use crate::{DiagramBuilder, diagram_builder::DiagramTreeNode};
+
+#[derive(Debug)]
+pub struct RendererError {
+    message: String,
+}
+
+impl RendererError {
+    pub fn new(message: &str) -> RendererError {
+        RendererError {
+            message: message.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for RendererError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl Error for RendererError {}
+
+pub trait Renderer<W: Write> {
+    fn render(
+        &self,
+        session: &DiagramBuilder,
+        diagram_node: &DiagramTreeNode,
+        stream: &mut W,
+    ) -> Result<(), RendererError>;
+}
+
+===/src/parser.rs===
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
+
+use crate::{components::*, DiagramBuilder, diagram_builder::*};
+
+/// A JSON Lines entity representing a single diagram element
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonEntity {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub entity_type: String,
+
+    // Common attributes (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<String>>,
+
+    // Text-specific attributes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_size: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_family: Option<String>,
+
+    // Box/Rectangle attributes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub padding: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_width: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_radius: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<Float>,
+
+    // Position attributes (for free containers)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<Float>,
+
+    // Image attributes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub src: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+
+    // Table attributes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cols: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header_fill_color: Option<String>,
+
+    // Line/Polyline attributes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stroke_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stroke_width: Option<Float>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_point: Option<(Float, Float)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_point: Option<(Float, Float)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub points: Option<Vec<(Float, Float)>>,
+
+    // Ellipse attributes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub center: Option<(Float, Float)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius: Option<(Float, Float)>,
+
+    // Catch-all for any other attributes
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// Parser for JSON Lines diagram format
+pub struct JsonLinesParser {
+    entities: HashMap<String, JsonEntity>,
+}
+
+impl JsonLinesParser {
+    pub fn new() -> Self {
+        Self {
+            entities: HashMap::new(),
+        }
+    }
+
+    /// Parse from a string containing JSON Lines
+    pub fn parse_string(&mut self, input: &str) -> Result<String, JsonLinesError> {
+        let mut root_id = None;
+
+        for (line_num, line) in input.lines().enumerate() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            match serde_json::from_str::<JsonEntity>(line) {
+                Ok(entity) => {
+                    if root_id.is_none() {
+                        root_id = Some(entity.id.clone());
+                    }
+                    self.entities.insert(entity.id.clone(), entity);
+                }
+                Err(e) => {
+                    return Err(JsonLinesError::ParseError {
+                        line: line_num + 1,
+                        message: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        root_id.ok_or(JsonLinesError::NoEntities)
+    }
+
+    /// Parse from a file
+    pub fn parse_file(&mut self, file_path: &str) -> Result<String, JsonLinesError> {
+        let file = File::open(file_path).map_err(|e| JsonLinesError::IoError(e.to_string()))?;
+        let reader = BufReader::new(file);
+        let mut root_id = None;
+
+        for (line_num, line_result) in reader.lines().enumerate() {
+            let line = line_result.map_err(|e| JsonLinesError::IoError(e.to_string()))?;
+            let line = line.trim();
+
+            if line.is_empty() {
+                continue;
+            }
+
+            match serde_json::from_str::<JsonEntity>(&line) {
+                Ok(entity) => {
+                    if root_id.is_none() {
+                        root_id = Some(entity.id.clone());
+                    }
+                    self.entities.insert(entity.id.clone(), entity);
+                }
+                Err(e) => {
+                    return Err(JsonLinesError::ParseError {
+                        line: line_num + 1,
+                        message: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        root_id.ok_or(JsonLinesError::NoEntities)
+    }
+
+    /// Parse from an iterator of lines (useful for streaming)
+    pub fn parse_lines<I>(&mut self, lines: I) -> Result<String, JsonLinesError>
+    where
+        I: IntoIterator<Item = String>,
+    {
+        let mut root_id = None;
+
+        for (line_num, line) in lines.into_iter().enumerate() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            match serde_json::from_str::<JsonEntity>(line) {
+                Ok(entity) => {
+                    if root_id.is_none() {
+                        root_id = Some(entity.id.clone());
+                    }
+                    self.entities.insert(entity.id.clone(), entity);
+                }
+                Err(e) => {
+                    return Err(JsonLinesError::ParseError {
+                        line: line_num + 1,
+                        message: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        root_id.ok_or(JsonLinesError::NoEntities)
+    }
+
+    /// Build the diagram tree from parsed entities
+    pub fn build(
+        &self,
+        root_id: &str,
+        builder: &mut DiagramBuilder,
+    ) -> Result<DiagramTreeNode, JsonLinesError> {
+        self.build_entity(root_id, builder)
+    }
+
+    fn build_entity(
+        &self,
+        entity_id: &str,
+        builder: &mut DiagramBuilder,
+    ) -> Result<DiagramTreeNode, JsonLinesError> {
+        let entity = self
+            .entities
+            .get(entity_id)
+            .ok_or_else(|| JsonLinesError::EntityNotFound(entity_id.to_string()))?;
+
+        match entity.entity_type.as_str() {
+            "text" => {
+                let content = entity
+                    .content
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("content".to_string()))?;
+
+                let options = TextOptions {
+                    font_size: entity.font_size.unwrap_or(12.0),
+                    text_color: entity.color.clone().unwrap_or_else(|| "black".to_string()),
+                    font_family: entity
+                        .font_family
+                        .clone()
+                        .unwrap_or_else(|| "Arial".to_string()),
+                    ..Default::default()
+                };
+
+                Ok(builder.new_text(content, options))
+            }
+
+            "box" => {
+                let children = entity
+                    .children
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
+
+                if children.len() != 1 {
+                    return Err(JsonLinesError::InvalidStructure(
+                        "Box must have exactly one child".to_string(),
+                    ));
+                }
+
+                let child = self.build_entity(&children[0], builder)?;
+                let options = BoxOptions {
+                    padding: entity.padding.unwrap_or(0.0),
+                    fill_color: entity
+                        .background
+                        .as_ref()
+                        .map(|bg| Fill::Color(bg.clone()))
+                        .unwrap_or(Fill::Color("white".to_string())),
+                    stroke_color: entity
+                        .border_color
+                        .clone()
+                        .unwrap_or_else(|| "black".to_string()),
+                    stroke_width: entity.border_width.unwrap_or(1.0),
+                    border_radius: entity.border_radius.unwrap_or(0.0),
+                };
+
+                Ok(builder.new_box(child, options))
+            }
+
+            "vstack" => {
+                
+                let halign = entity
+                    .extra
+                    .get("h-align")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "left" => Some(HorizontalAlignment::Left),
+                        "center" => Some(HorizontalAlignment::Center),
+                        "right" => Some(HorizontalAlignment::Right),
+                        _ => None,
+                    })
+                    .unwrap_or(HorizontalAlignment::Center);
+
+                let children = entity
+                    .children
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
+
+                let child_nodes: Result<Vec<_>, _> = children
+                    .iter()
+                    .map(|child_id| self.build_entity(child_id, builder))
+                    .collect();
+
+                Ok(builder.new_vstack(child_nodes?, halign))
+            }
+
+            "hstack" => {
+                let valign = entity
+                    .extra
+                    .get("v-align")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "top" => Some(VerticalAlignment::Top),
+                        "center" => Some(VerticalAlignment::Center),
+                        "bottom" => Some(VerticalAlignment::Bottom),
+                        _ => None,
+                    })
+                    .unwrap_or(VerticalAlignment::Center);
+                let children = entity
+                    .children
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
+
+                let child_nodes: Result<Vec<_>, _> = children
+                    .iter()
+                    .map(|child_id| self.build_entity(child_id, builder))
+                    .collect();
+
+                Ok(builder.new_hstack(child_nodes?,valign ))
+            }
+
+            "group" => {
+                let children = entity
+                    .children
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
+
+                let child_nodes: Result<Vec<_>, _> = children
+                    .iter()
+                    .map(|child_id| self.build_entity(child_id, builder))
+                    .collect();
+
+                Ok(builder.new_group(child_nodes?))
+            }
+
+            "rect" => {
+                let options = RectOptions {
+                    width: entity.width.unwrap_or(100.0),
+                    height: entity.height.unwrap_or(100.0),
+                    fill_color: entity
+                        .background
+                        .as_ref()
+                        .map(|bg| Fill::Color(bg.clone()))
+                        .unwrap_or(Fill::Color("white".to_string())),
+                    stroke_color: entity
+                        .border_color
+                        .clone()
+                        .unwrap_or_else(|| "black".to_string()),
+                    stroke_width: entity.border_width.unwrap_or(1.0),
+                    ..Default::default()
+                };
+
+                Ok(builder.new_rectangle(options))
+            }
+
+            "line" => {
+                let options = LineOptions {
+                    stroke_color: entity
+                        .stroke_color
+                        .clone()
+                        .unwrap_or_else(|| "black".to_string()),
+                    stroke_width: entity.stroke_width.unwrap_or(1.0),
+                    ..Default::default()
+                };
+
+                Ok(builder.new_line(entity.start_point.unwrap_or((0.0, 0.0)), entity.end_point.unwrap_or((0.0, 0.0)), options))
+            }
+
+            "ellipse" => {
+                let center = entity.center.unwrap_or((50.0, 50.0));
+                let radius = entity.radius.unwrap_or((25.0, 25.0));
+                let options = EllipseOptions {
+                    fill_color: entity
+                        .background.clone()
+                        .unwrap_or_else(|| "white".to_string()),
+                    stroke_color: entity
+                        .border_color
+                        .clone()
+                        .unwrap_or_else(|| "black".to_string()),
+                    stroke_width: entity.border_width.unwrap_or(1.0),
+                    ..Default::default()
+                };
+
+                Ok(builder.new_elipse(center, radius, options))
+            }
+
+            "image" => {
+                let size = (
+                    entity.width.unwrap_or(100.0),
+                    entity.height.unwrap_or(100.0),
+                );
+
+                if let Some(src) = &entity.src {
+                    Ok(builder.new_image(src, size))
+                } else if let Some(file_path) = &entity.file_path {
+                    Ok(builder.new_image_from_file(file_path, size))
+                } else {
+                    Err(JsonLinesError::MissingAttribute(
+                        "src or file_path".to_string(),
+                    ))
+                }
+            }
+
+            "table" => {
+                let children = entity
+                    .children
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
+                let cols = entity
+                    .cols
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("cols".to_string()))?;
+
+                let child_nodes: Result<Vec<_>, _> = children
+                    .iter()
+                    .map(|child_id| self.build_entity(child_id, builder))
+                    .collect();
+
+                let options = TableOptions {
+                    header_fill_color: entity
+                        .header_fill_color
+                        .clone()
+                        .unwrap_or_else(|| "lightgray".to_string()),
+                    ..Default::default()
+                };
+
+                Ok(builder.new_table(child_nodes?, cols, options))
+            }
+
+            "polyline" => {
+                let points = entity
+                    .points
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("points".to_string()))?;
+
+                let options = LineOptions {
+                    stroke_color: entity
+                        .stroke_color
+                        .clone()
+                        .unwrap_or_else(|| "black".to_string()),
+                    stroke_width: entity.stroke_width.unwrap_or(1.0),
+                    ..Default::default()
+                };
+
+                Ok(builder.new_polyline(points.clone(), options))
+            }
+
+            "free_container" => {
+                let children = entity
+                    .children
+                    .as_ref()
+                    .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
+
+                let mut positioned_children = Vec::new();
+                for child_id in children {
+                    let child_entity = self
+                        .entities
+                        .get(child_id)
+                        .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
+
+                    let child_node = self.build_entity(child_id, builder)?;
+                    let position = (child_entity.x.unwrap_or(0.0), child_entity.y.unwrap_or(0.0));
+                    positioned_children.push((child_node, position));
+                }
+
+                Ok(builder.new_free_container_with_children(positioned_children))
+            }
+
+            _ => Err(JsonLinesError::UnknownEntityType(
+                entity.entity_type.clone(),
+            )),
+        }
+    }
+
+    /// Validate that all child references exist
+    pub fn validate(&self) -> Result<(), JsonLinesError> {
+        for (id, entity) in &self.entities {
+            if let Some(children) = &entity.children {
+                for child_id in children {
+                    if !self.entities.contains_key(child_id) {
+                        return Err(JsonLinesError::MissingChild {
+                            parent: id.clone(),
+                            child: child_id.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Get all entity IDs
+    pub fn get_entity_ids(&self) -> Vec<&String> {
+        self.entities.keys().collect()
+    }
+}
+
+/// Builder for creating JSON Lines diagrams
+pub struct JsonLinesBuilder {
+    entities: Vec<JsonEntity>,
+    id_counter: usize,
+}
+
+impl JsonLinesBuilder {
+    pub fn new() -> Self {
+        Self {
+            entities: Vec::new(),
+            id_counter: 0,
+        }
+    }
+
+    pub fn next_id(&mut self) -> String {
+        self.id_counter += 1;
+        format!("e{}", self.id_counter)
+    }
+
+    pub fn text(&mut self, content: &str) -> String {
+        let id = self.next_id();
+        self.entities.push(JsonEntity {
+            id: id.clone(),
+            entity_type: "text".to_string(),
+            content: Some(content.to_string()),
+            ..Default::default()
+        });
+        id
+    }
+
+    pub fn text_styled(&mut self, content: &str, font_size: Float, color: &str) -> String {
+        let id = self.next_id();
+        self.entities.push(JsonEntity {
+            id: id.clone(),
+            entity_type: "text".to_string(),
+            content: Some(content.to_string()),
+            font_size: Some(font_size),
+            color: Some(color.to_string()),
+            ..Default::default()
+        });
+        id
+    }
+
+    pub fn box_with(&mut self, child: String, padding: Float, background: &str) -> String {
+        let id = self.next_id();
+        self.entities.push(JsonEntity {
+            id: id.clone(),
+            entity_type: "box".to_string(),
+            children: Some(vec![child]),
+            padding: Some(padding),
+            background: Some(background.to_string()),
+            ..Default::default()
+        });
+        id
+    }
+
+    pub fn vstack(&mut self, children: Vec<String>) -> String {
+        let id = self.next_id();
+        self.entities.push(JsonEntity {
+            id: id.clone(),
+            entity_type: "vstack".to_string(),
+            children: Some(children),
+            ..Default::default()
+        });
+        id
+    }
+
+    pub fn hstack(&mut self, children: Vec<String>) -> String {
+        let id = self.next_id();
+        self.entities.push(JsonEntity {
+            id: id.clone(),
+            entity_type: "hstack".to_string(),
+            children: Some(children),
+            ..Default::default()
+        });
+        id
+    }
+
+    pub fn rect(&mut self, width: Float, height: Float, color: &str) -> String {
+        let id = self.next_id();
+        self.entities.push(JsonEntity {
+            id: id.clone(),
+            entity_type: "rect".to_string(),
+            width: Some(width),
+            height: Some(height),
+            background: Some(color.to_string()),
+            ..Default::default()
+        });
+        id
+    }
+
+    /// Build and return the JSON Lines string
+    pub fn build(&self) -> Result<String, serde_json::Error> {
+        let mut lines = Vec::new();
+        for entity in &self.entities {
+            lines.push(serde_json::to_string(entity)?);
+        }
+        Ok(lines.join("\n"))
+    }
+
+    /// Write to a file
+    pub fn write_to_file(&self, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = File::create(file_path)?;
+        for entity in &self.entities {
+            writeln!(file, "{}", serde_json::to_string(entity)?)?;
+        }
+        Ok(())
+    }
+
+    /// Get the root entity ID (first entity)
+    pub fn root_id(&self) -> Option<String> {
+        self.entities.first().map(|e| e.id.clone())
+    }
+}
+
+impl Default for JsonEntity {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            entity_type: String::new(),
+            children: None,
+            content: None,
+            font_size: None,
+            color: None,
+            font_family: None,
+            padding: None,
+            background: None,
+            border_color: None,
+            border_width: None,
+            border_radius: None,
+            width: None,
+            height: None,
+            x: None,
+            y: None,
+            src: None,
+            file_path: None,
+            cols: None,
+            header_fill_color: None,
+            stroke_color: None,
+            stroke_width: None,
+            start_point: None,
+            end_point: None,
+            points: None,
+            center: None,
+            radius: None,
+            extra: Map::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum JsonLinesError {
+    ParseError { line: usize, message: String },
+    EntityNotFound(String),
+    MissingAttribute(String),
+    InvalidStructure(String),
+    UnknownEntityType(String),
+    MissingChild { parent: String, child: String },
+    NoEntities,
+    IoError(String),
+}
+
+impl std::fmt::Display for JsonLinesError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JsonLinesError::ParseError { line, message } => {
+                write!(f, "Parse error on line {}: {}", line, message)
+            }
+            JsonLinesError::EntityNotFound(id) => write!(f, "Entity not found: {}", id),
+            JsonLinesError::MissingAttribute(attr) => {
+                write!(f, "Missing required attribute: {}", attr)
+            }
+            JsonLinesError::InvalidStructure(msg) => write!(f, "Invalid structure: {}", msg),
+            JsonLinesError::UnknownEntityType(t) => write!(f, "Unknown entity type: {}", t),
+            JsonLinesError::MissingChild { parent, child } => {
+                write!(f, "Parent {} references missing child {}", parent, child)
+            }
+            JsonLinesError::NoEntities => write!(f, "No entities found"),
+            JsonLinesError::IoError(msg) => write!(f, "IO error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for JsonLinesError {}
+
+#[cfg(test)]
+mod tests {
+    use crate::DiagramBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_json_lines_parsing() {
+        let input = r#"
+{"id":"root","type":"box","padding":10,"background":"white","children":["text1"]}
+{"id":"text1","type":"text","content":"Hello World","font_size":16,"color":"blue"}
+"#;
+
+        let mut parser = JsonLinesParser::new();
+        let root_id = parser.parse_string(input).unwrap();
+        assert_eq!(root_id, "root");
+
+        parser.validate().unwrap();
+
+        let mut builder = DiagramBuilder::new();
+        let _diagram = parser.build(&root_id, &mut builder).unwrap();
+    }
+
+    #[test]
+    fn test_builder_api() {
+        let mut builder = JsonLinesBuilder::new();
+
+        let title = builder.text_styled("Document Title", 18.0, "blue");
+        let left_text = builder.text("Left Panel");
+        let right_text = builder.text("Right Panel");
+
+        let left_box = builder.box_with(left_text, 10.0, "lightblue");
+        let right_box = builder.box_with(right_text, 10.0, "lightgreen");
+
+        let content = builder.hstack(vec![left_box, right_box]);
+        let footer = builder.text_styled("Footer", 12.0, "gray");
+
+        let _root = builder.vstack(vec![title, content, footer]);
+
+        let jsonl = builder.build().unwrap();
+        println!("Generated JSON Lines:\n{}", jsonl);
+
+        // Parse it back to verify
+        let mut parser = JsonLinesParser::new();
+        let root_id = parser.parse_string(&jsonl).unwrap();
+        parser.validate().unwrap();
+    }
+
+    #[test]
+    fn test_streaming_parse() {
+        let lines = vec![
+            r#"{"id":"e1","type":"text","content":"Hello"}"#.to_string(),
+            r#"{"id":"e2","type":"text","content":"World"}"#.to_string(),
+            r#"{"id":"e3","type":"hstack","children":["e1","e2"]}"#.to_string(),
+        ];
+
+        let mut parser = JsonLinesParser::new();
+        let root_id = parser.parse_lines(lines).unwrap();
+        assert_eq!(root_id, "e1");
+        parser.validate().unwrap();
+    }
+
+    #[test]
+    fn test_file_operations() {
+        let mut builder = JsonLinesBuilder::new();
+        let text = builder.text("Test");
+        let root = builder.box_with(text, 5.0, "white");
+
+        // Write to file
+        builder.write_to_file("test_diagram.jsonl").unwrap();
+
+        // Read back
+        let mut parser = JsonLinesParser::new();
+        let root_id = parser.parse_file("test_diagram.jsonl").unwrap();
+        parser.validate().unwrap();
+
+        // Clean up
+        std::fs::remove_file("test_diagram.jsonl").ok();
+    }
+}
+
+// Example of what an LLM might generate
+pub fn example_llm_generated_jsonl() -> &'static str {
+    r#"{"id":"document","type":"box","padding":20,"background":"white","border_color":"gray","children":["layout"]}
+{"id":"layout","type":"vstack","children":["header","body","footer"]}
+{"id":"header","type":"text","content":"My Document","font_size":24,"color":"darkblue"}
+{"id":"body","type":"hstack","children":["sidebar","main"]}
+{"id":"sidebar","type":"box","padding":15,"background":"lightgray","children":["nav"]}
+{"id":"nav","type":"vstack","children":["link1","link2","link3"]}
+{"id":"link1","type":"text","content":"Home","color":"blue"}
+{"id":"link2","type":"text","content":"About","color":"blue"}
+{"id":"link3","type":"text","content":"Contact","color":"blue"}
+{"id":"main","type":"box","padding":15,"background":"white","children":["content"]}
+{"id":"content","type":"vstack","children":["article_title","article_body"]}
+{"id":"article_title","type":"text","content":"Article Title","font_size":18}
+{"id":"article_body","type":"text","content":"This is the main content of the article..."}
+{"id":"footer","type":"text","content":"Copyright 2024","font_size":10,"color":"gray"}"#
+}
+
+===/src/utils.rs===
+use crate::components::*;
+// Returns the entity type given its id.
+pub fn get_entity_type_from_id(entity_id: EntityID) -> EntityType {
+    match (entity_id >> 32) as u8 {
+        0 => EntityType::GroupShape,
+        1 => EntityType::HorizontalStackShape,
+        2 => EntityType::VerticalStackShape,
+        3 => EntityType::TextShape,
+        4 => EntityType::LineShape,
+        5 => EntityType::ArrowShape,
+        _ => EntityType::GroupShape,
+    }
+}
+===/src/diagram_builder.rs===
+use std::collections::HashMap;
+
+/**
+ * This object encapsulates diagram creation logic.
+ * Usage:
+ *```rust
+ * let builder = DiagramBuilder::new();
+ * let group = builder.new_group(
+ *   builder.new_box(builder.new_text("Hello World!"), BoxOptions{fill_color: "white".to_string(), stroke_color: "black".to_string(), stroke_width: 1.0, padding: 10.0, round_corners: false, border_radius: 0.0}),
+ * );
+ *
+ *
+ *
+ */
+//use TextOptions
+use crate::components::*;
+
+pub struct DiagramBuilder {
+    pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
+    pub entities: Vec<EntityID>,
+    pub positions: HashMap<EntityID, Point>,
+    pub sizes: HashMap<EntityID, Size>,
+    entity_id_counter: usize,
+
+    // Components
+    boxes: HashMap<EntityID, ShapeBox>,
+    rectangles: HashMap<EntityID, ShapeRect>,
+    groups: HashMap<EntityID, ShapeGroup>,
+    texts: HashMap<EntityID, ShapeText>,
+    textlines: HashMap<EntityID, TextLine>,
+    horizontal_stacks: HashMap<EntityID, HorizontalStack>,
+    vertical_stacks: HashMap<EntityID, VerticalStack>,
+    ellipses: HashMap<EntityID, ShapeEllipse>,
+    lines: HashMap<EntityID, ShapeLine>,
+    arrows: HashMap<EntityID, ShapeArrow>,
+    tables: HashMap<EntityID, Table>,
+    images: HashMap<EntityID, ShapeImage>,
+    polylines: HashMap<EntityID, PolyLine>,
+    free_containers: HashMap<EntityID, FreeContainer>,
+}
+
+// Stores the type of entity and the index of the entity in the corresponding vector
+// Used when building the diagram tree.
+#[derive(Debug, Clone)]
+pub struct DiagramTreeNode {
+    pub entity_type: EntityType,
+    // Index of the entity in the corresponding vector
+    pub entity_id: EntityID,
+    pub children: Vec<Box<DiagramTreeNode>>,
+}
+
+impl DiagramTreeNode {
+    fn new(entity_type: EntityType, id: EntityID) -> DiagramTreeNode {
+        DiagramTreeNode {
+            entity_type,
+            entity_id: id,
+            children: Vec::new(),
+        }
+    }
+
+    fn add_child(&mut self, child: DiagramTreeNode) {
+        self.children.push(Box::new(child));
+    }
+}
+
+/* New architecture (data driven)
+ * We have an array of entities, each entity is an id
+ * The id has 64 bits, we can use 32 bits for the type and 32 bits for the index
+ * To get the type: id >> 32
+ * To get the index: id & 0xFFFFFFFF
+ * We have a type enum with all the types
+*/
+
+impl DiagramBuilder {
+    pub fn new() -> DiagramBuilder {
+        DiagramBuilder {
+            entity_id_counter: 0,
+            measure_text: Some(|_text, _text_options| (0.0, 0.0)),
+            entities: Vec::new(),
+            positions: HashMap::new(),
+            sizes: HashMap::new(),
+            boxes: HashMap::new(),
+            rectangles: HashMap::new(),
+            groups: HashMap::new(),
+            texts: HashMap::new(),
+            textlines: HashMap::new(),
+            horizontal_stacks: HashMap::new(),
+            vertical_stacks: HashMap::new(),
+            ellipses: HashMap::new(),
+            lines: HashMap::new(),
+            arrows: HashMap::new(),
+            tables: HashMap::new(),
+            images: HashMap::new(),
+            polylines: HashMap::new(),
+            free_containers: HashMap::new(),
+        }
+    }
+
+    /* Create a new entity of a given type
+     * Returns the id of the new entity
+     * We have another array with the positions of the entities
+     * in the same index. So they are fast to access
+     */
+    pub fn new_entity(&mut self, entity_type: EntityType) -> EntityID {
+        self.entity_id_counter += 1;
+        let id = self.entity_id_counter;
+        println!("Creating new entity with id {}", id);
+        self.entities.push(id);
+        self.positions.insert(id, Point::new(0.0, 0.0));
+        self.sizes.insert(id, Size::new(0.0, 0.0));
+        id
+    }
+
+    pub fn clear_cache(&mut self) {
+        //clear entities vector
+        self.entities = Vec::new();
+        self.positions = HashMap::new();
+        self.sizes = HashMap::new();
+    }
+
+    //set the measure_text function
+    pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (Float, Float)) {
+        println!("Setting measure text function");
+        self.measure_text = Option::Some(measure_text);
+    }
+
+    //get the position of an entity
+    pub fn get_position(&self, entity_id: EntityID) -> (Float, Float) {
+        let pos = self.positions.get(&entity_id).unwrap();
+        (pos.x, pos.y)
+    }
+
+    pub fn set_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
+        println!("Setting position of entity {} to ({}, {})", entity_id, x, y);
+        let pos = self.positions.get_mut(&entity_id).unwrap();
+        pos.x = x;
+        pos.y = y;
+    }
+
+    //get the size of an entity
+    pub fn get_size(&self, entity_id: EntityID) -> (Float, Float) {
+        let size = self.sizes.get(&entity_id).unwrap();
+        (size.w, size.h)
+    }
+
+    pub fn set_size(&mut self, entity_id: EntityID, width: Float, height: Float) {
+        let size = self.sizes.get_mut(&entity_id).unwrap();
+        size.w = width;
+        size.h = height;
+    }
+
+    /**
+     * Architecture note:
+     * the new_element methods should only create the necessary elements
+     * without calculating the position and size.
+     * That will be done in the layout layer.
+     */
+
+    // Wraps an element in a box
+    pub fn new_box(&mut self, child: DiagramTreeNode, options: BoxOptions) -> DiagramTreeNode {
+        let box_id = self.new_entity(EntityType::BoxShape);
+
+        let sbox = ShapeBox::new(box_id, child.entity_id, options);
+        self.boxes.insert(box_id, sbox);
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::BoxShape,
+            entity_id: box_id,
+            children: Vec::new(),
+        };
+        node.children.push(Box::new(child.clone()));
+        node
+    }
+
+    // Creates a new Vertical stack.
+    pub fn new_vstack(&mut self,
+         children: Vec<DiagramTreeNode>,
+        horizontal_alignment: HorizontalAlignment,
+        ) -> DiagramTreeNode {
+        let stack_id = self.new_entity(EntityType::VerticalStackShape);
+        let mut vstack = VerticalStack {
+            entity: stack_id,
+            elements: Vec::new(),
+            horizontal_alignment
+        };
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::VerticalStackShape,
+            entity_id: stack_id,
+            children: Vec::new(),
+        };
+
+        //set children
+        for child in children {
+            vstack.elements.push(child.entity_id);
+            node.add_child(child)
+        }
+
+        self.vertical_stacks.insert(stack_id, vstack);
+
+        node
+    }
+
+    // Creates a new Vertical stack.
+    pub fn new_hstack(
+        &mut self,
+        children: Vec<DiagramTreeNode>,
+        vertical_alignment: VerticalAlignment,
+    ) -> DiagramTreeNode {
+        let stack_id = self.new_entity(EntityType::HorizontalStackShape);
+        let mut hstack = HorizontalStack {
+            entity: stack_id,
+            elements: Vec::new(),
+            vertical_alignment,
+        };
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::HorizontalStackShape,
+            entity_id: stack_id,
+            children: Vec::new(),
+        };
+
+        //set children
+        for child in children {
+            hstack.elements.push(child.entity_id);
+            node.add_child(child)
+        }
+
+        self.horizontal_stacks.insert(stack_id, hstack);
+
+        node
+    }
+
+    pub fn new_rectangle(&mut self, options: RectOptions) -> DiagramTreeNode {
+        let rect_id = self.new_entity(EntityType::RectShape);
+        let rect = ShapeRect::new(rect_id, options);
+        self.rectangles.insert(rect_id, rect);
+        DiagramTreeNode::new(EntityType::RectShape, rect_id)
+    }
+
+    // Creates a new Text element
+    // text: the text to display
+    // options: the options for the text
+    // ```rust
+    // let text = session.new_text("Hello World", TextOptions::new());
+    // ```
+    pub fn new_text(&mut self, text: &str, options: TextOptions) -> DiagramTreeNode {
+        let text_id = self.new_entity(EntityType::TextShape);
+        //create the lines
+        let text_lines = textwrap::wrap(&text, options.line_width);
+        let lines: Vec<EntityID> = text_lines
+            .iter()
+            .map(|line| {
+                let line_id = self.new_entity(EntityType::TextLine);
+                let text_line = TextLine {
+                    entity: line_id,
+                    text: line.to_string(),
+                };
+                self.textlines.insert(line_id, text_line);
+                line_id
+            })
+            .collect();
+
+        let text = ShapeText::new(text_id, text, options, &lines);
+        self.texts.insert(text_id, text);
+        DiagramTreeNode::new(EntityType::TextShape, text_id)
+    }
+
+    pub fn new_line(
+        &mut self,
+        start: (Float, Float),
+        end: (Float, Float),
+        options: LineOptions,
+    ) -> DiagramTreeNode {
+        let line_id = self.new_entity(EntityType::LineShape);
+        let line = ShapeLine::new(line_id, start, end, options);
+        self.lines.insert(line_id, line);
+        println!("Creating new line with id {}", line_id);
+        DiagramTreeNode::new(EntityType::LineShape, line_id)
+    }
+
+    pub fn new_elipse(
+        &mut self,
+        center: (Float, Float),
+        radius: (Float, Float),
+        options: EllipseOptions,
+    ) -> DiagramTreeNode {
+        let ellipse_id = self.new_entity(EntityType::EllipseShape);
+        let ellipse = ShapeEllipse::new(ellipse_id, center, radius, options);
+        self.ellipses.insert(ellipse_id, ellipse);
+        DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id)
+    }
+
+    pub fn new_image(
+        &mut self,
+        image_data: &str,
+        preferred_size: (Float, Float),
+    ) -> DiagramTreeNode {
+        let image_id = self.new_entity(EntityType::ImageShape);
+        let image = ShapeImage::new(image_id, image_data.to_string(), preferred_size);
+        self.images.insert(image_id, image);
+        DiagramTreeNode::new(EntityType::ImageShape, image_id)
+    }
+
+    pub fn new_image_from_file(
+        &mut self,
+        file_path: &str,
+        preferred_size: (Float, Float),
+    ) -> DiagramTreeNode {
+        let image_id = self.new_entity(EntityType::ImageShape);
+        let image = ShapeImage::from_file(image_id, file_path.to_string(), preferred_size);
+        self.images.insert(image_id, image);
+        DiagramTreeNode::new(EntityType::ImageShape, image_id)
+    }
+
+    // Creates a new Group.
+    pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+        let group_id = self.new_entity(EntityType::GroupShape);
+        let mut sgroup = ShapeGroup {
+            entity: group_id,
+            elements: Vec::new(),
+        };
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::GroupShape,
+            entity_id: group_id,
+            children: Vec::new(),
+        };
+
+        //set children
+        for child in children {
+            sgroup.elements.push(child.entity_id);
+            node.add_child(child)
+        }
+
+        self.groups.insert(group_id, sgroup);
+
+        node
+    }
+
+    pub fn new_table(
+        &mut self,
+        cells: Vec<DiagramTreeNode>,
+        cols: usize,
+        options: TableOptions,
+    ) -> DiagramTreeNode {
+        let mut cell_ids = Vec::new();
+        for cell in &cells {
+            cell_ids.push(cell.entity_id);
+        }
+        //create entities for the col and row lines
+        let mut col_lines = Vec::new();
+        for i in 0..cols {
+            let line_id = self.new_entity(EntityType::LineShape);
+            let line = ShapeLine::new(line_id, (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            self.lines.insert(line_id, line);
+            col_lines.push(line_id);
+        }
+        let num_rows = cells.len() / cols;
+        let mut row_lines = Vec::new();
+        for i in 0..num_rows + 1 {
+            let line_id = self.new_entity(EntityType::LineShape);
+            let line = ShapeLine::new(line_id, (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            self.lines.insert(line_id, line);
+            row_lines.push(line_id);
+        }
+
+        //Add a rectangle for the header row
+        let header = self.new_rectangle(RectOptions {
+            fill_color: Fill::Color(options.header_fill_color.clone()),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            ..Default::default()
+        });
+
+        let table_id = self.new_entity(EntityType::TableShape);
+        let table = Table::new(
+            table_id,
+            cell_ids,
+            col_lines.clone(),
+            row_lines.clone(),
+            cols,
+            header.entity_id,
+            options.clone(),
+        );
+
+        self.tables.insert(table_id, table);
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::TableShape,
+            entity_id: table_id,
+            children: Vec::new(),
+        };
+
+        // Add the header before the cells, otherwise it can cover the cells
+        node.add_child(DiagramTreeNode::new(
+            EntityType::RectShape,
+            header.entity_id,
+        ));
+
+        for child in cells {
+            node.add_child(child)
+        }
+
+        //add the lines
+        for line in col_lines {
+            node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
+        }
+        for line in row_lines {
+            node.add_child(DiagramTreeNode::new(EntityType::LineShape, line));
+        }
+
+        node
+    }
+
+    pub fn new_polyline(
+        &mut self,
+        points: Vec<(Float, Float)>,
+        options: LineOptions,
+    ) -> DiagramTreeNode {
+        let polyline_id = self.new_entity(EntityType::PolyLine);
+        let polyline = PolyLine::new(polyline_id, points, options);
+        self.polylines.insert(polyline_id, polyline);
+        DiagramTreeNode::new(EntityType::PolyLine, polyline_id)
+    }
+
+    /// Creates a new FreeContainer that allows absolute positioning of children
+    /// The container will size itself based on the positions and sizes of its children
+    pub fn new_free_container(&mut self) -> DiagramTreeNode {
+        let container_id = self.new_entity(EntityType::FreeContainer);
+        let container = FreeContainer::new(container_id);
+        self.free_containers.insert(container_id, container);
+        DiagramTreeNode::new(EntityType::FreeContainer, container_id)
+    }
+
+    /// Creates a new FreeContainer with all children at once
+    pub fn new_free_container_with_children(
+        &mut self,
+        children_with_positions: Vec<(DiagramTreeNode, (Float, Float))>,
+    ) -> DiagramTreeNode {
+        let container_id = self.new_entity(EntityType::FreeContainer);
+
+        // Create the free container
+        let mut container = FreeContainer::new(container_id);
+
+        // Create the node for the tree
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::FreeContainer,
+            entity_id: container_id,
+            children: Vec::new(),
+        };
+
+        // Add all children with their positions
+        for (child, position) in children_with_positions {
+            container.add_child(child.entity_id, position);
+            node.add_child(child);
+        }
+
+        // Store the container
+        self.free_containers.insert(container_id, container);
+
+        node
+    }
+
+    /// Add a child to a FreeContainer at the specified position
+    /// The position is relative to the container's top-left corner
+    pub fn add_to_free_container(
+        &mut self,
+        container_id: EntityID,
+        child: DiagramTreeNode,
+        position: (Float, Float),
+    ) -> DiagramTreeNode {
+        // Get the free container
+        let container = self.free_containers.get_mut(&container_id).unwrap();
+
+        // Add the child to the container with its position
+        container.add_child(child.entity_id, position);
+
+        // Create a new tree node for the container with the child
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::FreeContainer,
+            entity_id: container_id,
+            children: Vec::new(),
+        };
+
+        // Add the child node
+        node.add_child(child);
+
+        node
+    }
+
+    // Enhanced API convenience methods
+
+    /// Create a new HStackBuilder for fluent horizontal stack creation
+    pub fn hstack(&mut self) -> HStackBuilder {
+        HStackBuilder::new(self)
+    }
+
+    /// Create a new BoxBuilder for fluent box creation
+    pub fn box_with(&mut self, child: DiagramTreeNode) -> BoxBuilder {
+        BoxBuilder::new(self, child)
+    }
+}
+
+// element list accessors
+impl DiagramBuilder {
+    pub fn get_text(&self, id: EntityID) -> &ShapeText {
+        &self.texts[&id]
+    }
+
+    pub fn get_group(&self, id: EntityID) -> &ShapeGroup {
+        &self.groups[&id]
+    }
+
+    pub fn get_horizontal_stack(&self, id: EntityID) -> &HorizontalStack {
+        &self.horizontal_stacks[&id]
+    }
+
+    pub fn get_vertical_stack(&self, id: EntityID) -> &VerticalStack {
+        &self.vertical_stacks[&id]
+    }
+
+    pub fn get_ellipse(&self, id: EntityID) -> &ShapeEllipse {
+        &self.ellipses[&id]
+    }
+
+    pub fn get_line(&self, id: EntityID) -> &ShapeLine {
+        &self.lines[&id]
+    }
+
+    pub fn get_rectangle(&self, id: EntityID) -> &ShapeRect {
+        &self.rectangles[&id]
+    }
+
+    pub fn get_text_line(&self, id: EntityID) -> &TextLine {
+        &self.textlines[&id]
+    }
+
+    pub fn get_arrow(&self, id: EntityID) -> &ShapeArrow {
+        &self.arrows[&id]
+    }
+
+    pub fn get_table(&self, id: EntityID) -> &Table {
+        &self.tables[&id]
+    }
+
+    pub fn get_image(&self, id: EntityID) -> &ShapeImage {
+        &self.images[&id]
+    }
+
+    pub fn get_box(&self, id: EntityID) -> &ShapeBox {
+        &self.boxes[&id]
+    }
+
+    pub fn get_polyline(&self, id: EntityID) -> &PolyLine {
+        &self.polylines[&id]
+    }
+
+    pub fn get_free_container(&self, id: EntityID) -> &FreeContainer {
+        &self.free_containers[&id]
+    }
+
+    pub fn get_free_container_mut(&mut self, id: EntityID) -> &mut FreeContainer {
+        self.free_containers.get_mut(&id).unwrap()
+    }
+}
+
+// Enhanced API Builder Structs
+
+/// Builder for creating horizontal stacks with fluent syntax
+pub struct HStackBuilder<'a> {
+    builder: &'a mut DiagramBuilder,
+    children: Vec<DiagramTreeNode>,
+}
+
+impl<'a> HStackBuilder<'a> {
+    fn new(builder: &'a mut DiagramBuilder) -> Self {
+        HStackBuilder {
+            builder,
+            children: Vec::new(),
+        }
+    }
+
+    /// Add a child element to the horizontal stack
+    pub fn add(mut self, child: DiagramTreeNode) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    /// Add a text element to the horizontal stack
+    pub fn add_text(mut self, text: &str, options: TextOptions) -> Self {
+        let text_node = self.builder.new_text(text, options);
+        self.children.push(text_node);
+        self
+    }
+
+    /// Add a text element with default options to the horizontal stack
+    pub fn add_text_default(mut self, text: &str) -> Self {
+        let text_node = self.builder.new_text(text, TextOptions::default());
+        self.children.push(text_node);
+        self
+    }
+
+    /// Build the horizontal stack
+    pub fn build(self) -> DiagramTreeNode {
+        self.builder.new_hstack(self.children, VerticalAlignment::Center)
+    }
+}
+
+/// Builder for creating boxes with fluent syntax
+pub struct BoxBuilder<'a> {
+    builder: &'a mut DiagramBuilder,
+    child: DiagramTreeNode,
+    options: BoxOptions,
+}
+
+impl<'a> BoxBuilder<'a> {
+    fn new(builder: &'a mut DiagramBuilder, child: DiagramTreeNode) -> Self {
+        BoxBuilder {
+            builder,
+            child,
+            options: BoxOptions::default(),
+        }
+    }
+
+    /// Set the padding for the box
+    pub fn padding(mut self, padding: Float) -> Self {
+        self.options.padding = padding;
+        self
+    }
+
+    /// Set the background color for the box
+    pub fn background(mut self, color: &str) -> Self {
+        self.options.fill_color = Fill::Color(color.to_string());
+        self
+    }
+
+    /// Set the border color for the box
+    pub fn border_color(mut self, color: &str) -> Self {
+        self.options.stroke_color = color.to_string();
+        self
+    }
+
+    /// Set the border width for the box
+    pub fn border_width(mut self, width: Float) -> Self {
+        self.options.stroke_width = width;
+        self
+    }
+
+    /// Set the border radius for the box
+    pub fn border_radius(mut self, radius: Float) -> Self {
+        self.options.border_radius = radius;
+        self
+    }
+
+    /// Build the box
+    pub fn build(self) -> DiagramTreeNode {
+        self.builder.new_box(self.child, self.options)
+    }
+}
+
+//test
+#[cfg(test)]
+mod tests {
+    use crate::get_entity_type_from_id;
+
+    use super::*;
+
+    #[test]
+    fn test_session() {
+        let mut session = DiagramBuilder::new();
+
+        session.set_measure_text_fn(|text, text_options| {
+            let textW: Float = text.len() as Float * text_options.font_size as Float;
+
+            (textW, text_options.font_size.into())
+        });
+        let (w, h) = session.measure_text.unwrap()(
+            "hello",
+            &TextOptions {
+                font_size: 12.0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(w, 60.0);
+        assert_eq!(h, 12.0);
+    }
+}
+
+
+===/svg_renderer.txt===
+===/Cargo.toml===
+[package]
+name = "svg_renderer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+volare_engine_layout = { path = "../volare_engine_layout" }
+base64 = "0.21"
+
+[lib]
+name = "svg_renderer"
+path = "src/lib.rs"
+===/src/lib.rs===
+use std::io::Write;
+use volare_engine_layout::diagram_builder::DiagramTreeNode;
+use volare_engine_layout::*;
+use volare_engine_layout::FreeContainer;
+//use error
+use std::io::Error;
+
+pub struct SVGRenderer;
+
+impl<W: Write> Renderer<W> for SVGRenderer {
+    
+ fn render(
+    &self,
+    session: &DiagramBuilder,
+    diagram_node: &DiagramTreeNode,
+    stream: &mut W,
+) -> Result<(), RendererError> {
+    let mut svg = String::new();
+    let root_size = session.get_size(diagram_node.entity_id);
+    let root_pos = session.get_position(diagram_node.entity_id);
+
+    svg.push_str(&format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
+    ));
+
+    svg.push_str(&format!(
+        r#"<svg width="{}" height="{}" viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
+        root_size.0, root_size.1,
+        root_pos.0, root_pos.1, root_size.0, root_size.1
+    ));
+
+    svg.push_str(render_node(diagram_node, session).as_str());
+    //close svg tag
+    svg.push_str("</svg>");
+    svg.push_str("\n");
+    
+    // Properly handle the result from writing to the stream
+    stream.write_all(svg.as_bytes())
+        .map_err(|e| RendererError::new(&e.to_string()))?;
+    
+    Ok(())
+}
+}
+
+
+
+// Render a node and its children
+fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
+    let mut svg = String::new();
+
+    let entity_id = node.entity_id;
+    
+
+    match node.entity_type {
+        EntityType::GroupShape => {
+            render_group(session, &mut svg, entity_id,  node);
+        }
+        EntityType::BoxShape => {
+            render_box(session, &mut svg, entity_id, node);
+        }
+        EntityType::TextShape => {
+            render_text(session, &mut svg, entity_id, node);
+        }
+        EntityType::VerticalStackShape => {
+            render_vertical_stack(session, &mut svg, entity_id, node);
+        }
+        EntityType::HorizontalStackShape => {
+            render_horizontal_stack(session, &mut svg, entity_id, node);
+        }
+        EntityType::LineShape => {
+            render_line(session, &mut svg, entity_id, node);
+        }
+        EntityType::ArrowShape => {
+            render_arrow(session, &mut svg, entity_id, node);
+        }
+        EntityType::EllipseShape => {
+            render_ellipse(session, &mut svg, entity_id, node);
+        }
+        //table
+        EntityType::TableShape => {
+            render_table(session, &mut svg, entity_id, node);
+        }
+        //Image
+        EntityType::ImageShape => {
+            render_image(session, &mut svg, entity_id, node);
+        }
+        
+        EntityType:: PolyLine => {
+            render_polyline(session, &mut svg, entity_id, node);
+        }
+        
+        EntityType::FreeContainer => {
+            render_free_container(session, &mut svg, entity_id, node);
+        }
+
+        EntityType::RectShape => {
+            render_rectangle(session, &mut svg, entity_id, node);
+        }
+
+        _ => {}
+        
+    }
+
+    svg
+}
+fn render_polyline(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let polyline_shape = session.get_polyline(node.entity_id);
+    let pos = session.get_position(entity_id);
+
+    // Convert points to a space-separated string
+    let points_str = polyline_shape.points.iter()
+        .map(|&(x, y)| format!("{},{}", x, y))
+        .collect::<Vec<_>>().join(" ");
+
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<polyline points="{}" stroke="{}" stroke-width="{}" fill="none" />"#,
+        points_str,
+        polyline_shape.line_options.stroke_color,
+        polyline_shape.line_options.stroke_width));
+    svg.push_str("</g>");
+}
+
+fn render_free_container(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let container = session.get_free_container(entity_id);
+    let pos = session.get_position(entity_id);
+    
+    // Open a group for the container with the correct position
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    
+    // If there's a background color, draw a rectangle with it
+    if let Some(bg_color) = &container.background_color {
+        svg.push_str(&format!(
+            r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" "#,
+            size.0, size.1, bg_color
+        ));
+        
+        // Add border if specified
+        if let Some(border_color) = &container.border_color {
+            if container.border_width > 0.0 {
+                svg.push_str(&format!(
+                    r#"stroke="{}" stroke-width="{}" "#,
+                    border_color, container.border_width
+                ));
+            }
+        }
+        
+        svg.push_str("/>");
+    } 
+    // If there's only a border but no background, draw just the outline
+    else if let Some(border_color) = &container.border_color {
+        if container.border_width > 0.0 {
+            svg.push_str(&format!(
+                r#"<rect x="0" y="0" width="{}" height="{}" fill="none" stroke="{}" stroke-width="{}" />"#,
+                size.0, size.1, border_color, container.border_width
+            ));
+        }
+    }
+    
+    // Render children
+    for child in node.children.iter() {
+        svg.push_str(render_node(child, session).as_str());
+    }
+    
+    // Close the container group
+    svg.push_str("</g>");
+}
+
+
+fn render_image(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let image_shape = session.get_image(node.entity_id);
+    let pos = session.get_position(entity_id);
+    
+    // Determine the image source
+    let image_src = if let Some(file_path) = &image_shape.file_path {
+        // For file-based images, we'll embed them as data URLs in the SVG
+        // We need to read the file, encode it to base64, and create a data URL
+        match read_image_file_as_data_url(file_path) {
+            Ok(data_url) => data_url,
+            Err(err) => {
+                eprintln!("Error loading image from file '{}': {}", file_path, err);
+                // Fallback to a placeholder for errors
+                "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22%23ddd%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2250%22%20font-family%3D%22sans-serif%22%20font-size%3D%2220%22%20text-anchor%3D%22middle%22%20alignment-baseline%3D%22middle%22%3EImage%20Error%3C%2Ftext%3E%3C%2Fsvg%3E".to_string()
+            }
+        }
+    } else {
+        // For base64 images, use the stored image data
+        // If it's already a data URL, use it as-is
+        image_shape.image.clone()
+    };
+    
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    
+    // Add the SVG image element with the appropriate source
+    svg.push_str(&format!(r#"<image x="0" y="0" width="{}" height="{}" xlink:href="{}" />"#,
+        size.0, 
+        size.1, 
+        image_src));
+    
+    svg.push_str("</g>");
+}
+
+// Helper function to read an image file and convert it to a data URL
+fn read_image_file_as_data_url(file_path: &str) -> Result<String, std::io::Error> {
+    use std::fs::File;
+    use std::io::Read;
+    use base64::engine::general_purpose::STANDARD as BASE64;
+    use base64::Engine;
+    use std::path::Path;
+    
+    // Read the file
+    let mut file = File::open(file_path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    
+    // Determine mime type based on file extension
+    let mime_type = match Path::new(file_path).extension().and_then(|ext| ext.to_str()) {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream", // Default mime type
+    };
+    
+    // Encode as base64 and create data URL
+    let base64_data = BASE64.encode(&buffer);
+    let data_url = format!("data:{};base64,{}", mime_type, base64_data);
+    
+    Ok(data_url)
+}
+
+fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let line_shape = session.get_line(node.entity_id);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+     size.0, 
+     size.1, 
+     line_shape.line_options.stroke_color,
+     line_shape.line_options.stroke_width));
+    svg.push_str("</g>");
+}
+
+fn render_rectangle(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let rect_shape = session.get_rectangle(node.entity_id);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+     size.0, 
+     size.1, 
+     rect_shape.rect_options.fill_color,
+     rect_shape.rect_options.stroke_color,
+     rect_shape.rect_options.stroke_width,
+     rect_shape.rect_options.border_radius,
+     rect_shape.rect_options.border_radius));
+    svg.push_str("</g>");
+}
+
+fn render_arrow(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let arrow_shape = session.get_arrow(node.entity_id);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+     size.0, 
+     size.1, 
+     arrow_shape.arrow_options.stroke_color,
+     arrow_shape.arrow_options.stroke_width));
+    //TODO: paint arrow head
+    svg.push_str("</g>");
+}
+
+fn render_ellipse(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let ellipse_shape = session.get_ellipse(node.entity_id);
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    svg.push_str(&format!(r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
+     size.0/2.0, 
+     size.1/2.0, 
+     size.0/2.0, 
+     size.1/2.0, 
+     ellipse_shape.ellipse_options.stroke_color,
+     ellipse_shape.ellipse_options.stroke_width,
+     ellipse_shape.ellipse_options.fill_color));
+    svg.push_str("</g>");
+}
+
+
+fn render_group(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID,  node: &DiagramTreeNode ) {
+  
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    for child in node.children.iter() {
+        print!("render_node recursive");
+        svg.push_str(render_node(child, session).as_str());
+    }
+    svg.push_str("</g>");
+}
+
+fn render_table(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let table_shape = session.get_table(node.entity_id);
+    let pos = session.get_position(entity_id);
+    
+    let header_size = session.get_size(table_shape.header_rect);
+
+
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+     //render container rect element
+    svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" />"#,
+        size.0, 
+        size.1, 
+        table_shape.table_options.fill_color,
+        table_shape.table_options.border_color,
+        table_shape.table_options.border_width
+    ));
+
+    // render header, cells, lines, etc. Should have been added to the node
+    for child in node.children.iter() {
+        svg.push_str(render_node(child, session).as_str());
+    }
+    svg.push_str("</g>");
+}
+
+
+fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let size = session.get_size(entity_id);
+    let box_shape = session.get_box(node.entity_id);
+   
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+    
+    // svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+    //  size.0, 
+    //  size.1, 
+    //  box_shape.box_options.fill_color,
+    //  box_shape.box_options.stroke_color,
+    //  box_shape.box_options.stroke_width,
+    //  box_shape.box_options.border_radius,
+    //  box_shape.box_options.border_radius));
+
+    match &box_shape.box_options.fill_color {
+        Fill::Color(color) => {
+            svg.push_str(&format!(r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
+            size.0, 
+            size.1, 
+            color,
+            box_shape.box_options.stroke_color,
+            box_shape.box_options.stroke_width,
+            box_shape.box_options.border_radius,
+            box_shape.box_options.border_radius));
+        }
+        ,
+        Fill::LinearGradient(_linearGrad) => {
+            todo!()
+        },
+        Fill::RadialGradient(_) => todo!(),
+    }
+     if node.children.len() > 0 {
+        // we only render the first child for now
+        // The layout phase already positions the wrapped entity with padding, so no need to add extra translate
+        let first_child = &node.children[0];
+        svg.push_str(render_node(&first_child, session).as_str());
+        
+    }
+    svg.push_str("</g>");
+}
+
+fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let text_shape = session.get_text(node.entity_id);
+    let pos = session.get_position(entity_id);
+    let size = session.get_size(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" data-debug="{}" >"#,
+        pos.0, pos.1,
+        format!("size: {}, {}, pos: {}, {}", 
+            size.0, size.1,
+            pos.0, pos.1)
+    ));
+
+    //render parent text container
+    svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}px" font-family="{}" >"#,
+        0,
+        text_shape.text_options.text_color,
+        text_shape.text_options.font_size,
+        text_shape.text_options.font_family));
+   
+    //render lines
+    for line_id in text_shape.lines.iter() {
+        let line = session.get_text_line(*line_id);
+        let pos = session.get_position(line.entity);
+        let lineSize = session.get_size(line.entity);
+        svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}px" font-family="{}" alignment-baseline="hanging" data-debug="{}" >"#,
+        pos.0,
+        pos.1,
+        text_shape.text_options.text_color,
+        text_shape.text_options.font_size,
+        text_shape.text_options.font_family,
+        //debug info
+        format!("size: {}, {}, pos: {}, {}",
+            lineSize.0, lineSize.1,
+            pos.0, pos.1)
+        ));
+        let txt = if line.text.trim().is_empty() {
+            "&#8203;".to_string()  // Create a new String directly
+        } else {
+            line.text.clone()  // Clone the original
+        };
+        println!("text:::");
+        println!("text {}", txt);
+        svg.push_str(&txt);
+        svg.push_str("</tspan>");
+    }
+    svg.push_str("</text>");
+    svg.push_str("</g>");
+}
+
+fn render_vertical_stack(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+
+    //render items
+    for child in node.children.iter() {
+        svg.push_str(render_node(child, session).as_str())
+    }
+    svg.push_str("</g>");
+}
+
+fn render_horizontal_stack(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    let pos = session.get_position(entity_id);
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})" >"#,
+        pos.0, pos.1
+    ));
+
+    //render items
+    for child in node.children.iter() {
+        svg.push_str(render_node(child, session).as_str())
+    }
+    svg.push_str("</g>");
+}
+
+
+//test that groups are rendered correctly
+#[test]
+fn test_render_group() {
+    let mut session = DiagramBuilder::new();
+    let group = session.new_group(Vec::new());
+    let node = render_node(&group, &session);
+    assert_eq!(node, r#"<g transform="translate(0 0)" ></g>"#);
+}
+
+//test that BoxShape with wrapped group is rendered correctly
+#[test]
+fn test_render_box_with_rect_in_group() {
+    let mut session = DiagramBuilder::new();
+
+    let rect = session.new_rectangle(RectOptions {
+         width: 100.0, height: 50.0,
+         fill_color:Fill::Color("black".to_string()), 
+         stroke_color: String::from("magenta"), 
+         stroke_width: 1.0, border_radius: 1.0 });
+    
+    let group = session.new_group(vec![rect]);
+
+    let box_ = session.new_box(group, BoxOptions{
+        fill_color:Fill::Color("white".to_string()),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+        padding: 2.0,
+        border_radius: 0.0,
+    });
+
+    layout_tree_node(&mut session, &box_);
+
+    let node = render_node(&box_, &session);
+    assertIsSameSVG(&node, r#"
+    <g transform="translate(0 0)" >
+        <rect x="0" y="0" width="104" height="54" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" />
+            <g transform="translate(2 2)" >
+                <g transform="translate(0 0)">
+                    <rect x="0" y="0" width="100" height="50" fill="black" stroke="magenta" stroke-width="1" rx="1" ry="1" />
+                </g>
+            </g>
+     </g>"#);
+}
+
+fn assertIsSameSVG(a: &str, b: &str) {
+    // Normalize whitespace and compare
+    let strA = a.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    let strB = b.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    assert_eq!(strA.replace('\n', "").replace('\r', ""),  strB.replace('\n', "").replace('\r', ""));
+}
+
+//test line
+#[test]
+fn test_render_line() {
+    let options = LineOptions{
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+    };
+    let mut session = DiagramBuilder::new();
+    let line = session.new_line(options);
+    
+    let node = render_node(&line, &session);
+    assert_eq!(
+        node,
+        r#"<g transform="translate(0 0)" ><line x1="0" y1="0" x2="0" y2="0" stroke="black" stroke-width="1" /></g>"#
+    );
+}
+
+//test eclipse
+#[test]
+fn test_render_ellipse() {
+    let options = EllipseOptions{
+        fill_color: "white".to_string(),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+    };
+    let mut session = DiagramBuilder::new();
+    let ellipse = session.new_elipse((0.0, 0.0), (0.0, 0.0), options);
+    
+    let node = render_node(&ellipse, &session);
+    assertIsSameSVG(
+        &node,
+        r#"
+        <g transform="translate(0 0)" >
+            <ellipse cx="0" cy="0" rx="0" ry="0" stroke="black" stroke-width="1" fill="white" />
+        </g>"#
+    );
+}
+
+#[test]
+fn test_render_box_rounded_corners_with_group() {
+    let mut session = DiagramBuilder::new();
+    let group = session.new_group(Vec::new());
+    let box_ = session.new_box(group, BoxOptions{
+        fill_color: Fill::Color("white".to_string()),
+        stroke_color: "black".to_string(),
+        stroke_width: 1.0,
+        padding: 0.0,
+        border_radius: 5.5,
+    });
+    let node = render_node(&box_, &session);
+    assertIsSameSVG(
+        &node,
+        r#"<g transform="translate(0 0)" >
+            <rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" />
+            <g transform="translate(0 0)" >
+            </g>
+        </g>"#
+    );
+}
+
+
+
