@@ -6,7 +6,7 @@ pub mod measure_text;
 use image_renderer::PNGRenderer;
 use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::RectOptions;
+use volare_engine_layout::{RectOptions, SizeBehavior};
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
 
 //import layout
@@ -16,7 +16,6 @@ use volare_engine_layout::{
 };
 //import io modules to write to file
 use measure_text::{
-    measure_text_ultra_tight,
     measure_text_svg_character_advance,
 }; // Use the ultra-tight measurement for text
 
@@ -59,8 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create horizontal stack with 2 rects and one text, set vertical align to center 
     let mut rectOpts = RectOptions::default();
-    rectOpts.height = 150.0;
-    rectOpts.width = 150.0;
+    rectOpts.width_behavior =  SizeBehavior::Fixed(150.0);
+    rectOpts.height_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.stroke_color = "black".to_string();
     rectOpts.stroke_width = 1.0;
     let rect = session.new_rectangle(rectOpts.clone());
@@ -184,12 +183,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     table_items.push(text);
 
     //Add sample image from file (first instance)
-    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (200.0, 200.0));
+    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
     //table_items.push(sampleImage);
 
     //Add sample image from file
     // The path is relative to where the binary is run
-    let file_image = session.new_image_from_file("demo/assets/sample.png", (150.0, 150.0));
+    let file_image = session.new_image_from_file("demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
    // table_items.push(file_image);
 
     // Create a FreeContainer with multiple visual elements at specific positions using the new method

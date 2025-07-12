@@ -1,7 +1,7 @@
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
-use crate::{HorizontalAlignment, SizeBehavior, VerticalAlignment};
+use crate::{HorizontalAlignment, ShapeRect, SizeBehavior, VerticalAlignment};
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
@@ -206,19 +206,41 @@ pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse
     session.set_size(shape_ellipse.entity, w, h);
 }
 
-pub fn layout_rect(session: &mut DiagramBuilder, entity: EntityID, width: Float, height: Float) {
-    //set the size of the rect
-    session.set_size(entity, width, height);
+pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
+    // If the rect has a fixed size, use that
+    let width = match rect.rect_options.width_behavior {
+        SizeBehavior::Fixed(w) => w,
+        _ => 0.0
+    };
+    let height = match rect.rect_options.height_behavior {
+        SizeBehavior::Fixed(h) => h,
+        _ => 0.0
+    };
+
+    session.set_size(rect.entity, width, height);
 }
 
 /**
  * Sets the image entity size to the preferred size
  */
 pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
+
+    let width = match shape_image.width_behavior {
+        SizeBehavior::Fixed(val) => val,
+        SizeBehavior::Content => 100.0, // TODO: Obtener size de la data de la imagen
+        _ => 100.0
+    };
+
+     let height = match shape_image.height_behavior {
+        SizeBehavior::Fixed(val) => val,
+        SizeBehavior::Content => 100.0, // TODO: Obtener size de la data de la imagen
+        _ => 100.0
+    };
+
     session.set_size(
         shape_image.entity,
-        shape_image.preferred_size.0,
-        shape_image.preferred_size.1,
+        width,
+        height,
     );
 }
 
@@ -478,6 +500,9 @@ pub struct BoundingBox {
 }
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
+
+    
+
     //start with the bottom elements
     for child in &root.children {
         println!("Layout child: {:?}", child);
@@ -508,12 +533,10 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
 
         EntityType::RectShape => {
             //get the Rect entity
-            let rect = session.get_rectangle(root.entity_id);
+            let rect = session.get_rectangle(root.entity_id).clone();
             layout_rect(
                 session,
-                root.entity_id,
-                rect.rect_options.width,
-                rect.rect_options.height,
+                &rect
             );
         }
 

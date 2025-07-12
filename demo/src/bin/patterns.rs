@@ -3,7 +3,7 @@
 //import svg_renderer
 use image_renderer::PNGRenderer;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions};
 use demo::measure_text::{ measure_text_ultra_tight};
 
 //import layout
@@ -21,7 +21,8 @@ struct CardOptions {
 //componente card
 //la tarjeta tiene contenido y titulo
 fn card_component(session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
-    session.new_vstack(vec![header,content])
+    session.new_vstack(vec![header,content], HorizontalAlignment::Center)
+
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

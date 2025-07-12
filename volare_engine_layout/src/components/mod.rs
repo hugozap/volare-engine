@@ -348,8 +348,8 @@ impl BoxOptions {
 //RectOptions
 #[derive(Default, Debug)]
 pub struct RectOptions {
-    pub width: Float,
-    pub height: Float,
+    pub width_behavior: SizeBehavior,
+    pub height_behavior: SizeBehavior,
     pub fill_color: Fill,
     pub stroke_color: String,
     pub stroke_width: Float,
@@ -359,8 +359,8 @@ pub struct RectOptions {
 impl Clone for RectOptions {
     fn clone(&self) -> Self {
         RectOptions {
-            width: self.width,
-            height: self.height,
+            width_behavior: self.width_behavior.clone(),
+            height_behavior: self.height_behavior.clone(), 
             fill_color: self.fill_color.clone(),
             stroke_color: self.stroke_color.clone(),
             stroke_width: self.stroke_width,
@@ -372,8 +372,9 @@ impl Clone for RectOptions {
 impl RectOptions {
     pub fn new() -> RectOptions {
         RectOptions {
-            width: 100.0,
-            height: 100.0,
+            width_behavior: SizeBehavior::Fixed(100.0),
+            height_behavior: SizeBehavior::Fixed(100.0),
+            // Default fill color is white
             fill_color: Fill::Color(String::from("white")),
             stroke_color: String::from("black"),
             stroke_width: 1.0,
@@ -911,7 +912,8 @@ pub struct ShapeImage {
     pub image: String,
     //path to image file on disk (optional)
     pub file_path: Option<String>,
-    pub preferred_size: (Float, Float),
+    pub width_behavior: SizeBehavior,
+    pub height_behavior: SizeBehavior
 }
 
 impl Clone for ShapeImage {
@@ -920,7 +922,8 @@ impl Clone for ShapeImage {
             entity: self.entity,
             image: self.image.clone(),
             file_path: self.file_path.clone(),
-            preferred_size: self.preferred_size,
+            width_behavior: self.width_behavior.clone(),
+            height_behavior: self.height_behavior.clone(),
         }
     }
 }
@@ -940,21 +943,23 @@ impl Entity for ShapeImage {
 }
 
 impl ShapeImage {
-    pub fn new(entity: EntityID, image: String, preferred_size: (Float, Float)) -> ShapeImage {
+    pub fn new(entity: EntityID, image: String, size: (SizeBehavior, SizeBehavior)) -> ShapeImage {
         ShapeImage {
             entity,
             image,
             file_path: None,
-            preferred_size,
+            width_behavior: size.0,
+            height_behavior: size.1,
         }
     }
     
-    pub fn from_file(entity: EntityID, file_path: String, preferred_size: (Float, Float)) -> ShapeImage {
+    pub fn from_file(entity: EntityID, file_path: String, size: (SizeBehavior, SizeBehavior)) -> ShapeImage {
         ShapeImage {
             entity,
             image: String::new(), // Empty as we're using file_path instead
             file_path: Some(file_path),
-            preferred_size,
+            width_behavior: size.0,
+            height_behavior: size.1,
         }
     }
 }

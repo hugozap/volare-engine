@@ -39,9 +39,9 @@ pub struct JsonEntity {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_radius: Option<Float>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub width: Option<Float>,
+    pub width: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub height: Option<Float>,
+    pub height: Option<Value>,
 
     // Position attributes (for free containers)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,6 +83,44 @@ pub struct JsonEntity {
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
+
+
+// 2. Helper function to parse unified width/height values
+
+/// Parse a unified width/height value that can be either a number (fixed) or string (behavior)
+fn parse_unified_dimension(value: Option<&Value>) -> SizeBehavior {
+    match value {
+        Some(Value::Number(num)) => {
+            // Numeric value = fixed size
+            if let Some(float_val) = num.as_f64() {
+                SizeBehavior::Fixed(float_val as Float)
+            } else {
+                SizeBehavior::Content // Fallback for invalid numbers
+            }
+        }
+        Some(Value::String(behavior)) => {
+            // String value = behavior specification
+            match behavior.to_lowercase().as_str() {
+                "content" => SizeBehavior::Content,
+                "grow" => SizeBehavior::Grow,
+                "auto" => SizeBehavior::Content, // Alias for content
+                _ => {
+                    // Try to parse as number string (e.g., "300")
+                    if let Ok(parsed) = behavior.parse::<Float>() {
+                        SizeBehavior::Fixed(parsed)
+                    } else {
+                        SizeBehavior::Content // Fallback for unknown strings
+                    }
+                }
+            }
+        }
+        _ => {
+            // No value or unsupported type = content behavior (default)
+            SizeBehavior::Content
+        }
+    }
+}
+
 
 /// Parser for JSON Lines diagram format
 pub struct JsonLinesParser {
@@ -242,6 +280,11 @@ impl JsonLinesParser {
                 }
 
                 let child = self.build_entity(&children[0], builder)?;
+
+                let width_behavior = parse_unified_dimension(entity.width.as_ref());
+                let height_behavior = parse_unified_dimension(entity.height.as_ref());
+
+                
                 let options = BoxOptions {
                     padding: entity.padding.unwrap_or(0.0),
                     fill_color: entity
@@ -255,6 +298,8 @@ impl JsonLinesParser {
                         .unwrap_or_else(|| "black".to_string()),
                     stroke_width: entity.border_width.unwrap_or(1.0),
                     border_radius: entity.border_radius.unwrap_or(0.0),
+                    width_behavior,
+                    height_behavior,
                     ..BoxOptions::default()
                 };
 
@@ -328,9 +373,12 @@ impl JsonLinesParser {
             }
 
             "rect" => {
+                let width_behavior = parse_unified_dimension(entity.width.as_ref());
+                let height_behavior = parse_unified_dimension(entity.height.as_ref());
+
                 let options = RectOptions {
-                    width: entity.width.unwrap_or(100.0),
-                    height: entity.height.unwrap_or(100.0),
+                    width_behavior,
+                    height_behavior,
                     fill_color: entity
                         .background
                         .as_ref()
@@ -379,15 +427,14 @@ impl JsonLinesParser {
             }
 
             "image" => {
-                let size = (
-                    entity.width.unwrap_or(100.0),
-                    entity.height.unwrap_or(100.0),
-                );
+
+                let width_behavior = parse_unified_dimension(entity.width.as_ref());
+                let height_behavior = parse_unified_dimension(entity.height.as_ref());
 
                 if let Some(src) = &entity.src {
-                    Ok(builder.new_image(src, size))
+                    Ok(builder.new_image(src, (width_behavior, height_behavior)))
                 } else if let Some(file_path) = &entity.file_path {
-                    Ok(builder.new_image_from_file(file_path, size))
+                    Ok(builder.new_image_from_file(file_path, (width_behavior, height_behavior)))
                 } else {
                     Err(JsonLinesError::MissingAttribute(
                         "src or file_path".to_string(),
@@ -488,121 +535,6 @@ impl JsonLinesParser {
     }
 }
 
-/// Builder for creating JSON Lines diagrams
-pub struct JsonLinesBuilder {
-    entities: Vec<JsonEntity>,
-    id_counter: usize,
-}
-
-impl JsonLinesBuilder {
-    pub fn new() -> Self {
-        Self {
-            entities: Vec::new(),
-            id_counter: 0,
-        }
-    }
-
-    pub fn next_id(&mut self) -> String {
-        self.id_counter += 1;
-        format!("e{}", self.id_counter)
-    }
-
-    pub fn text(&mut self, content: &str) -> String {
-        let id = self.next_id();
-        self.entities.push(JsonEntity {
-            id: id.clone(),
-            entity_type: "text".to_string(),
-            content: Some(content.to_string()),
-            ..Default::default()
-        });
-        id
-    }
-
-    pub fn text_styled(&mut self, content: &str, font_size: Float, color: &str) -> String {
-        let id = self.next_id();
-        self.entities.push(JsonEntity {
-            id: id.clone(),
-            entity_type: "text".to_string(),
-            content: Some(content.to_string()),
-            font_size: Some(font_size),
-            color: Some(color.to_string()),
-            ..Default::default()
-        });
-        id
-    }
-
-    pub fn box_with(&mut self, child: String, padding: Float, background: &str) -> String {
-        let id = self.next_id();
-        self.entities.push(JsonEntity {
-            id: id.clone(),
-            entity_type: "box".to_string(),
-            children: Some(vec![child]),
-            padding: Some(padding),
-            background: Some(background.to_string()),
-            ..Default::default()
-        });
-        id
-    }
-
-    pub fn vstack(&mut self, children: Vec<String>) -> String {
-        let id = self.next_id();
-        self.entities.push(JsonEntity {
-            id: id.clone(),
-            entity_type: "vstack".to_string(),
-            children: Some(children),
-            ..Default::default()
-        });
-        id
-    }
-
-    pub fn hstack(&mut self, children: Vec<String>) -> String {
-        let id = self.next_id();
-        self.entities.push(JsonEntity {
-            id: id.clone(),
-            entity_type: "hstack".to_string(),
-            children: Some(children),
-            ..Default::default()
-        });
-        id
-    }
-
-    pub fn rect(&mut self, width: Float, height: Float, color: &str) -> String {
-        let id = self.next_id();
-        self.entities.push(JsonEntity {
-            id: id.clone(),
-            entity_type: "rect".to_string(),
-            width: Some(width),
-            height: Some(height),
-            background: Some(color.to_string()),
-            ..Default::default()
-        });
-        id
-    }
-
-    /// Build and return the JSON Lines string
-    pub fn build(&self) -> Result<String, serde_json::Error> {
-        let mut lines = Vec::new();
-        for entity in &self.entities {
-            lines.push(serde_json::to_string(entity)?);
-        }
-        Ok(lines.join("\n"))
-    }
-
-    /// Write to a file
-    pub fn write_to_file(&self, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let mut file = File::create(file_path)?;
-        for entity in &self.entities {
-            writeln!(file, "{}", serde_json::to_string(entity)?)?;
-        }
-        Ok(())
-    }
-
-    /// Get the root entity ID (first entity)
-    pub fn root_id(&self) -> Option<String> {
-        self.entities.first().map(|e| e.id.clone())
-    }
-}
-
 impl Default for JsonEntity {
     fn default() -> Self {
         Self {
@@ -695,32 +627,7 @@ mod tests {
         let mut builder = DiagramBuilder::new();
         let _diagram = parser.build(&root_id, &mut builder).unwrap();
     }
-
-    #[test]
-    fn test_builder_api() {
-        let mut builder = JsonLinesBuilder::new();
-
-        let title = builder.text_styled("Document Title", 18.0, "blue");
-        let left_text = builder.text("Left Panel");
-        let right_text = builder.text("Right Panel");
-
-        let left_box = builder.box_with(left_text, 10.0, "lightblue");
-        let right_box = builder.box_with(right_text, 10.0, "lightgreen");
-
-        let content = builder.hstack(vec![left_box, right_box]);
-        let footer = builder.text_styled("Footer", 12.0, "gray");
-
-        let _root = builder.vstack(vec![title, content, footer]);
-
-        let jsonl = builder.build().unwrap();
-        println!("Generated JSON Lines:\n{}", jsonl);
-
-        // Parse it back to verify
-        let mut parser = JsonLinesParser::new();
-        let root_id = parser.parse_string(&jsonl).unwrap();
-        parser.validate().unwrap();
-    }
-
+    
     #[test]
     fn test_streaming_parse() {
         let lines = vec![
@@ -733,24 +640,6 @@ mod tests {
         let root_id = parser.parse_lines(lines).unwrap();
         assert_eq!(root_id, "e1");
         parser.validate().unwrap();
-    }
-
-    #[test]
-    fn test_file_operations() {
-        let mut builder = JsonLinesBuilder::new();
-        let text = builder.text("Test");
-        let root = builder.box_with(text, 5.0, "white");
-
-        // Write to file
-        builder.write_to_file("test_diagram.jsonl").unwrap();
-
-        // Read back
-        let mut parser = JsonLinesParser::new();
-        let root_id = parser.parse_file("test_diagram.jsonl").unwrap();
-        parser.validate().unwrap();
-
-        // Clean up
-        std::fs::remove_file("test_diagram.jsonl").ok();
     }
 }
 

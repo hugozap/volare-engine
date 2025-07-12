@@ -291,10 +291,10 @@ impl DiagramBuilder {
     pub fn new_image(
         &mut self,
         image_data: &str,
-        preferred_size: (Float, Float),
+        size: (SizeBehavior, SizeBehavior),
     ) -> DiagramTreeNode {
         let image_id = self.new_entity(EntityType::ImageShape);
-        let image = ShapeImage::new(image_id, image_data.to_string(), preferred_size);
+        let image = ShapeImage::new(image_id, image_data.to_string(), size);
         self.images.insert(image_id, image);
         DiagramTreeNode::new(EntityType::ImageShape, image_id)
     }
@@ -302,10 +302,10 @@ impl DiagramBuilder {
     pub fn new_image_from_file(
         &mut self,
         file_path: &str,
-        preferred_size: (Float, Float),
+        size: (SizeBehavior, SizeBehavior),
     ) -> DiagramTreeNode {
         let image_id = self.new_entity(EntityType::ImageShape);
-        let image = ShapeImage::from_file(image_id, file_path.to_string(), preferred_size);
+        let image = ShapeImage::from_file(image_id, file_path.to_string(), size);
         self.images.insert(image_id, image);
         DiagramTreeNode::new(EntityType::ImageShape, image_id)
     }
