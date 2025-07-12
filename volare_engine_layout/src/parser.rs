@@ -255,6 +255,7 @@ impl JsonLinesParser {
                         .unwrap_or_else(|| "black".to_string()),
                     stroke_width: entity.border_width.unwrap_or(1.0),
                     border_radius: entity.border_radius.unwrap_or(0.0),
+                    ..BoxOptions::default()
                 };
 
                 Ok(builder.new_box(child, options))

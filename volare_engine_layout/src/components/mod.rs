@@ -101,6 +101,44 @@ pub fn get_entity_type(entity_id: EntityID) -> EntityType {
     }
 }
 
+#[derive(Debug, Copy, PartialEq)]
+pub enum SizeBehavior {
+    /// Fixed size - element has a predetermined size that doesn't change
+    Fixed(Float),
+    /// Content size - element sizes itself based on its content (current default behavior)
+    Content,
+    /// Grow size - element takes all available space from its parent
+    Grow,
+}
+
+impl Default for SizeBehavior {
+    fn default() -> Self {
+        SizeBehavior::Content
+    }
+}
+
+impl Eq for SizeBehavior {
+
+}
+
+impl Clone for SizeBehavior {
+    fn clone(&self) -> Self {
+        match self {
+            SizeBehavior::Fixed(v) => SizeBehavior::Fixed(*v),
+            SizeBehavior::Content => SizeBehavior::Content,
+            SizeBehavior::Grow => SizeBehavior::Grow,
+        }
+    }
+}
+
+impl SizeBehavior {
+    pub fn unwrap_fixed(&self) -> Result<f32, &'static str> {
+        match self {
+            SizeBehavior::Fixed(val) => Ok(*val),
+            _ => Err("Called unwrap_fixed on non-Fixed SizeBehavior"),
+        }
+    }
+}
 
 /**
  * Boxes show a rectangle around the wrapped entity
@@ -256,13 +294,16 @@ impl fmt::Display for Fill {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct BoxOptions {
     pub fill_color: Fill,
     pub stroke_color: String,
     pub stroke_width: Float,
     pub padding: Float,
     pub border_radius: Float,
+        // Add size behavior fields
+    pub width_behavior: SizeBehavior,
+    pub height_behavior: SizeBehavior,
 }
 
 impl Clone for BoxOptions {
@@ -273,8 +314,16 @@ impl Clone for BoxOptions {
             stroke_width: self.stroke_width,
             padding: self.padding,
             border_radius: self.border_radius,
+            width_behavior: self.width_behavior.clone(),
+            height_behavior: self.height_behavior.clone(),
 
         }
+    }
+}
+
+impl Default for BoxOptions {
+    fn default() -> Self {
+        BoxOptions::new()
     }
 }
 
@@ -286,6 +335,8 @@ impl BoxOptions {
             stroke_width: 1.0,
             padding: 10.0,
             border_radius: 0.0,
+            width_behavior: SizeBehavior::Content,
+            height_behavior: SizeBehavior::Content,
         }
     }
 }

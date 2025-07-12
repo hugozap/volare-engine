@@ -1,7 +1,7 @@
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
-use crate::{HorizontalAlignment, VerticalAlignment};
+use crate::{HorizontalAlignment, SizeBehavior, VerticalAlignment};
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
@@ -10,32 +10,99 @@ use crate::{
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
-The wrapped element position and size should be updated before calling this function.
+The wrapped element position and size should be updated before calling this function
+(except for grow behavior).
 The wrapped element position is relative to the box position.
 */
 pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
-    //get the wrapped element dimensions
+    
+    // Get the wrapped element dimensions
     let wrapped_elem_size = session.get_size(shape_box.wrapped_entity);
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
 
-    //print element dimensions
+    // Calculate the box dimensions based on size behavior
+    let box_width = match shape_box.box_options.width_behavior {
+        SizeBehavior::Fixed(width) => {
+            // For fixed width, use the specified width
+            // The wrapped element should be positioned within this fixed width
+            width
+        }
+        SizeBehavior::Content => {
+            // Content sizing - size based on wrapped element + padding (current behavior)
+            wrapped_elem_size.0 + shape_box.box_options.padding * 2.0
+        }
+        SizeBehavior::Grow => {
+            // TODO: Implement grow behavior in future iterations
+            // For now, fall back to content behavior
+            wrapped_elem_size.0 + shape_box.box_options.padding * 2.0
+        }
+    };
+
+    let box_height = match shape_box.box_options.height_behavior {
+        SizeBehavior::Fixed(height) => {
+            // For fixed height, use the specified height
+            height
+        }
+        SizeBehavior::Content => {
+            // Content sizing - size based on wrapped element + padding (current behavior)
+            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+        }
+        SizeBehavior::Grow => {
+            // TODO: Implement grow behavior in future iterations
+            // For now, fall back to content behavior
+            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+        }
+    };
+
     println!(
-        "Box: {}, {}, {}, {}",
-        shape_box.entity, wrapped_elem_size.0, wrapped_elem_size.1, shape_box.box_options.padding
+        "Box: {}, width: {}, height: {}, padding: {}",
+        shape_box.entity, box_width, box_height, shape_box.box_options.padding
     );
-    //set the box dimensions
-    session.set_size(
-        shape_box.entity,
-        wrapped_elem_size.0 + shape_box.box_options.padding * 2.0,
-        wrapped_elem_size.1 + shape_box.box_options.padding * 2.0,
-    );
-    //Update the wrapped element position
-    session.set_position(
-        shape_box.wrapped_entity,
-        shape_box.box_options.padding,
-        shape_box.box_options.padding,
-    );
+
+    // Set the box dimensions
+    session.set_size(shape_box.entity, box_width, box_height);
+
+    // Position the wrapped element within the box
+    // For fixed sizing, we might want to center or align the content
+    let content_x = match shape_box.box_options.width_behavior {
+        SizeBehavior::Fixed(fixed_width) => {
+            // Center the content horizontally within the fixed width
+            let available_width = fixed_width - shape_box.box_options.padding * 2.0;
+            if wrapped_elem_size.0 <= available_width {
+                // Center the content
+                shape_box.box_options.padding + (available_width - wrapped_elem_size.0) / 2.0
+            } else {
+                // Content is larger than available space, align to left with padding
+                shape_box.box_options.padding
+            }
+        }
+        _ => {
+            // For content and grow behaviors, use standard padding
+            shape_box.box_options.padding
+        }
+    };
+
+    let content_y = match shape_box.box_options.height_behavior {
+        SizeBehavior::Fixed(fixed_height) => {
+            // Center the content vertically within the fixed height
+            let available_height = fixed_height - shape_box.box_options.padding * 2.0;
+            if wrapped_elem_size.1 <= available_height {
+                // Center the content
+                shape_box.box_options.padding + (available_height - wrapped_elem_size.1) / 2.0
+            } else {
+                // Content is larger than available space, align to top with padding
+                shape_box.box_options.padding
+            }
+        }
+        _ => {
+            // For content and grow behaviors, use standard padding
+            shape_box.box_options.padding
+        }
+    };
+
+    // Update the wrapped element position
+    session.set_position(shape_box.wrapped_entity, content_x, content_y);
 }
 
 /**
@@ -560,4 +627,50 @@ fn test_layout_box_with_text() {
     assert!(text_size.0 > 0.0);
     assert_eq!(box_size.0, 30.0);
     assert!(box_size.1 > text_size.1);
+}
+
+#[test]
+fn test_box_fixed_size() {
+    let mut session = DiagramBuilder::new();
+    session.set_measure_text_fn(|_, _| (10.0, 10.0));
+    let text = session.new_text(
+        "hello",
+        TextOptions {
+            font_size: 20.0,
+            line_width: 200,
+            ..Default::default()
+        },
+    );
+    let box_options = BoxOptions {
+        padding: 10.0,
+        width_behavior: SizeBehavior::Fixed(100.0),
+        height_behavior: SizeBehavior::Fixed(50.0),
+        ..Default::default()
+    };
+    let box_shape = session.new_box(text.clone(), box_options.clone());
+
+    //layout the box
+    layout_tree_node(&mut session, &box_shape);
+
+    let text_position = session.get_position(text.entity_id);
+    let text_size = session.get_size(text.entity_id);
+
+    let box_position = session.get_position(box_shape.entity_id);
+    let box_size = session.get_size(box_shape.entity_id);
+
+    //assert equal positions
+    // Assert that the text is centered within the box
+    assert_eq!(
+        text_position.0,
+        box_options.padding + (box_options.width_behavior.unwrap_fixed().unwrap() - box_options.padding * 2.0 - text_size.0) / 2.0
+    );
+    assert_eq!(
+        text_position.1,
+        box_options.padding + (box_options.height_behavior.unwrap_fixed().unwrap() - box_options.padding * 2.0 - text_size.1) / 2.0
+    );
+    assert_eq!(box_position, (0.0, 0.0));
+
+    // assert the box size is equal to the fixed size
+    assert_eq!(box_size.0, 100.0);
+    assert_eq!(box_size.1, 50.0);
 }

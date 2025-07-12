@@ -218,15 +218,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let thetext = format!(
         r#"
-    The adjustment factor {} (currently font_size * 0.05) slightly shifts the text vertically to achieve better visual centering. It's a small empirical correction that helps the
-    text appear more naturally centered to the human eye, rather than strictly mathematically centered.
-  
-    Without this adjustment, the text might appear slightly too high in the box, even when it's mathematically centered according to its metrics. This is particularly noticeable
-    with certain fonts or at larger font sizes.
-  
-    In essence, it's an optical adjustment that helps the text look properly centered, compensating for the inherent asymmetry in font design and the way our eyes perceive text
-    positioning."#,
-        "\u{f1878}"
+    Esto es un texto
+    Otra linea de texto
+    Otra mas...
+    "#
     );
 
     let blue_text = session.new_text(
@@ -247,6 +242,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         stroke_width: 1.0,
         padding: 10.0,
         border_radius: 3.0,
+        width_behavior: volare_engine_layout::SizeBehavior::Fixed(700.0), // Fixed width for the box
+        height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), 
+        ..BoxOptions::default()
     };
     let blue_box = session.new_box(blue_text, box_options);
 
@@ -287,7 +285,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     free_container.border_width = 5.0; // Thicker border
 
     // Add the FreeContainer to the table
-   // table_items.push(container_with_elements);
+    table_items.push(container_with_elements);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
