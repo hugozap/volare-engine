@@ -77,7 +77,7 @@ impl DiagramBuilder {
     pub fn new() -> DiagramBuilder {
         DiagramBuilder {
             entity_id_counter: 0,
-            entityTypes : HashMap::<EntityID, EntityType>::new(),
+            entityTypes: HashMap::<EntityID, EntityType>::new(),
             measure_text: Some(|_text, _text_options| (0.0, 0.0)),
             entities: Vec::new(),
             positions: HashMap::new(),
@@ -97,7 +97,6 @@ impl DiagramBuilder {
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
-
         }
     }
 
@@ -120,6 +119,10 @@ impl DiagramBuilder {
         self.custom_components.has_component(component_type)
     }
 
+    pub fn get_custom_component_types(&self) -> Vec<&String> {
+        self.custom_components.get_registered_types()
+    }
+
     pub fn create_custom_component(
         &mut self,
         component_type: &str,
@@ -132,7 +135,7 @@ impl DiagramBuilder {
             ));
         }
 
-        let factory = { self.custom_components.get(component_type).unwrap().clone() }; 
+        let factory = { self.custom_components.get(component_type).unwrap().clone() };
 
         factory(options, self)
     }
@@ -739,5 +742,108 @@ mod tests {
         );
         assert_eq!(w, 60.0);
         assert_eq!(h, 12.0);
+    }
+}
+
+//Component registration tests
+#[cfg(test)]
+mod component_registration_tests {
+    use serde_json::{json, Map, Value};
+
+    use super::*;
+
+    /// Custom Component 1: Badge
+    /// Creates a rounded pill-shaped element with text
+    fn create_badge_component(
+        attrs: &Map<String, Value>,
+        builder: &mut DiagramBuilder,
+    ) -> Result<DiagramTreeNode, String> {
+        println!("🏷️  Creating badge component with attrs: {:?}", attrs);
+
+        // Extract attributes
+        let text = get_string_attr(attrs, "text", "Badge");
+        let background = get_string_attr(attrs, "background", "blue");
+        let color = get_string_attr(attrs, "color", "white");
+        let font_size = get_float_attr(attrs, "font_size", 12.0);
+        let padding = get_float_attr(attrs, "padding", 8.0);
+
+        // Create text element
+        let text_options = TextOptions {
+            font_family: "Arial".to_string(),
+            font_size,
+            text_color: color,
+            line_width: 200,
+            line_spacing: 0.0,
+        };
+        let text_node = builder.new_text(&text, text_options);
+
+        // Wrap in rounded box
+        let box_options = BoxOptions {
+            fill_color: Fill::Color(background),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            padding,
+            border_radius: font_size,               // Make it pill-shaped
+            width_behavior: SizeBehavior::Content,  // Auto width based on text
+            height_behavior: SizeBehavior::Content, // Auto height based on text
+        };
+        let badge = builder.new_box(text_node, box_options);
+
+        println!("✅ Badge '{}' created successfully", text);
+        Ok(badge)
+    }
+
+    // Helper function to extract attributes (since we can't access CustomComponentRegistry helpers directly)
+    fn get_string_attr(attrs: &Map<String, Value>, key: &str, default: &str) -> String {
+        attrs
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(default)
+            .to_string()
+    }
+
+    fn get_float_attr(attrs: &Map<String, Value>, key: &str, default: f64) -> Float {
+        attrs.get(key).and_then(|v| v.as_f64()).unwrap_or(default) as Float
+    }
+
+    fn get_bool_attr(attrs: &Map<String, Value>, key: &str, default: bool) -> bool {
+        attrs.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
+    }
+
+    fn get_int_attr(attrs: &Map<String, Value>, key: &str, default: i64) -> i64 {
+        attrs.get(key).and_then(|v| v.as_i64()).unwrap_or(default)
+    }
+
+    #[test]
+    fn test_badge_component() {
+        let mut builder = DiagramBuilder::new();
+        builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
+        builder.register_custom_component("badge", create_badge_component);
+
+        let attrs = json!({
+            "text": "Test",
+            "background": "blue"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let result = builder.create_custom_component("badge", &attrs);
+        assert!(result.is_ok());
+        let badge_node = result.unwrap();
+        assert_eq!(badge_node.entity_type, EntityType::BoxShape);
+        assert!(builder.has_custom_component("badge"));
+        let badge = builder.get_box(badge_node.entity_id);
+        assert_eq!(badge.box_options.fill_color, Fill::Color("blue".to_string()));
+    }
+
+    #[test]
+    fn test_all_components_registration() {
+        let mut builder = DiagramBuilder::new();
+        builder.register_custom_component("badge", create_badge_component);
+
+        let types = builder.get_custom_component_types();
+        assert_eq!(types.len(), 1);
+        assert!(builder.has_custom_component("badge"));
     }
 }

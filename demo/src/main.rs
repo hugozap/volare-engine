@@ -360,5 +360,3 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     table
 }
 
-// Custom component to register:
-// This is a placeholder for any custom components you might want to register

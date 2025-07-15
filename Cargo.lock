@@ -196,6 +196,8 @@ dependencies = [
  "image_renderer",
  "resvg",
  "rusttype",
+ "serde",
+ "serde_json",
  "svg_renderer",
  "volare_engine_layout",
 ]

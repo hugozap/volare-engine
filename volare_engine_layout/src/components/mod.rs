@@ -296,6 +296,60 @@ impl fmt::Display for Fill {
     }
 }
 
+impl PartialEq for Fill {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Fill::Color(a), Fill::Color(b)) => a == b,
+            (Fill::LinearGradient(a), Fill::LinearGradient(b)) => a == b,
+            (Fill::RadialGradient(a), Fill::RadialGradient(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Fill {}
+
+impl PartialEq for LinearGradient {
+    fn eq(&self, other: &Self) -> bool {
+        self.x1 == other.x1
+            && self.y1 == other.y1
+            && self.x2 == other.x2
+            && self.y2 == other.y2
+            && self.stops == other.stops
+    }
+}
+
+impl Eq for LinearGradient {}
+
+impl PartialEq for RadialGradient {
+    fn eq(&self, other: &Self) -> bool {
+        self.cx == other.cx
+            && self.cy == other.cy
+            && self.r == other.r
+            && self.stops == other.stops
+    }
+}
+
+impl Eq for RadialGradient {}
+
+impl PartialEq for GradientStop {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                GradientStop::ColorStop { offset: a_offset, color: a_color },
+                GradientStop::ColorStop { offset: b_offset, color: b_color },
+            ) => a_offset == b_offset && a_color == b_color,
+            (
+                GradientStop::OpacityStop { offset: a_offset, opacity: a_opacity },
+                GradientStop::OpacityStop { offset: b_offset, opacity: b_opacity },
+            ) => a_offset == b_offset && a_opacity == b_opacity,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for GradientStop {}
+
 #[derive(Debug)]
 pub struct BoxOptions {
     pub fill_color: Fill,
