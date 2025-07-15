@@ -55,6 +55,8 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         //TODO: falta tener en cuenta padding al momento de hacer layout de elementos de box
         padding: 50.0,
         border_radius: 0.0,
+        width_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), // fixed width
+        height_behavior: volare_engine_layout::SizeBehavior::Content, // auto height
     };
 
     let box1 = session.new_box(blue_text, box_options);

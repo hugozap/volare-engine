@@ -21,6 +21,8 @@ use measure_text::{
 
 use std::fs::File;
 
+
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
@@ -357,3 +359,6 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     let table = session.new_table(texts, 3, table_options);
     table
 }
+
+// Custom component to register:
+// This is a placeholder for any custom components you might want to register

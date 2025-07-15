@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 /**
  * This object encapsulates diagram creation logic.
@@ -21,6 +21,7 @@ pub struct DiagramBuilder {
     pub positions: HashMap<EntityID, Point>,
     pub sizes: HashMap<EntityID, Size>,
     entity_id_counter: usize,
+    pub entityTypes: HashMap<EntityID, EntityType>,
 
     // Components
     boxes: HashMap<EntityID, ShapeBox>,
@@ -37,6 +38,7 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
+    pub custom_components: CustomComponentRegistry,
 }
 
 // Stores the type of entity and the index of the entity in the corresponding vector
@@ -50,7 +52,7 @@ pub struct DiagramTreeNode {
 }
 
 impl DiagramTreeNode {
-    fn new(entity_type: EntityType, id: EntityID) -> DiagramTreeNode {
+    pub fn new(entity_type: EntityType, id: EntityID) -> DiagramTreeNode {
         DiagramTreeNode {
             entity_type,
             entity_id: id,
@@ -75,6 +77,7 @@ impl DiagramBuilder {
     pub fn new() -> DiagramBuilder {
         DiagramBuilder {
             entity_id_counter: 0,
+            entityTypes : HashMap::<EntityID, EntityType>::new(),
             measure_text: Some(|_text, _text_options| (0.0, 0.0)),
             entities: Vec::new(),
             positions: HashMap::new(),
@@ -93,7 +96,45 @@ impl DiagramBuilder {
             images: HashMap::new(),
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
+            custom_components: CustomComponentRegistry::new(),
+
         }
+    }
+
+    /// Register a custom component with the builder
+    pub fn register_custom_component<F>(&mut self, component_type: &str, factory: F)
+    where
+        F: Fn(
+                &serde_json::Map<String, serde_json::Value>,
+                &mut DiagramBuilder,
+            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.custom_components.register(component_type, factory);
+    }
+
+    /// Check if a custom component is registered
+    pub fn has_custom_component(&self, component_type: &str) -> bool {
+        self.custom_components.has_component(component_type)
+    }
+
+    pub fn create_custom_component(
+        &mut self,
+        component_type: &str,
+        options: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<DiagramTreeNode, String> {
+        if !self.custom_components.has_component(component_type) {
+            return Err(format!(
+                "Custom component '{}' not registered",
+                component_type
+            ));
+        }
+
+        let factory = { self.custom_components.get(component_type).unwrap().clone() }; 
+
+        factory(options, self)
     }
 
     /* Create a new entity of a given type
@@ -108,6 +149,7 @@ impl DiagramBuilder {
         self.entities.push(id);
         self.positions.insert(id, Point::new(0.0, 0.0));
         self.sizes.insert(id, Size::new(0.0, 0.0));
+        self.entityTypes.insert(id, entity_type.clone());
         id
     }
 
@@ -172,15 +214,16 @@ impl DiagramBuilder {
     }
 
     // Creates a new Vertical stack.
-    pub fn new_vstack(&mut self,
-         children: Vec<DiagramTreeNode>,
+    pub fn new_vstack(
+        &mut self,
+        children: Vec<DiagramTreeNode>,
         horizontal_alignment: HorizontalAlignment,
-        ) -> DiagramTreeNode {
+    ) -> DiagramTreeNode {
         let stack_id = self.new_entity(EntityType::VerticalStackShape);
         let mut vstack = VerticalStack {
             entity: stack_id,
             elements: Vec::new(),
-            horizontal_alignment
+            horizontal_alignment,
         };
         let mut node = DiagramTreeNode {
             entity_type: EntityType::VerticalStackShape,
@@ -558,6 +601,22 @@ impl DiagramBuilder {
     pub fn get_free_container_mut(&mut self, id: EntityID) -> &mut FreeContainer {
         self.free_containers.get_mut(&id).unwrap()
     }
+
+    pub fn get_custom_component(
+        &self,
+        component_type: &str,
+    ) -> Option<
+        &Arc<
+            dyn Fn(
+                    &serde_json::Map<String, serde_json::Value>,
+                    &mut DiagramBuilder,
+                ) -> Result<DiagramTreeNode, String>
+                + Send
+                + Sync,
+        >,
+    > {
+        self.custom_components.get(component_type)
+    }
 }
 
 // Enhanced API Builder Structs
@@ -598,7 +657,8 @@ impl<'a> HStackBuilder<'a> {
 
     /// Build the horizontal stack
     pub fn build(self) -> DiagramTreeNode {
-        self.builder.new_hstack(self.children, VerticalAlignment::Center)
+        self.builder
+            .new_hstack(self.children, VerticalAlignment::Center)
     }
 }
 

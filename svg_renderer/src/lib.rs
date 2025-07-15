@@ -495,11 +495,12 @@ fn test_render_box_with_rect_in_group() {
     let mut session = DiagramBuilder::new();
 
     let rect = session.new_rectangle(RectOptions {
-         width: 100.0, height: 50.0,
-         fill_color:Fill::Color("black".to_string()), 
-         stroke_color: String::from("magenta"), 
+         width_behavior: SizeBehavior::Fixed(100.0),
+         height_behavior: SizeBehavior::Fixed(50.0),
+         fill_color:Fill::Color("black".to_string()),
+         stroke_color: String::from("magenta"),
          stroke_width: 1.0, border_radius: 1.0 });
-    
+
     let group = session.new_group(vec![rect]);
 
     let box_ = session.new_box(group, BoxOptions{
@@ -508,6 +509,8 @@ fn test_render_box_with_rect_in_group() {
         stroke_width: 1.0,
         padding: 2.0,
         border_radius: 0.0,
+        width_behavior: SizeBehavior::Content, // 100 + 2*2 (padding)
+        height_behavior: SizeBehavior::Content, // 50 + 2
     });
 
     layout_tree_node(&mut session, &box_);
@@ -539,7 +542,7 @@ fn test_render_line() {
         stroke_width: 1.0,
     };
     let mut session = DiagramBuilder::new();
-    let line = session.new_line(options);
+    let line = session.new_line((0.0,0.0),(0.0,0.0),options);
     
     let node = render_node(&line, &session);
     assert_eq!(
@@ -579,6 +582,8 @@ fn test_render_box_rounded_corners_with_group() {
         stroke_width: 1.0,
         padding: 0.0,
         border_radius: 5.5,
+        width_behavior: SizeBehavior::Content, // 0 + 2*0 (padding)
+        height_behavior: SizeBehavior::Content, // 0 + 2*0  
     });
     let node = render_node(&box_, &session);
     assertIsSameSVG(

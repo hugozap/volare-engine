@@ -2,7 +2,9 @@
 pub mod table;
 
 use core::fmt;
-use std::any::Any;
+use std::{any::Any, collections::HashMap, sync::Arc};
+
+use serde_json::{Value, Map};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -1034,5 +1036,352 @@ impl FreeContainer {
         self.border_color = Some(color.to_string());
         self.border_width = width;
         self
+    }
+}
+
+
+/// Type alias for custom component factory functions
+/// Takes a map of attributes and a mutable reference to DiagramBuilder
+/// Returns a Result with either a DiagramTreeNode or an error message
+pub type CustomComponentFactory = Arc<dyn Fn(&Map<String, Value>, &mut crate::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync>;
+
+/// Registry for custom components
+pub struct CustomComponentRegistry {
+    factories: HashMap<String, CustomComponentFactory>,
+}
+
+impl CustomComponentRegistry {
+    pub fn new() -> Self {
+        Self {
+            factories: HashMap::new(),
+        }
+    }
+
+    /// Register a new custom component with the given identifier and factory function
+    pub fn register<F>(&mut self, component_type: &str, factory: F)
+    where
+        F: Fn(&Map<String, Value>, &mut crate::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync + 'static,
+    {
+        self.factories.insert(component_type.to_string(), Arc::new(factory));
+    }
+
+    /// Create a component instance using the registered factory
+    pub fn create_component(
+        &self,
+        component_type: &str,
+        attributes: &Map<String, Value>,
+        builder: &mut crate::DiagramBuilder,
+    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
+        match self.factories.get(component_type) {
+            Some(factory) => factory(attributes, builder),
+            None => Err(format!("Unknown custom component type: {}", component_type)),
+        }
+    }
+
+    /// Check if a component type is registered
+    pub fn has_component(&self, component_type: &str) -> bool {
+        self.factories.contains_key(component_type)
+    }
+
+    /// Get all registered component types
+    pub fn get_registered_types(&self) -> Vec<&String> {
+        self.factories.keys().collect()
+    }
+
+     pub fn get(
+        &self,
+        component_type: &str,
+    ) -> Option<&Arc<dyn Fn(&serde_json::Map<String, serde_json::Value>, &mut crate::diagram_builder::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync>> {
+        self.factories.get(component_type)
+    }
+}
+
+impl Default for CustomComponentRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod custom_component_tests {
+    use super::*;
+    use crate::*;
+    use serde_json::json;
+
+    /// Test custom component: Badge
+    /// Creates a rounded box with text and a colored background
+    fn create_badge_component(
+        attrs: &Map<String, Value>,
+        builder: &mut DiagramBuilder,
+    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
+        // Extract attributes with defaults
+        let text = attrs
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Badge")
+            .to_string();
+
+        let background_color = attrs
+            .get("background_color")
+            .and_then(|v| v.as_str())
+            .unwrap_or("blue")
+            .to_string();
+
+        let text_color = attrs
+            .get("text_color")
+            .and_then(|v| v.as_str())
+            .unwrap_or("white")
+            .to_string();
+
+        let font_size = attrs
+            .get("font_size")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(12.0) as Float;
+
+        let padding = attrs
+            .get("padding")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(8.0) as Float;
+
+        let border_radius = attrs
+            .get("border_radius")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(15.0) as Float;
+
+        // Create the badge components
+        let text_options = TextOptions {
+            font_family: "Arial".to_string(),
+            font_size,
+            text_color,
+            line_width: 200, // Reasonable default
+            line_spacing: 0.0,
+        };
+
+        let text_node = builder.new_text(&text, text_options);
+
+        let box_options = BoxOptions {
+            fill_color: Fill::Color(background_color),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            padding,
+            border_radius,
+            width_behavior: SizeBehavior::Content,
+            height_behavior: SizeBehavior::Content,
+        };
+
+        let badge_node = builder.new_box(text_node, box_options);
+        Ok(badge_node)
+    }
+
+    /// Test custom component: Card
+    /// Creates a card with title, content, and optional footer
+    fn create_card_component(
+        attrs: &Map<String, Value>,
+        builder: &mut DiagramBuilder,
+    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
+        let title = attrs
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Card Title")
+            .to_string();
+
+        let content = attrs
+            .get("content")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Card content goes here")
+            .to_string();
+
+        let footer = attrs.get("footer").and_then(|v| v.as_str());
+
+        let padding = attrs
+            .get("padding")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(16.0) as Float;
+
+        let background_color = attrs
+            .get("background_color")
+            .and_then(|v| v.as_str())
+            .unwrap_or("white")
+            .to_string();
+
+        let border_color = attrs
+            .get("border_color")
+            .and_then(|v| v.as_str())
+            .unwrap_or("gray")
+            .to_string();
+
+        // Create title
+        let title_options = TextOptions {
+            font_family: "Arial".to_string(),
+            font_size: 18.0,
+            text_color: "black".to_string(),
+            line_width: 300,
+            line_spacing: 0.0,
+        };
+        let title_node = builder.new_text(&title, title_options);
+
+        // Create content
+        let content_options = TextOptions {
+            font_family: "Arial".to_string(),
+            font_size: 14.0,
+            text_color: "gray".to_string(),
+            line_width: 300,
+            line_spacing: 2.0,
+        };
+        let content_node = builder.new_text(&content, content_options);
+
+        // Create children vector
+        let mut children = vec![title_node, content_node];
+
+        // Add footer if provided
+        if let Some(footer_text) = footer {
+            let footer_options = TextOptions {
+                font_family: "Arial".to_string(),
+                font_size: 12.0,
+                text_color: "lightgray".to_string(),
+                line_width: 300,
+                line_spacing: 0.0,
+            };
+            let footer_node = builder.new_text(footer_text, footer_options);
+            children.push(footer_node);
+        }
+
+        // Create vertical stack
+        let stack = builder.new_vstack(children, HorizontalAlignment::Left);
+
+        // Wrap in box
+        let box_options = BoxOptions {
+            fill_color: Fill::Color(background_color),
+            stroke_color: border_color,
+            stroke_width: 1.0,
+            padding,
+            border_radius: 8.0,
+            width_behavior: SizeBehavior::Content,
+            height_behavior: SizeBehavior::Content,
+        };
+
+        let card_node = builder.new_box(stack, box_options);
+        Ok(card_node)
+    }
+
+    #[test]
+    fn test_custom_component_registry() {
+        let mut registry = CustomComponentRegistry::new();
+
+        // Register badge component
+        registry.register("badge", create_badge_component);
+
+        // Register card component  
+        registry.register("card", create_card_component);
+
+        // Test that components are registered
+        assert!(registry.has_component("badge"));
+        assert!(registry.has_component("card"));
+        assert!(!registry.has_component("unknown"));
+
+        // Test getting registered types
+        let types = registry.get_registered_types();
+        assert_eq!(types.len(), 2);
+        assert!(types.contains(&&"badge".to_string()));
+        assert!(types.contains(&&"card".to_string()));
+    }
+
+    #[test]
+    fn test_create_badge_component() {
+        let mut registry = CustomComponentRegistry::new();
+        registry.register("badge", create_badge_component);
+
+        let mut builder = DiagramBuilder::new();
+        builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
+
+        // Create badge with custom attributes
+        let attrs = json!({
+            "text": "NEW",
+            "background_color": "red",
+            "text_color": "white",
+            "font_size": 14.0,
+            "padding": 6.0,
+            "border_radius": 20.0
+        });
+
+        let attrs_map = attrs.as_object().unwrap();
+        let badge = registry.create_component("badge", attrs_map, &mut builder);
+
+        assert!(badge.is_ok());
+        let badge_node = badge.unwrap();
+        assert_eq!(badge_node.entity_type, EntityType::BoxShape);
+    }
+
+    #[test]
+    fn test_create_card_component() {
+        let mut registry = CustomComponentRegistry::new();
+        registry.register("card", create_card_component);
+
+        let mut builder = DiagramBuilder::new();
+        builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
+
+        // Create card with custom attributes
+        let attrs = json!({
+            "title": "Welcome Card",
+            "content": "This is a sample card component with custom content.",
+            "footer": "Created with custom components",
+            "padding": 20.0,
+            "background_color": "lightblue",
+            "border_color": "darkblue"
+        });
+
+        let attrs_map = attrs.as_object().unwrap();
+        let card = registry.create_component("card", attrs_map, &mut builder);
+
+        assert!(card.is_ok());
+        let card_node = card.unwrap();
+        assert_eq!(card_node.entity_type, EntityType::BoxShape);
+    }
+
+    #[test]
+    fn test_unknown_component_error() {
+        let registry = CustomComponentRegistry::new();
+        let mut builder = DiagramBuilder::new();
+        let attrs = json!({}).as_object().unwrap().clone();
+
+        let result = registry.create_component("unknown", &attrs, &mut builder);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unknown custom component type"));
+    }
+}
+
+// Helper functions for extracting common attribute types
+impl CustomComponentRegistry {
+    /// Helper to extract a string attribute with a default value
+    pub fn get_string_attr(attrs: &Map<String, Value>, key: &str, default: &str) -> String {
+        attrs
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(default)
+            .to_string()
+    }
+
+    /// Helper to extract a float attribute with a default value
+    pub fn get_float_attr(attrs: &Map<String, Value>, key: &str, default: f64) -> Float {
+        attrs
+            .get(key)
+            .and_then(|v| v.as_f64())
+            .unwrap_or(default) as Float
+    }
+
+    /// Helper to extract a boolean attribute with a default value
+    pub fn get_bool_attr(attrs: &Map<String, Value>, key: &str, default: bool) -> bool {
+        attrs
+            .get(key)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(default)
+    }
+
+    /// Helper to extract an integer attribute with a default value
+    pub fn get_int_attr(attrs: &Map<String, Value>, key: &str, default: i64) -> i64 {
+        attrs
+            .get(key)
+            .and_then(|v| v.as_i64())
+            .unwrap_or(default)
     }
 }
