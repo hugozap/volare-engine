@@ -54,6 +54,11 @@ fn create_card_component(
     let shadow = get_bool_attr(attrs, "shadow", true);
     let variant = get_string_attr(attrs, "variant", "default");
 
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        id = uuid::Uuid::new_v4().to_string()
+    }
+
     // Define card styles based on variant
     let (bg_color, border_color) = match variant.as_str() {
         "primary" => ("#ffffff", "#007bff"),
@@ -68,6 +73,7 @@ fn create_card_component(
     // Add title if provided
     if !title.is_empty() {
         let title_text = builder.new_text(
+            format!("{}_title", id),
             &title,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -83,6 +89,7 @@ fn create_card_component(
     // Add subtitle if provided
     if !subtitle.is_empty() {
         let subtitle_text = builder.new_text(
+            format!("{}_subtitle", id),
             &subtitle,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -98,6 +105,7 @@ fn create_card_component(
     // Add content if provided
     if !content.is_empty() {
         let content_text = builder.new_text(
+            format!("{}_content", id),
             &content,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -113,6 +121,7 @@ fn create_card_component(
     // Add footer if provided
     if !footer.is_empty() {
         let footer_text = builder.new_text(
+            format!("{}_footer", id),
             &footer,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -126,12 +135,15 @@ fn create_card_component(
     }
 
     // Create layout
-    let content_stack = builder.new_vstack(children, HorizontalAlignment::Left);
+    let content_stack = builder.new_vstack(
+        format!("{}_contentstack", id),
+        children, HorizontalAlignment::Left);
 
     // Apply shadow effect by creating multiple boxes
     if shadow {
         // Shadow box (slightly offset)
         let shadow_box = builder.new_box(
+            format!("{}_shadowbox", id),
             content_stack,
             BoxOptions {
                 fill_color: Fill::Color("#00000010".to_string()),
@@ -145,7 +157,9 @@ fn create_card_component(
         );
 
         // Main card box
-        let main_content = builder.new_rectangle(RectOptions {
+        let main_content = builder.new_rectangle(
+            format!("{}_maincontent", id),
+            RectOptions {
             width_behavior: SizeBehavior::Content,
             height_behavior: SizeBehavior::Content,
             fill_color: Fill::Color(bg_color.to_string()),
@@ -155,13 +169,16 @@ fn create_card_component(
         });
 
         // Use free container to overlay them
-        let card = builder.new_free_container(vec![
+        let card = builder.new_free_container(
+            id, 
+            vec![
             (shadow_box, (2.0, 2.0)),   // Shadow slightly offset
             (main_content, (0.0, 0.0)), // Main card on top
         ]);
         Ok(card)
     } else {
         let card = builder.new_box(
+            id,
             content_stack,
             BoxOptions {
                 fill_color: Fill::Color(bg_color.to_string()),
@@ -187,6 +204,11 @@ fn create_list_component(
     let spacing = get_float_attr(attrs, "spacing", 4.0);
     let width = get_float_attr(attrs, "width", 300.0);
     let font_size = get_float_attr(attrs, "font_size", 14.0);
+    let mut id = get_string_attr(attrs, "id", "");
+
+    if id.is_empty(){
+        id = uuid::Uuid::new_v4().to_string()
+    }
 
     if items.is_empty() {
         return Err("List component requires 'items' array".to_string());
@@ -204,6 +226,7 @@ fn create_list_component(
         };
 
         let marker_text = builder.new_text(
+            format!("{}-marker", id),
             &marker,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -215,6 +238,7 @@ fn create_list_component(
         );
 
         let item_text = builder.new_text(
+            format!("{}_item_text", id),
             item,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -225,11 +249,15 @@ fn create_list_component(
             },
         );
 
-        let list_item = builder.new_hstack(vec![marker_text, item_text], VerticalAlignment::Top);
+        let list_item = builder.new_hstack(
+            format!("list_items_{}", id),
+            vec![marker_text, item_text], VerticalAlignment::Top);
         list_children.push(list_item);
     }
 
-    let list = builder.new_vstack(list_children, HorizontalAlignment::Left);
+    let list = builder.new_vstack(
+        format!("list_items_{}", id),
+        list_children, HorizontalAlignment::Left);
     Ok(list)
 }
 
@@ -244,6 +272,11 @@ fn create_form_field_component(
     let required = get_bool_attr(attrs, "required", false);
     let width = get_float_attr(attrs, "width", 250.0);
     let error = get_string_attr(attrs, "error", "");
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+         id = format!("form_field_{}", uuid::Uuid::new_v4());
+    }
 
     let mut children = Vec::new();
 
@@ -255,6 +288,7 @@ fn create_form_field_component(
     };
 
     let label_node = builder.new_text(
+        format!("label_{}", id),
         &label_text,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -273,6 +307,7 @@ fn create_form_field_component(
     };
 
     let placeholder_text = builder.new_text(
+        format!("placeholder_{}", id),
         &placeholder,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -284,6 +319,7 @@ fn create_form_field_component(
     );
 
     let input_field = builder.new_box(
+        format!("input_field_{}", id),
         placeholder_text,
         BoxOptions {
             fill_color: Fill::Color("#ffffff".to_string()),
@@ -305,6 +341,7 @@ fn create_form_field_component(
     // Add error message if present
     if !error.is_empty() {
         let error_text = builder.new_text(
+            format!("error_{}", id),
             &error,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -317,7 +354,7 @@ fn create_form_field_component(
         children.push(error_text);
     }
 
-    let form_field = builder.new_vstack(children, HorizontalAlignment::Left);
+    let form_field = builder.new_vstack(id.to_string(), children, HorizontalAlignment::Left);
     Ok(form_field)
 }
 
@@ -332,7 +369,11 @@ fn create_stats_card_component(
     let icon = get_string_attr(attrs, "icon", "📊");
     let trend = get_string_attr(attrs, "trend", "neutral"); // up, down, neutral
     let color = get_string_attr(attrs, "color", "#007bff");
-
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("stats_card_{}", uuid::Uuid::new_v4());
+    }
     // Determine trend color and symbol
     let (trend_color, trend_symbol) = match trend.as_str() {
         "up" => ("#28a745", "↗"),
@@ -342,6 +383,7 @@ fn create_stats_card_component(
 
     // Create icon
     let icon_text = builder.new_text(
+        format!("icon_{}", id),
         &icon,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -354,6 +396,7 @@ fn create_stats_card_component(
 
     // Create value and title section
     let value_text = builder.new_text(
+        format!("value_{}", id),
         &value,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -365,6 +408,7 @@ fn create_stats_card_component(
     );
 
     let title_text = builder.new_text(
+        format!("title_{}", id),
         &title,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -381,6 +425,7 @@ fn create_stats_card_component(
     if !change.is_empty() {
         let change_text = format!("{} {}", trend_symbol, change);
         let change_node = builder.new_text(
+            "change_text".to_string(),
             &change_text,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -393,10 +438,11 @@ fn create_stats_card_component(
         right_children.push(change_node);
     }
 
-    let right_section = builder.new_vstack(right_children, HorizontalAlignment::Left);
-    let content = builder.new_hstack(vec![icon_text, right_section], VerticalAlignment::Center);
+    let right_section = builder.new_vstack("right_section".to_string(), right_children, HorizontalAlignment::Left);
+    let content = builder.new_hstack("stats_card_content".to_string(), vec![icon_text, right_section], VerticalAlignment::Center);
 
     let stats_card = builder.new_box(
+        id,
         content,
         BoxOptions {
             fill_color: Fill::Color("#ffffff".to_string()),
@@ -421,6 +467,11 @@ fn create_nav_menu_component(
     let orientation = get_string_attr(attrs, "orientation", "horizontal"); // horizontal, vertical
     let active_item = get_string_attr(attrs, "active_item", "");
     let style = get_string_attr(attrs, "style", "default"); // default, pills, tabs
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("nav_menu_{}", uuid::Uuid::new_v4());
+    }
 
     if items.is_empty() {
         return Err("Navigation menu requires 'items' array".to_string());
@@ -442,6 +493,7 @@ fn create_nav_menu_component(
         };
 
         let nav_text = builder.new_text(
+            format!("nav_text_{}_{}", item, id),
             item,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -453,6 +505,7 @@ fn create_nav_menu_component(
         );
 
         let nav_item = builder.new_box(
+            format!("nav_item_{}_{}", item, id),
             nav_text,
             BoxOptions {
                 fill_color: Fill::Color(bg_color.to_string()),
@@ -469,8 +522,8 @@ fn create_nav_menu_component(
     }
 
     let nav_menu = match orientation.as_str() {
-        "vertical" => builder.new_vstack(nav_children, HorizontalAlignment::Left),
-        _ => builder.new_hstack(nav_children, VerticalAlignment::Center),
+        "vertical" => builder.new_vstack(format!("nav_menu_{}_{}", id, orientation), nav_children, HorizontalAlignment::Left),
+        _ => builder.new_hstack(format!("nav_menu_{}_{}", id, orientation), nav_children, VerticalAlignment::Center),
     };
 
     Ok(nav_menu)
@@ -485,6 +538,12 @@ fn create_header_component(
     let subtitle = get_string_attr(attrs, "subtitle", "");
     let breadcrumbs = get_array_attr(attrs, "breadcrumbs");
     let show_back = get_bool_attr(attrs, "show_back", false);
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("header_{}", uuid::Uuid::new_v4());
+    }
+
 
     let mut children = Vec::new();
 
@@ -492,6 +551,7 @@ fn create_header_component(
     if !breadcrumbs.is_empty() {
         let breadcrumb_text = breadcrumbs.join(" > ");
         let breadcrumb_node = builder.new_text(
+            format!("breadcrumb_{}",id),
             &breadcrumb_text,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -507,6 +567,7 @@ fn create_header_component(
     // Add back button if requested
     if show_back {
         let back_text = builder.new_text(
+            "back_button".to_string(),
             "← Back",
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -521,6 +582,7 @@ fn create_header_component(
 
     // Add main title
     let title_node = builder.new_text(
+        format!("title_{}", id),
         &title,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -535,6 +597,7 @@ fn create_header_component(
     // Add subtitle if provided
     if !subtitle.is_empty() {
         let subtitle_node = builder.new_text(
+            format!("subtitle_{}", id),
             &subtitle,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -547,7 +610,7 @@ fn create_header_component(
         children.push(subtitle_node);
     }
 
-    let header = builder.new_vstack(children, HorizontalAlignment::Left);
+    let header = builder.new_vstack("header".to_string(),children, HorizontalAlignment::Left);
     Ok(header)
 }
 

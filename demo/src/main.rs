@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     points.push((10.0, 0.0));
 
     let polyline = session.new_polyline(
+        "star".to_string(),
         points,
         LineOptions {
             stroke_color: "black".to_string(),
@@ -64,11 +65,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rectOpts.height_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.stroke_color = "black".to_string();
     rectOpts.stroke_width = 1.0;
-    let rect = session.new_rectangle(rectOpts.clone());
-    let rect2 = session.new_rectangle(rectOpts.clone());
+    let rect = session.new_rectangle("r1".to_string(), rectOpts.clone());
+    let rect2 = session.new_rectangle("r2".to_string(), rectOpts.clone());
 
 
     let label = session.new_text(
+        "label".to_string(),
         "Center",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -80,6 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let hstack_centered = session.new_hstack(
+        "hstack_centered".to_string(),
         vec![rect, label, rect2],
         volare_engine_layout::VerticalAlignment::Center
     );
@@ -100,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     hex_points.push(hex_points[0]);
 
     let hexagon = session.new_polyline(
+        "hexagon".to_string(),
         hex_points,
         LineOptions {
             stroke_color: "blue".to_string(),
@@ -111,6 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
     for i in 0..10 {
         let ellipse = session.new_elipse(
+            format!("table_ellipse_{}", i).to_string(),
             (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
@@ -121,7 +126,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         table_items_ellipses.push(ellipse);
     }
-    let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
+    let tableEllipses = session.new_table("table_ellipses".to_string(), table_items_ellipses, 5, TableOptions::default());
 
     //Create a list of 10 texts
     let mut table_items = Vec::new();
@@ -131,6 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     table_items.push(hexagon);
     for i in 0..10 {
         let text = session.new_text(
+            format!("table_text_{}", i),
             &format!("Text hey ☣ {} \nthis is a multiline text", i),
             text_options.clone(),
         );
@@ -141,6 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create an ellipse and wrap it with a box
     let ellipse = session.new_elipse(
+        "ellipse1".to_string(),
         (0.0, 0.0),
         (10.0, 10.0),
         EllipseOptions {
@@ -155,6 +162,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Now add 10 ellipses
     for i in 0..10 {
         let ellipse = session.new_elipse(
+            format!("ellipse{}", i).to_string(),
             (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
@@ -179,24 +187,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //create text shape
     let text = session.new_text(
+        "lorem_ipsum".to_string(),
         std::str::from_utf8(lorem_ipsum).unwrap(),
         text_options.clone(),
     );
     table_items.push(text);
 
     //Add sample image from file (first instance)
-    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
+    let sampleImage = session.new_image_from_file("imagefile0".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
     //table_items.push(sampleImage);
 
     //Add sample image from file
     // The path is relative to where the binary is run
-    let file_image = session.new_image_from_file("demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
+    let file_image = session.new_image_from_file("imagefile".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
    // table_items.push(file_image);
 
     // Create a FreeContainer with multiple visual elements at specific positions using the new method
 
     // Create all elements first
     let title_text = session.new_text(
+        "titletext".to_string(),
         "FreeContainer Demo",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -208,6 +218,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let red_circle = session.new_elipse(
+        "redcircle".to_string(),
         (0.0, 0.0),   // center position (will be positioned by container)
         (15.0, 15.0), // radius
         EllipseOptions {
@@ -226,6 +237,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let blue_text = session.new_text(
+        "bluetext".to_string(),
         &thetext,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -247,9 +259,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), 
         ..BoxOptions::default()
     };
-    let blue_box = session.new_box(blue_text, box_options);
+    let blue_box = session.new_box("bluebox".to_string(),blue_text, box_options);
 
     let green_ellipse = session.new_elipse(
+        "greeneclipse".to_string(),
         (0.0, 0.0),
         (30.0, 20.0),
         EllipseOptions {
@@ -260,6 +273,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let subtitle = session.new_text(
+        "test_absolute".to_string(),
         "Absolute positioning of elements",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -271,7 +285,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Create a container with all children at once
-    let container_with_elements = session.new_free_container(vec![
+    let container_with_elements = session.new_free_container("containerwithelems".to_string(),vec![
         (title_text, (30.0, 10.0)),
         (red_circle, (40.0, 50.0)),
         (blue_box, (80.0, 40.0)),
@@ -280,7 +294,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]);
 
     // Add styling to the container with more vibrant colors
-    let free_container = session.get_free_container_mut(container_with_elements.entity_id);
+    let free_container = session.get_free_container_mut(container_with_elements.entity_id.clone());
     free_container.background_color = Some("#FFDDDD".to_string()); // Light red background (more visible)
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
@@ -344,7 +358,9 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     //Create a list of 10 texts
     let mut texts = Vec::new();
     for i in 0..10 {
+        let textid = format!("text_{}", i);
         let text = session.new_text(
+            textid,
             &format!("Text hey {} \nthis is a multiline text", i),
             text_options.clone(),
         );
@@ -356,7 +372,7 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
         ..Default::default()
     };
     //Create a table for the texts with 2 columns
-    let table = session.new_table(texts, 3, table_options);
+    let table = session.new_table("tabletexts".to_string(), texts, 3, table_options);
     table
 }
 

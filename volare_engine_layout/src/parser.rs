@@ -536,14 +536,8 @@ impl JsonLinesBuilder {
         }
     }
 
-    pub fn next_id(&mut self) -> String {
-        self.id_counter += 1;
-        format!("e{}", self.id_counter)
-    }
-
     /// Create a text entity
-    pub fn text(&mut self, content: &str) -> String {
-        let id = self.next_id();
+    pub fn text(&mut self, id: String,  content: &str) -> String {
         let mut attrs = Map::new();
         attrs.insert("content".to_string(), Value::String(content.to_string()));
         
@@ -556,8 +550,8 @@ impl JsonLinesBuilder {
     }
 
     /// Create a styled text entity
-    pub fn text_styled(&mut self, content: &str, font_size: f64, color: &str) -> String {
-        let id = self.next_id();
+    pub fn text_styled(&mut self,id: String, content: &str, font_size: f64, color: &str) -> String {
+ 
         let mut attrs = Map::new();
         attrs.insert("content".to_string(), Value::String(content.to_string()));
         attrs.insert("font_size".to_string(), Value::Number(serde_json::Number::from_f64(font_size).unwrap()));
@@ -572,8 +566,8 @@ impl JsonLinesBuilder {
     }
 
     /// Create a box entity
-    pub fn box_with(&mut self, child: String, padding: f64, background: &str) -> String {
-        let id = self.next_id();
+    pub fn box_with(&mut self,id: String, child: String, padding: f64, background: &str) -> String {
+      
         let mut attrs = Map::new();
         attrs.insert("children".to_string(), Value::Array(vec![Value::String(child)]));
         attrs.insert("padding".to_string(), Value::Number(serde_json::Number::from_f64(padding).unwrap()));
@@ -588,8 +582,8 @@ impl JsonLinesBuilder {
     }
 
     /// Create a vertical stack
-    pub fn vstack(&mut self, children: Vec<String>) -> String {
-        let id = self.next_id();
+    pub fn vstack(&mut self, id: String, children: Vec<String>) -> String {
+  
         let mut attrs = Map::new();
         attrs.insert("children".to_string(), Value::Array(children.into_iter().map(Value::String).collect()));
         
@@ -602,8 +596,8 @@ impl JsonLinesBuilder {
     }
 
     /// Create a horizontal stack
-    pub fn hstack(&mut self, children: Vec<String>) -> String {
-        let id = self.next_id();
+    pub fn hstack(&mut self, id: String, children: Vec<String>) -> String {
+    
         let mut attrs = Map::new();
         attrs.insert("children".to_string(), Value::Array(children.into_iter().map(Value::String).collect()));
         
@@ -616,8 +610,8 @@ impl JsonLinesBuilder {
     }
 
     /// Create a rectangle
-    pub fn rect(&mut self, width: f64, height: f64, color: &str) -> String {
-        let id = self.next_id();
+    pub fn rect(&mut self,id: String, width: f64, height: f64, color: &str) -> String {
+      
         let mut attrs = Map::new();
         attrs.insert("width".to_string(), Value::Number(serde_json::Number::from_f64(width).unwrap()));
         attrs.insert("height".to_string(), Value::Number(serde_json::Number::from_f64(height).unwrap()));
@@ -632,8 +626,7 @@ impl JsonLinesBuilder {
     }
 
     /// Create a custom component entity
-    pub fn custom_component(&mut self, component_type: &str, attributes: Map<String, Value>) -> String {
-        let id = self.next_id();
+    pub fn custom_component(&mut self,id:String,  component_type: &str, attributes: Map<String, Value>) -> String {
         
         self.entities.push(JsonEntity {
             id: id.clone(),
@@ -757,7 +750,7 @@ mod tests {
             assert!(attrs.contains_key("background"));
             
             // Return a dummy node for testing
-            Ok(DiagramTreeNode::new(EntityType::TextShape, 1))
+            Ok(DiagramTreeNode::new(EntityType::TextShape, "test_component".to_string()))
         }
 
         let mut builder = DiagramBuilder::new();
@@ -791,24 +784,24 @@ mod tests {
     fn test_builder_api() {
         let mut builder = JsonLinesBuilder::new();
 
-        let title = builder.text_styled("Document Title", 18.0, "blue");
-        let left_text = builder.text("Left Panel");
-        let right_text = builder.text("Right Panel");
+        let title = builder.text_styled("title".to_string(), "Document Title", 18.0, "blue");
+        let left_text = builder.text("left_text".to_string(), "Left Panel");
+        let right_text = builder.text("right_text".to_string(), "Right Panel");
 
-        let left_box = builder.box_with(left_text, 10.0, "lightblue");
-        let right_box = builder.box_with(right_text, 10.0, "lightgreen");
+        let left_box = builder.box_with("left_box".to_string(), left_text, 10.0, "lightblue");
+        let right_box = builder.box_with("right_box".to_string(), right_text, 10.0, "lightgreen");
 
-        let content = builder.hstack(vec![left_box, right_box]);
-        let footer = builder.text_styled("Footer", 12.0, "gray");
+        let content = builder.hstack("content".to_string(), vec![left_box, right_box]);
+        let footer = builder.text_styled("footer".to_string(), "Footer", 12.0, "gray");
 
-        let _root = builder.vstack(vec![title, content, footer]);
+        let _root = builder.vstack("root".to_string(), vec![title, content, footer]);
 
         let jsonl = builder.build().unwrap();
         println!("Generated JSON Lines:\n{}", jsonl);
 
         // Parse it back to verify
         let mut parser = JsonLinesParser::new();
-        let root_id = parser.parse_string(&jsonl).unwrap();
+        parser.parse_string(&jsonl).unwrap();
         parser.validate().unwrap();
     }
 

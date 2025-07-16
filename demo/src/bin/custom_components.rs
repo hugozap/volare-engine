@@ -2,9 +2,9 @@
 // Demo program showing how to register and use custom components
 
 use demo::measure_text::measure_text_svg_character_advance;
-use volare_engine_layout::*;
 use serde_json::{json, Map, Value};
-use std::fs::File;
+use std::{fmt::format, fs::File};
+use volare_engine_layout::*;
 
 // Helper function to extract attributes (since we can't access CustomComponentRegistry helpers directly)
 fn get_string_attr(attrs: &Map<String, Value>, key: &str, default: &str) -> String {
@@ -16,24 +16,15 @@ fn get_string_attr(attrs: &Map<String, Value>, key: &str, default: &str) -> Stri
 }
 
 fn get_float_attr(attrs: &Map<String, Value>, key: &str, default: f64) -> Float {
-    attrs
-        .get(key)
-        .and_then(|v| v.as_f64())
-        .unwrap_or(default) as Float
+    attrs.get(key).and_then(|v| v.as_f64()).unwrap_or(default) as Float
 }
 
 fn get_bool_attr(attrs: &Map<String, Value>, key: &str, default: bool) -> bool {
-    attrs
-        .get(key)
-        .and_then(|v| v.as_bool())
-        .unwrap_or(default)
+    attrs.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
 }
 
 fn get_int_attr(attrs: &Map<String, Value>, key: &str, default: i64) -> i64 {
-    attrs
-        .get(key)
-        .and_then(|v| v.as_i64())
-        .unwrap_or(default)
+    attrs.get(key).and_then(|v| v.as_i64()).unwrap_or(default)
 }
 
 /// Custom Component 1: Badge
@@ -51,6 +42,11 @@ fn create_badge_component(
     let font_size = get_float_attr(attrs, "font_size", 12.0);
     let padding = get_float_attr(attrs, "padding", 8.0);
 
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        id =  uuid::Uuid::new_v4().to_string()
+    }
+
     // Create text element
     let text_options = TextOptions {
         font_family: "AnonymicePro Nerd Font".to_string(),
@@ -59,7 +55,9 @@ fn create_badge_component(
         line_width: 200,
         line_spacing: 0.0,
     };
-    let text_node = builder.new_text(&text, text_options);
+    let text_node = builder.new_text(
+        format!("{}_text", id),
+        &text, text_options);
 
     // Wrap in rounded box
     let box_options = BoxOptions {
@@ -67,11 +65,13 @@ fn create_badge_component(
         stroke_color: "transparent".to_string(),
         stroke_width: 0.0,
         padding,
-        border_radius: font_size, // Make it pill-shaped
-        width_behavior: SizeBehavior::Content, // Auto width based on text
-        height_behavior: SizeBehavior::Content, // Auto height based on text    
+        border_radius: font_size,               // Make it pill-shaped
+        width_behavior: SizeBehavior::Content,  // Auto width based on text
+        height_behavior: SizeBehavior::Content, // Auto height based on text
     };
-    let badge = builder.new_box(text_node, box_options);
+    let badge = builder.new_box(
+        id,
+        text_node, box_options);
 
     println!("✅ Badge '{}' created successfully", text);
     Ok(badge)
@@ -90,6 +90,16 @@ fn create_alert_component(
     let message = get_string_attr(attrs, "message", "Alert message");
     let width = get_float_attr(attrs, "width", 300.0);
     let show_icon = get_bool_attr(attrs, "show_icon", true);
+    let mut id = get_string_attr(attrs, "id", "");
+
+    if id.is_empty() {
+        id = uuid::Uuid::new_v4().to_string()
+    }
+
+    //TODO aqui seria util tener
+    // let context = builder.CreateComponentContext(id)
+    // y todos los elems internos les asigna prefijo el id
+    // util para no tener que concatenarlos
 
     // Define alert styles
     let (bg_color, border_color, icon) = match alert_type.as_str() {
@@ -103,58 +113,86 @@ fn create_alert_component(
 
     // Create header with optional icon
     if show_icon {
-        let icon_text = builder.new_text(icon, TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 18.0,
-            text_color: border_color.to_string(),
-            line_width: 50,
-            line_spacing: 0.0,
-        });
+        let icon_text = builder.new_text(
+            format!("{}_showicon", id),
+            icon,
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: 18.0,
+                text_color: border_color.to_string(),
+                line_width: 50,
+                line_spacing: 0.0,
+            },
+        );
 
-        let title_text = builder.new_text(&title, TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            text_color: "#333".to_string(),
-            line_width: (width - 50.0) as usize,
-            line_spacing: 0.0,
-        });
+        let title_text = builder.new_text(
+            format!("{}_title", id),
+            &title,
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: 16.0,
+                text_color: "#333".to_string(),
+                line_width: (width - 50.0) as usize,
+                line_spacing: 0.0,
+            },
+        );
 
-        let header = builder.new_hstack(vec![icon_text, title_text], VerticalAlignment::Center);
+        let header = builder.new_hstack(
+            format!("{}_header", id),
+            vec![icon_text, title_text],
+            VerticalAlignment::Center,
+        );
         children.push(header);
     } else {
-        let title_text = builder.new_text(&title, TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            text_color: "#333".to_string(),
-            line_width: width as usize,
-            line_spacing: 0.0,
-        });
+        let title_text = builder.new_text(
+            format!("{}_title", id),
+            &title,
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: 16.0,
+                text_color: "#333".to_string(),
+                line_width: width as usize,
+                line_spacing: 0.0,
+            },
+        );
         children.push(title_text);
     }
 
     // Add message
-    let message_text = builder.new_text(&message, TextOptions {
-        font_family: "AnonymicePro Nerd Font".to_string(),
-        font_size: 14.0,
-        text_color: "#666".to_string(),
-        line_width: width as usize,
-        line_spacing: 2.0,
-    });
+    let message_text = builder.new_text(
+        format!("{}_addmsg", id),
+        &message,
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 14.0,
+            text_color: "#666".to_string(),
+            line_width: width as usize,
+            line_spacing: 2.0,
+        },
+    );
     children.push(message_text);
 
     // Create vertical layout
-    let content = builder.new_vstack(children, HorizontalAlignment::Left);
+    let content = builder.new_vstack(
+        format!("{}_contentstack", id),
+        children,
+        HorizontalAlignment::Left,
+    );
 
     // Wrap in styled box
-    let alert_box = builder.new_box(content, BoxOptions {
-        fill_color: Fill::Color(bg_color.to_string()),
-        stroke_color: border_color.to_string(),
-        stroke_width: 1.0,
-        padding: 16.0,
-        border_radius: 8.0,
-        width_behavior: SizeBehavior::Fixed(width),
-        height_behavior: SizeBehavior::Content, // Auto height based on content
-    });
+    let alert_box = builder.new_box(
+        id,
+        content,
+        BoxOptions {
+            fill_color: Fill::Color(bg_color.to_string()),
+            stroke_color: border_color.to_string(),
+            stroke_width: 1.0,
+            padding: 16.0,
+            border_radius: 8.0,
+            width_behavior: SizeBehavior::Fixed(width),
+            height_behavior: SizeBehavior::Content, // Auto height based on content
+        },
+    );
 
     println!("✅ Alert '{}' ({}) created successfully", title, alert_type);
     Ok(alert_box)
@@ -174,52 +212,67 @@ fn create_progress_bar_component(
     let bg_color = get_string_attr(attrs, "bg_color", "lightgray");
     let fill_color = get_string_attr(attrs, "fill_color", "blue");
     let show_text = get_bool_attr(attrs, "show_text", false);
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        // Generate a unique ID if not provided
+         id = format!("progress_bar_{}", uuid::Uuid::new_v4());
+    }
 
     // Create background bar
-    let bg_rect = builder.new_rectangle(RectOptions {
-        width_behavior: SizeBehavior::Fixed(width),
-        height_behavior: SizeBehavior::Fixed(height),
-        fill_color: Fill::Color(bg_color),
-        stroke_color: "transparent".to_string(),
-        stroke_width: 0.0,
-        border_radius: height / 2.0,
-    });
+    let bg_rect = builder.new_rectangle(
+        format!("bg_{}", id),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(width),
+            height_behavior: SizeBehavior::Fixed(height),
+            fill_color: Fill::Color(bg_color),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            border_radius: height / 2.0,
+        },
+    );
 
     // Create progress fill
     let fill_width = width * progress;
-    let fill_rect = builder.new_rectangle(RectOptions {
-        width_behavior: SizeBehavior::Fixed(fill_width),
-        height_behavior: SizeBehavior::Fixed(height),
-        fill_color: Fill::Color(fill_color),
-        stroke_color: "transparent".to_string(),
-        stroke_width: 0.0,
-        border_radius: height / 2.0,
-    });
+    let fill_rect = builder.new_rectangle(
+        format!("fill_{}", id),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(fill_width),
+            height_behavior: SizeBehavior::Fixed(height),
+            fill_color: Fill::Color(fill_color),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            border_radius: height / 2.0,
+        },
+    );
 
-    let mut elements = vec![
-        (bg_rect, (0.0, 0.0)),
-        (fill_rect, (0.0, 0.0)),
-    ];
+    let mut elements = vec![(bg_rect, (0.0, 0.0)), (fill_rect, (0.0, 0.0))];
 
     // Add percentage text if requested
     if show_text {
         let percentage = (progress * 100.0) as i32;
-        let text_node = builder.new_text(&format!("{}%", percentage), TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: height * 0.7,
-            text_color: "black".to_string(),
-            line_width: 100,
-            line_spacing: 0.0,
-        });
+        let text_node = builder.new_text(
+            format!("text_{}", id),
+            &format!("{}%", percentage),
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: height * 0.7,
+                text_color: "black".to_string(),
+                line_width: 100,
+                line_spacing: 0.0,
+            },
+        );
         // Center the text roughly
         let text_x = (width - 30.0) / 2.0; // Rough centering
         let text_y = height * 0.15;
         elements.push((text_node, (text_x, text_y)));
     }
 
-    let progress_bar = builder.new_free_container(elements);
+    let progress_bar = builder.new_free_container(id.to_string(), elements);
 
-    println!("✅ Progress bar ({}%) created successfully", (progress * 100.0) as i32);
+    println!(
+        "✅ Progress bar ({}%) created successfully",
+        (progress * 100.0) as i32
+    );
     Ok(progress_bar)
 }
 
@@ -235,6 +288,11 @@ fn create_button_component(
     let variant = get_string_attr(attrs, "variant", "primary");
     let size = get_string_attr(attrs, "size", "medium");
     let disabled = get_bool_attr(attrs, "disabled", false);
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("button_{}", uuid::Uuid::new_v4());
+    }
 
     // Define button styles based on variant
     let (bg_color, text_color, border_color) = if disabled {
@@ -258,26 +316,37 @@ fn create_button_component(
     };
 
     // Create button text
-    let button_text = builder.new_text(&text, TextOptions {
-        font_family: "AnonymicePro Nerd Font".to_string(),
-        font_size,
-        text_color: text_color.to_string(),
-        line_width: 200,
-        line_spacing: 0.0,
-    });
+    let button_text = builder.new_text(
+        format!("{}-{}", id, text),
+        &text,
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size,
+            text_color: text_color.to_string(),
+            line_width: 200,
+            line_spacing: 0.0,
+        },
+    );
 
     // Wrap in styled box
-    let button = builder.new_box(button_text, BoxOptions {
-        fill_color: Fill::Color(bg_color.to_string()),
-        stroke_color: border_color.to_string(),
-        stroke_width: 1.0,
-        padding: f32::max(padding_x, padding_y), // Use max for uniform padding
-        border_radius: 4.0,
-        width_behavior: SizeBehavior::Content, // Auto width based on text
-        height_behavior: SizeBehavior::Content, // Auto height based on text
-    });
+    let button = builder.new_box(
+        format!("button_{}", id),
+        button_text,
+        BoxOptions {
+            fill_color: Fill::Color(bg_color.to_string()),
+            stroke_color: border_color.to_string(),
+            stroke_width: 1.0,
+            padding: f32::max(padding_x, padding_y), // Use max for uniform padding
+            border_radius: 4.0,
+            width_behavior: SizeBehavior::Content, // Auto width based on text
+            height_behavior: SizeBehavior::Content, // Auto height based on text
+        },
+    );
 
-    println!("✅ Button '{}' ({}, {}) created successfully", text, variant, size);
+    println!(
+        "✅ Button '{}' ({}, {}) created successfully",
+        text, variant, size
+    );
     Ok(button)
 }
 
@@ -298,7 +367,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 1: Direct usage with Rust API
     println!("=== Demo 1: Direct Rust API Usage ===");
-    
+
     // Create components directly
     let badge_attrs = json!({
         "text": "NEW",
@@ -306,7 +375,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "color": "white",
         "font_size": 14.0,
         "padding": 10.0
-    }).as_object().unwrap().clone();
+    })
+    .as_object()
+    .unwrap()
+    .clone();
 
     let _badge = builder.create_custom_component("badge", &badge_attrs)?;
 
@@ -316,7 +388,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "message": "Your custom component system is working perfectly!",
         "width": 400.0,
         "show_icon": true
-    }).as_object().unwrap().clone();
+    })
+    .as_object()
+    .unwrap()
+    .clone();
 
     let _alert = builder.create_custom_component("alert", &alert_attrs)?;
 
@@ -324,7 +399,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 2: JSON Lines usage
     println!("=== Demo 2: JSON Lines Usage ===");
-    
+
     let jsonl_input = r##"
 {"id":"root","type":"vstack","children":["title","demo_section","buttons_section","progress_section","alerts_section"],"h_align":"center"}
 {"id":"title","type":"text","content":"🎨 Custom Components Showcase","font_size":25,"color":"darkblue"}
@@ -351,21 +426,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
     let root_id = parser.parse_string(jsonl_input)?;
-    
+
     // Create a fresh builder for parsing
     let mut parse_builder = DiagramBuilder::new();
     parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
-    
+
     // Register components with the parse builder
     parse_builder.register_custom_component("badge", create_badge_component);
     parse_builder.register_custom_component("alert", create_alert_component);
     parse_builder.register_custom_component("progress_bar", create_progress_bar_component);
     parse_builder.register_custom_component("button", create_button_component);
-    
+
     // Build the diagram
     let diagram = parser.build(&root_id, &mut parse_builder)?;
     println!("✅ JSON Lines parsing successful!");
-    
+
     // Calculate layout
     println!("📐 Calculating layout...");
     layout::layout_tree_node(&mut parse_builder, &diagram);
@@ -373,30 +448,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 3: Render to SVG
     println!("\n=== Demo 3: SVG Rendering ===");
-    
+
     let temp_dir = std::env::temp_dir();
     let mut svg_path = temp_dir.clone();
     svg_path.push("custom-components-showcase.svg");
-    
+
     let svg_renderer = svg_renderer::SVGRenderer {};
     let mut svg_file = File::create(&svg_path)?;
     svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
-    
+
     println!("✅ SVG rendered successfully!");
     println!("📄 File saved to: {}", svg_path.to_str().unwrap());
-
-    
 
     // Demo 4: Statistics
     println!("\n=== Demo 4: Component Statistics ===");
     let registered_types = parse_builder.get_custom_component_types();
     println!("📊 Registered custom components: {:?}", registered_types);
     println!("🔢 Total custom components: {}", registered_types.len());
-    
+
     // Count components in the diagram
-    fn count_custom_components(node: &diagram_builder::DiagramTreeNode, types: &[&String]) -> usize {
+    fn count_custom_components(
+        node: &diagram_builder::DiagramTreeNode,
+        types: &[&String],
+    ) -> usize {
         let mut count = 0;
-        if types.iter().any(|t| t.as_str() == format!("{:?}", node.entity_type)) {
+        if types
+            .iter()
+            .any(|t| t.as_str() == format!("{:?}", node.entity_type))
+        {
             count += 1;
         }
         for child in &node.children {
@@ -404,13 +483,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         count
     }
-    
+
     let custom_count = count_custom_components(&diagram, &registered_types);
     println!("🎯 Custom components in diagram: {}", custom_count);
 
     println!("\n🎉 Custom Component Demo Complete!");
     println!("💡 Check the generated SVG file to see your custom components in action!");
-    
+
     Ok(())
 }
 
@@ -427,7 +506,10 @@ mod tests {
         let attrs = json!({
             "text": "Test",
             "background": "blue"
-        }).as_object().unwrap().clone();
+        })
+        .as_object()
+        .unwrap()
+        .clone();
 
         let result = builder.create_custom_component("badge", &attrs);
         assert!(result.is_ok());
@@ -457,11 +539,11 @@ mod tests {
 
         let mut parser = parser::JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(measure_text_svg_character_advance);
         builder.register_custom_component("badge", create_badge_component);
-        
+
         let result = parser.build(&root_id, &mut builder);
         assert!(result.is_ok());
     }

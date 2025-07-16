@@ -20,8 +20,9 @@ struct CardOptions {
 
 //componente card
 //la tarjeta tiene contenido y titulo
-fn card_component(session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
-    session.new_vstack(vec![header,content], HorizontalAlignment::Center)
+fn card_component(id: String, session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
+    
+    session.new_vstack(id.clone(), vec![header,content], HorizontalAlignment::Center)
 
 }
 
@@ -45,9 +46,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_spacing: 5.0,
         };
 
-    let cheader = session.new_text("card title", textOpts.clone());
-    let ccontent = session.new_text("card contents", textOpts.clone());
-    let card1 = card_component(&mut session, cheader, ccontent, cardOptions);
+    let cheader = session.new_text("title".to_string(), "card title", textOpts.clone());
+    let ccontent = session.new_text("contents".to_string(), "card contents", textOpts.clone());
+    let card1 = card_component("card".to_string(), &mut session, cheader, ccontent, cardOptions);
 
 
 
@@ -60,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
     toptions.cell_padding = 5;
-    let table = session.new_table(table_items, 1, toptions);
+    let table = session.new_table("items".to_string(), table_items, 1, toptions);
 
     // Calculate layout
     layout_tree_node(&mut session, &table);

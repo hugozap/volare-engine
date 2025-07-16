@@ -591,7 +591,6 @@ impl DiagramBuilder {
 //test
 #[cfg(test)]
 mod tests {
-    use crate::get_entity_type_from_id;
 
     use super::*;
 

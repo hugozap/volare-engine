@@ -41,6 +41,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         };
 
     let blue_text = session.new_text(
+        "blue_text".to_string(),
         std::str::from_utf8(thetext).unwrap(),
        textOpts.clone(),
     );
@@ -59,7 +60,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         height_behavior: volare_engine_layout::SizeBehavior::Content, // auto height
     };
 
-    let box1 = session.new_box(blue_text, box_options);
+    let box1 = session.new_box("box1".to_string(), blue_text, box_options);
 
     
     // Add the FreeContainer to the table
@@ -70,7 +71,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
     toptions.cell_padding = 5;
-    let table = session.new_table(table_items, 5, toptions);
+    let table = session.new_table("text_table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
     layout_tree_node(&mut session, &table);
