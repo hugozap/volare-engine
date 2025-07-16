@@ -297,7 +297,7 @@ impl JsonLinesParser {
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
                 };
 
-                Ok(builder.new_text(&content, options))
+                Ok(builder.new_text(entity_id.to_string(), &content, options))
             }
 
             "box" => {
@@ -328,7 +328,7 @@ impl JsonLinesParser {
                     height_behavior,
                 };
 
-                Ok(builder.new_box(child, options))
+                Ok(builder.new_box(entity_id.to_string(), child, options))
             }
 
             "vstack" => {
@@ -347,7 +347,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_vstack(child_nodes?, halign))
+                Ok(builder.new_vstack(entity_id.to_string(),child_nodes?, halign))
             }
 
             "hstack" => {
@@ -366,7 +366,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_hstack(child_nodes?, valign))
+                Ok(builder.new_hstack(entity_id.to_string(),child_nodes?, valign))
             }
 
             "group" => {
@@ -378,7 +378,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_group(child_nodes?))
+                Ok(builder.new_group(entity_id.to_string(),child_nodes?))
             }
 
             "rect" => {
@@ -397,7 +397,7 @@ impl JsonLinesParser {
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                 };
 
-                Ok(builder.new_rectangle(options))
+                Ok(builder.new_rectangle(entity_id.to_string(),options))
             }
 
             "line" => {
@@ -409,7 +409,7 @@ impl JsonLinesParser {
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                Ok(builder.new_line(start_point, end_point, options))
+                Ok(builder.new_line(entity_id.to_string(),start_point, end_point, options))
             }
 
             "ellipse" => {
@@ -422,7 +422,7 @@ impl JsonLinesParser {
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width", "border_width"], 1.0),
                 };
 
-                Ok(builder.new_elipse(center, radius, options))
+                Ok(builder.new_elipse(entity_id.to_string(),center, radius, options))
             }
 
             "image" => {
@@ -433,9 +433,9 @@ impl JsonLinesParser {
                 let file_path = get_string_attr(&entity.attributes, &["file_path"], "");
 
                 if !src.is_empty() {
-                    Ok(builder.new_image(&src, (width_behavior, height_behavior)))
+                    Ok(builder.new_image(entity_id.to_string(),&src, (width_behavior, height_behavior)))
                 } else if !file_path.is_empty() {
-                    Ok(builder.new_image_from_file(&file_path, (width_behavior, height_behavior)))
+                    Ok(builder.new_image_from_file(entity_id.to_string(),&file_path, (width_behavior, height_behavior)))
                 } else {
                     Err(JsonLinesError::MissingAttribute("src or file_path".to_string()))
                 }
@@ -459,7 +459,7 @@ impl JsonLinesParser {
                     cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20) as usize,
                 };
 
-                Ok(builder.new_table(child_nodes?, cols, options))
+                Ok(builder.new_table(entity_id.to_string(),child_nodes?, cols, options))
             }
 
             "polyline" => {
@@ -471,7 +471,7 @@ impl JsonLinesParser {
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                Ok(builder.new_polyline(points, options))
+                Ok(builder.new_polyline(entity_id.to_string(),points, options))
             }
 
             "free_container" => {
@@ -490,7 +490,7 @@ impl JsonLinesParser {
                     positioned_children.push((child_node, position));
                 }
 
-                Ok(builder.new_free_container_with_children(positioned_children))
+                Ok(builder.new_free_container(entity_id.to_string(),positioned_children))
             }
 
             _ => Err(JsonLinesError::UnknownEntityType(

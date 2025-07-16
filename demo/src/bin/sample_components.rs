@@ -155,7 +155,7 @@ fn create_card_component(
         });
 
         // Use free container to overlay them
-        let card = builder.new_free_container_with_children(vec![
+        let card = builder.new_free_container(vec![
             (shadow_box, (2.0, 2.0)),   // Shadow slightly offset
             (main_content, (0.0, 0.0)), // Main card on top
         ]);

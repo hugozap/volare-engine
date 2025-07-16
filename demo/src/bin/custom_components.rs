@@ -217,7 +217,7 @@ fn create_progress_bar_component(
         elements.push((text_node, (text_x, text_y)));
     }
 
-    let progress_bar = builder.new_free_container_with_children(elements);
+    let progress_bar = builder.new_free_container(elements);
 
     println!("✅ Progress bar ({}%) created successfully", (progress * 100.0) as i32);
     Ok(progress_bar)

@@ -32,13 +32,13 @@ pub struct Table {
 impl Clone for Table {
     fn clone(&self) -> Self {
         Table {
-            entity: self.entity,
+            entity: self.entity.clone(),
             cols: self.cols,
             cells: self.cells.clone(),
             col_lines: self.col_lines.clone(),
             row_lines: self.row_lines.clone(),
             table_options: self.table_options.clone(),
-            header_rect: self.header_rect,
+            header_rect: self.header_rect.clone(),
         }
     }
 }
@@ -60,7 +60,7 @@ impl Table {
 
 impl Entity for Table {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {

@@ -8,7 +8,7 @@ use serde_json::{Value, Map};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
-pub type EntityID = usize;
+pub type EntityID = String;
 pub type Float = f32;
 
 //Export table and table options
@@ -84,25 +84,6 @@ pub enum EntityType {
     FreeContainer
 }
 
-pub fn get_entity_type(entity_id: EntityID) -> EntityType {
-    match (entity_id >> 32) as u32 {
-        0 => EntityType::BoxShape,
-        1 => EntityType::TextShape,
-        2 => EntityType::LineShape,
-        3 => EntityType::ArrowShape,
-        4 => EntityType::EllipseShape,
-        5 => EntityType::ImageShape,
-        6 => EntityType::GroupShape,
-        7 => EntityType::VerticalStackShape,
-        8 => EntityType::HorizontalStackShape,
-        9 => EntityType::TableShape,
-        10 => EntityType::TextLine,
-        11 => EntityType::PolyLine,
-        12 => EntityType::FreeContainer,
-        _ => panic!("Invalid entity type"),
-    }
-}
-
 #[derive(Debug, Copy, PartialEq)]
 pub enum SizeBehavior {
     /// Fixed size - element has a predetermined size that doesn't change
@@ -156,8 +137,8 @@ pub struct ShapeBox {
 impl Clone for ShapeBox {
     fn clone(&self) -> Self {
         ShapeBox {
-            entity: self.entity,
-            wrapped_entity: self.wrapped_entity,
+            entity: self.entity.clone(),
+            wrapped_entity: self.wrapped_entity.clone(),
             box_options: self.box_options.clone(),
         }
     }
@@ -165,7 +146,7 @@ impl Clone for ShapeBox {
 
 impl Entity for ShapeBox {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -456,7 +437,7 @@ impl ShapeRect {
 impl Clone for ShapeRect {
     fn clone(&self) -> Self {
         ShapeRect {
-            entity: self.entity,
+            entity: self.entity.clone(),
             rect_options: self.rect_options.clone(),
         }
     }
@@ -464,7 +445,7 @@ impl Clone for ShapeRect {
 
 impl Entity for ShapeRect {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -486,7 +467,7 @@ pub struct ShapeGroup {
 impl Clone for ShapeGroup {
     fn clone(&self) -> Self {
         ShapeGroup {
-            entity: self.entity,
+            entity: self.entity.clone(),
             elements: self.elements.clone(),
         }
     }
@@ -494,7 +475,7 @@ impl Clone for ShapeGroup {
 
 impl Entity for ShapeGroup {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -516,7 +497,7 @@ pub struct TextLine {
 impl Clone for TextLine {
     fn clone(&self) -> Self {
         TextLine {
-            entity: self.entity,
+            entity: self.entity.clone(),
             text: self.text.clone(),
         }
     }
@@ -524,7 +505,7 @@ impl Clone for TextLine {
 
 impl Entity for TextLine {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -547,7 +528,7 @@ pub struct ShapeText {
 impl Clone for ShapeText {
     fn clone(&self) -> Self {
         ShapeText {
-            entity: self.entity,
+            entity: self.entity.clone(),
             text: self.text.clone(),
             text_options: self.text_options.clone(),
             lines: self.lines.clone(),
@@ -571,7 +552,7 @@ impl ShapeText {
 
 impl Entity for ShapeText {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -644,7 +625,7 @@ pub struct VerticalStack {
 impl Clone for VerticalStack {
     fn clone(&self) -> Self {
         VerticalStack {
-            entity: self.entity,
+            entity: self.entity.clone(),
             elements: self.elements.clone(),
             horizontal_alignment: self.horizontal_alignment.clone()
         }
@@ -653,7 +634,7 @@ impl Clone for VerticalStack {
 
 impl Entity for VerticalStack {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -701,7 +682,7 @@ pub struct HorizontalStack {
 impl Clone for HorizontalStack {
     fn clone(&self) -> Self {
         HorizontalStack {
-            entity: self.entity,
+            entity: self.entity.clone(),
             elements: self.elements.clone(),
             vertical_alignment: self.vertical_alignment.clone(),
         }
@@ -710,7 +691,7 @@ impl Clone for HorizontalStack {
 
 impl Entity for HorizontalStack {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -732,7 +713,7 @@ pub struct ShapeLine {
 impl Clone for ShapeLine {
     fn clone(&self) -> Self {
         ShapeLine {
-            entity: self.entity,
+            entity: self.entity.clone(),
             start: self.start,
             end: self.end,
             line_options: self.line_options.clone(),
@@ -754,7 +735,7 @@ impl ShapeLine {
 
 impl Entity for ShapeLine {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -808,7 +789,7 @@ impl PolyLine {
 
 impl Entity for PolyLine {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -823,7 +804,7 @@ impl Entity for PolyLine {
 impl Clone for PolyLine {
     fn clone(&self) -> Self {
         PolyLine {
-            entity: self.entity,
+            entity: self.entity.clone(),
             points: self.points.clone(),
             line_options: self.line_options.clone(),
         }
@@ -840,7 +821,7 @@ pub struct ShapeArrow {
 impl Clone for ShapeArrow {
     fn clone(&self) -> Self {
         ShapeArrow {
-            entity: self.entity,
+            entity: self.entity.clone(),
             start: self.start,
             end: self.end,
             arrow_options: self.arrow_options.clone(),
@@ -850,7 +831,7 @@ impl Clone for ShapeArrow {
 
 impl Entity for ShapeArrow {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -899,7 +880,7 @@ pub struct ShapeEllipse {
 impl Clone for ShapeEllipse {
     fn clone(&self) -> Self {
         ShapeEllipse {
-            entity: self.entity,
+            entity: self.entity.clone(),
             center: self.center,
             radius: self.radius,
             ellipse_options: self.ellipse_options.clone(),
@@ -920,7 +901,7 @@ impl ShapeEllipse {
 
 impl Entity for ShapeEllipse {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -975,7 +956,7 @@ pub struct ShapeImage {
 impl Clone for ShapeImage {
     fn clone(&self) -> Self {
         ShapeImage {
-            entity: self.entity,
+            entity: self.entity.clone(),
             image: self.image.clone(),
             file_path: self.file_path.clone(),
             width_behavior: self.width_behavior.clone(),
@@ -986,7 +967,7 @@ impl Clone for ShapeImage {
 
 impl Entity for ShapeImage {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1033,7 +1014,7 @@ pub struct FreeContainer {
 impl Clone for FreeContainer {
     fn clone(&self) -> Self {
         FreeContainer {
-            entity: self.entity,
+            entity: self.entity.clone(),
             children: self.children.clone(),
             background_color: self.background_color.clone(),
             border_color: self.border_color.clone(),
@@ -1044,7 +1025,7 @@ impl Clone for FreeContainer {
 
 impl Entity for FreeContainer {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {

@@ -271,7 +271,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Create a container with all children at once
-    let container_with_elements = session.new_free_container_with_children(vec![
+    let container_with_elements = session.new_free_container(vec![
         (title_text, (30.0, 10.0)),
         (red_circle, (40.0, 50.0)),
         (blue_box, (80.0, 40.0)),
@@ -291,7 +291,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
     toptions.cell_padding = 2;
-    let table = session.new_table(table_items, 5, toptions);
+    let table = session.new_table("table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
     layout_tree_node(&mut session, &table);

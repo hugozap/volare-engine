@@ -18,7 +18,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
     
     // Get the wrapped element dimensions
-    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity);
+    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
 
     // Calculate the box dimensions based on size behavior
@@ -61,7 +61,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     );
 
     // Set the box dimensions
-    session.set_size(shape_box.entity, box_width, box_height);
+    session.set_size(shape_box.entity.clone(), box_width, box_height);
 
     // Position the wrapped element within the box
     // For fixed sizing, we might want to center or align the content
@@ -102,7 +102,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     };
 
     // Update the wrapped element position
-    session.set_position(shape_box.wrapped_entity, content_x, content_y);
+    session.set_position(shape_box.wrapped_entity.clone(), content_x, content_y);
 }
 
 /**
@@ -115,7 +115,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
     let mut width = 0.0;
     let mut height = 0.0;
     for elem in shape_group.elements.iter() {
-        let elem_size = session.get_size(*elem);
+        let elem_size = session.get_size(elem.clone());
         if elem_size.0 > width {
             width = elem_size.0;
         }
@@ -123,7 +123,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
             height = elem_size.1;
         }
     }
-    session.set_size(shape_group.entity, width, height);
+    session.set_size(shape_group.entity.clone(), width, height);
 }
 
 pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
@@ -136,13 +136,13 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         let mut max_line_width = 0.0;
         for line in shape_text.lines.iter() {
             println!("Line: {:?}", line);
-            let textLine = session.get_text_line(*line);
+            let textLine = session.get_text_line(line.clone());
             let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
             if line_size.0 > max_line_width {
                 max_line_width = line_size.0;
             }
-            session.set_position(*line, 0.0, y);
-            session.set_size(*line, line_size.0, line_size.1);
+            session.set_position(line.clone(), 0.0, y);
+            session.set_size(line.clone(), line_size.0, line_size.1);
             y += line_size.1 + shape_text.text_options.line_spacing as Float;
         }
         y -= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
@@ -153,7 +153,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
             "Setting size to text entity: {} - {} {}",
             shape_text.entity, max_line_width, y
         );
-        session.set_size(shape_text.entity, max_line_width, y);
+        session.set_size(shape_text.entity.clone(), max_line_width, y);
     }
 }
 
@@ -168,12 +168,12 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
     let y = start.1.min(end.1);
 
     session.set_size(
-        shape_line.entity,
+        shape_line.entity.clone(),
         (end.0 - start.0).abs(),
         (end.1 - start.1).abs(),
     );
 
-    session.set_position(shape_line.entity, x, y);
+    session.set_position(shape_line.entity.clone(), x, y);
 }
 
 /**
@@ -187,12 +187,12 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
     let y = start.1.min(end.1);
 
     session.set_size(
-        shape_arrow.entity,
+        shape_arrow.entity.clone(),
         (end.0 - start.0).abs(),
         (end.1 - start.1).abs(),
     );
 
-    session.set_position(shape_arrow.entity, x, y);
+    session.set_position(shape_arrow.entity.clone(), x, y);
 }
 
 /**
@@ -203,7 +203,7 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
 pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
     let w = shape_ellipse.radius.0 * 2.0;
     let h = shape_ellipse.radius.1 * 2.0;
-    session.set_size(shape_ellipse.entity, w, h);
+    session.set_size(shape_ellipse.entity.clone(), w, h);
 }
 
 pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
@@ -217,7 +217,7 @@ pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
         _ => 0.0
     };
 
-    session.set_size(rect.entity, width, height);
+    session.set_size(rect.entity.clone(), width, height);
 }
 
 /**
@@ -238,7 +238,7 @@ pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
     };
 
     session.set_size(
-        shape_image.entity,
+        shape_image.entity.clone(),
         width,
         height,
     );
@@ -253,25 +253,25 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     let mut width = 0.0;
     for elem in vertical_stack.elements.iter() {
         println!("DEBUG:::y: {}", y);
-        let elem_size = session.get_size(*elem);
-        session.set_position(*elem, 0.0, y);
+        let elem_size = session.get_size(elem.clone());
+        session.set_position(elem.clone(), 0.0, y);
         y += elem_size.1;
         if elem_size.0 > width {
             width = elem_size.0;
         }
     }
-    session.set_size(vertical_stack.entity, width, y);
+    session.set_size(vertical_stack.entity.clone(), width, y);
 
       // Second pass: only adjust x positions if alignment is specified
         for elem in vertical_stack.elements.iter() {
-            let elem_size = session.get_size(*elem);
-            let current_pos = session.get_position(*elem);
+            let elem_size = session.get_size(elem.clone());
+            let current_pos = session.get_position(elem.clone());
             let x = match vertical_stack.horizontal_alignment {
                 HorizontalAlignment::Left => 0.0,
                 HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
                 HorizontalAlignment::Right => width - elem_size.0,
             };
-            session.set_position(*elem, x, current_pos.1); // Update x, keep y
+            session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y   
         }
 }
 
@@ -279,25 +279,25 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
     let mut x = 0.0;
     let mut height = 0.0;
     for elem in horizontal_stack.elements.iter() {
-        let elem_size = session.get_size(*elem);
-        session.set_position(*elem, x, 0.0);
+        let elem_size = session.get_size(elem.clone());
+        session.set_position(elem.clone(), x, 0.0);
         x += elem_size.0;
         if elem_size.1 > height {
             height = elem_size.1;
         }
     }
-    session.set_size(horizontal_stack.entity, x, height);
+    session.set_size(horizontal_stack.entity.clone(), x, height);
 
     // Second pass: only adjust y positions, keep existing x positions
         for elem in horizontal_stack.elements.iter() {
-            let elem_size = session.get_size(*elem);
-            let current_pos = session.get_position(*elem); // Get the x we already set
+            let elem_size = session.get_size(elem.clone());
+            let current_pos = session.get_position(elem.clone()); // Get the x we already set
             let y = match horizontal_stack.vertical_alignment {
                 VerticalAlignment::Top => 0.0,
                 VerticalAlignment::Center => (height - elem_size.1) / 2.0,
                 VerticalAlignment::Bottom => height - elem_size.1,
             };
-            session.set_position(*elem, current_pos.0, y); // Keep x, update y
+            session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
         }
 }
 
@@ -334,11 +334,11 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
             cols.push(Vec::new());
             col_widths.push(0.0);
         }
-        rows[row].push(*elem);
-        cols[col].push(*elem);
+        rows[row].push(elem.clone());
+        cols[col].push(elem.clone());
 
         //update the row and col sizes
-        let elem_size = session.get_size(*elem);
+        let elem_size = session.get_size(elem.clone());
         if elem_size.0 > col_widths[col] {
             col_widths[col] = elem_size.0 + table.table_options.cell_padding as Float * 2.0;
         }
@@ -361,7 +361,7 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         let mut y = 0.0;
         for (j, elem) in col.iter().enumerate() {
             session.set_position(
-                *elem,
+                elem.clone(),
                 x + table.table_options.cell_padding as Float,
                 y + table.table_options.cell_padding as Float,
             );
@@ -398,33 +398,33 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     }
 
     //Update the size of the table header rect
-    session.set_size(table.header_rect, width, row_heights[0]);
+    session.set_size(table.header_rect.clone(), width, row_heights[0]);
 
     //print the size of the table
     println!("Table size: {:?}", (width, height));
 
-    session.set_size(table.entity, width, height);
+    session.set_size(table.entity.clone(), width, height);
 
     //We need to update the position of the horizontal lines and their size
     for (i, line) in table.row_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(*line);
+        let line_size = session.get_size(line.clone());
         if i < horizontal_line_positions.len() {
             //set the y position of the horizontal line, x will be 0
-            session.set_position(*line, 0.0, horizontal_line_positions[i]);
+            session.set_position(line.clone(), 0.0, horizontal_line_positions[i]);
             //update the size, we only need to update the height and leave the width as it is (0 by default)
-            session.set_size(*line, width, line_size.1);
+            session.set_size(line.clone(), width, line_size.1);
         }
     }
 
     for (i, line) in table.col_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(*line);
+        let line_size = session.get_size(line.clone());
         if i < vertical_line_positions.len() {
             //set the x position of the vertical line, y will be 0
-            session.set_position(*line, vertical_line_positions[i], 0.0);
+            session.set_position(line.clone(), vertical_line_positions[i], 0.0);
             //update the size, we only need to update the width and leave the height as it is (0 by default)
-            session.set_size(*line, line_size.0, height);
+            session.set_size(line.clone(), line_size.0, height);
         }
     }
 }
@@ -449,7 +449,7 @@ pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
             }
         }
     }
-    session.set_size(polyline.entity, width, height);
+    session.set_size(polyline.entity.clone(), width, height);
 }
 
 /**
@@ -465,10 +465,10 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     // Iterate through all children and find the maximum extent
     for (child_id, position) in &container.children {
         // Get the child's size
-        let child_size = session.get_size(*child_id);
+        let child_size = session.get_size(child_id.clone());
 
         // Set the child's position relative to the container
-        session.set_position(*child_id, position.0, position.1);
+        session.set_position(child_id.clone(), position.0, position.1);
 
         // Calculate the right and bottom edges of this child
         let right = position.0 + child_size.0;
@@ -489,7 +489,7 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     max_height += margin;
 
     // Set the container's size
-    session.set_size(container.entity, max_width, max_height);
+    session.set_size(container.entity.clone(), max_width, max_height);
 }
 
 pub struct BoundingBox {
@@ -509,8 +509,8 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         layout_tree_node(session, child);
         //print size and position of the child
 
-        let child_size = session.get_size(child.entity_id);
-        let child_pos = session.get_position(child.entity_id);
+        let child_size = session.get_size(child.entity_id.clone());
+        let child_pos = session.get_position(child.entity_id.clone());
         println!("Child size: {:?}", child_size);
         println!("Child pos: {:?}", child_pos);
     }
@@ -521,19 +521,19 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::TextShape => {
             {
                 //get the Shape text entity
-                let text = session.get_text(root.entity_id).clone();
+                let text = session.get_text(root.entity_id.clone()).clone();
                 layout_text(session, &text);
             }
         }
         EntityType::BoxShape => {
             //get the Shape box entity
-            let box_shape = session.get_box(root.entity_id).clone();
+            let box_shape = session.get_box(root.entity_id.clone()).clone();
             layout_box(session, &box_shape);
         }
 
         EntityType::RectShape => {
             //get the Rect entity
-            let rect = session.get_rectangle(root.entity_id).clone();
+            let rect = session.get_rectangle(root.entity_id.clone()).clone();
             layout_rect(
                 session,
                 &rect
@@ -542,54 +542,54 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
 
         EntityType::LineShape => {
             //get the Shape line entity
-            let line = session.get_line(root.entity_id).clone();
+            let line = session.get_line(root.entity_id.clone()).clone();
             layout_line(session, &line);
         }
         EntityType::ArrowShape => {
             //get the Shape arrow entity
-            let arrow = session.get_arrow(root.entity_id).clone();
+            let arrow = session.get_arrow(root.entity_id.clone()).clone();
             layout_arrow(session, &arrow);
         }
         EntityType::EllipseShape => {
             //get the Shape ellipse entity
-            let ellipse = session.get_ellipse(root.entity_id).clone();
+            let ellipse = session.get_ellipse(root.entity_id.clone()).clone();
             layout_ellipse(session, &ellipse);
         }
         EntityType::ImageShape => {
             //get the Shape image entity
-            let image = session.get_image(root.entity_id).clone();
+            let image = session.get_image(root.entity_id.clone()).clone();
             layout_image(session, &image);
         }
         EntityType::VerticalStackShape => {
             //get the VerticalStack entity
-            let vertical_stack = session.get_vertical_stack(root.entity_id).clone();
+            let vertical_stack = session.get_vertical_stack(root.entity_id.clone()).clone();
             layout_vertical_stack(session, &vertical_stack);
         }
 
         EntityType::HorizontalStackShape => {
             //get the HorizontalStack entity
-            let horizontal_stack = session.get_horizontal_stack(root.entity_id).clone();
+            let horizontal_stack = session.get_horizontal_stack(root.entity_id.clone()).clone();
             layout_horizontal_stack(session, &horizontal_stack);
         }
 
         EntityType::TableShape => {
             //get the Table entity
-            let table = session.get_table(root.entity_id).clone();
+            let table = session.get_table(root.entity_id.clone()).clone();
             layout_table(session, &table);
         }
 
         EntityType::GroupShape => {
             //get the Group entity
-            let group = session.get_group(root.entity_id).clone();
+            let group = session.get_group(root.entity_id.clone()).clone();
             layout_group(session, &group);
         }
 
         EntityType::PolyLine => {
-            let polyline = session.get_polyline(root.entity_id).clone();
+            let polyline = session.get_polyline(root.entity_id.clone()).clone();
             layout_polyline(session, &polyline);
         }
         EntityType::FreeContainer => {
-            let container = session.get_free_container(root.entity_id).clone();
+            let container = session.get_free_container(root.entity_id.clone()).clone();
             layout_free_container(session, &container);
         }
 
@@ -598,8 +598,8 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     }
 
     //Return the bounding box for the root element
-    let size = session.get_size(root.entity_id);
-    let position = session.get_position(root.entity_id);
+    let size = session.get_size(root.entity_id.clone());
+    let position = session.get_position(root.entity_id.clone());
     BoundingBox {
         x: position.0,
         y: position.1,
@@ -617,6 +617,7 @@ fn test_layout_box_with_text() {
     let mut session = DiagramBuilder::new();
     session.set_measure_text_fn(|_, _| (10.0, 10.0));
     let text = session.new_text(
+        "testid".to_string(),
         "hello",
         TextOptions {
             font_size: 20.0,
@@ -628,7 +629,7 @@ fn test_layout_box_with_text() {
         padding: 10.0,
         ..Default::default()
     };
-    let box_shape = session.new_box(text.clone(), box_options.clone());
+    let box_shape = session.new_box("testbox".to_string(), text.clone(), box_options.clone());
 
     //print box options
     println!("--box options: {:?}", box_options);
@@ -636,11 +637,11 @@ fn test_layout_box_with_text() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id);
-    let text_size = session.get_size(text.entity_id);
+    let text_position = session.get_position(text.entity_id.clone());
+    let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id);
-    let box_size = session.get_size(box_shape.entity_id);
+    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_size = session.get_size(box_shape.entity_id.clone());
     //assert equal positions
 
     // assert the box size is greater than the text size
@@ -657,6 +658,7 @@ fn test_box_fixed_size() {
     let mut session = DiagramBuilder::new();
     session.set_measure_text_fn(|_, _| (10.0, 10.0));
     let text = session.new_text(
+        "testid".to_string(),
         "hello",
         TextOptions {
             font_size: 20.0,
@@ -670,16 +672,16 @@ fn test_box_fixed_size() {
         height_behavior: SizeBehavior::Fixed(50.0),
         ..Default::default()
     };
-    let box_shape = session.new_box(text.clone(), box_options.clone());
+    let box_shape = session.new_box("testbox".to_string(), text.clone(), box_options.clone());
 
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id);
-    let text_size = session.get_size(text.entity_id);
+    let text_position = session.get_position(text.entity_id.clone());
+    let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id);
-    let box_size = session.get_size(box_shape.entity_id);
+    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_size = session.get_size(box_shape.entity_id.clone());
 
     //assert equal positions
     // Assert that the text is centered within the box
