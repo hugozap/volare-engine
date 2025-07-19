@@ -246,20 +246,28 @@ fn read_image_file_as_data_url(file_path: &str) -> Result<String, std::io::Error
     
     Ok(data_url)
 }
+// Fixed render_line function for svg_renderer/src/lib.rs
 
 fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
-    let size = session.get_size(entity_id.clone());
     let line_shape = session.get_line(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
-     size.0, 
-     size.1, 
-     line_shape.line_options.stroke_color,
-     line_shape.line_options.stroke_width));
+    
+    // FIXED: Use the actual line start and end coordinates, not size
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+        line_shape.start.0,   // Use actual start point
+        line_shape.start.1,
+        line_shape.end.0,     // Use actual end point  
+        line_shape.end.1,
+        line_shape.line_options.stroke_color,
+        line_shape.line_options.stroke_width
+    ));
+    
     svg.push_str("</g>");
 }
 
@@ -281,40 +289,54 @@ fn render_rectangle(session: &DiagramBuilder, svg: &mut String, entity_id: Entit
      rect_shape.rect_options.border_radius));
     svg.push_str("</g>");
 }
-
 fn render_arrow(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
-    let size = session.get_size(entity_id.clone());
     let arrow_shape = session.get_arrow(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
-     size.0, 
-     size.1, 
-     arrow_shape.arrow_options.stroke_color,
-     arrow_shape.arrow_options.stroke_width));
-    //TODO: paint arrow head
+    
+    // FIXED: Use actual arrow start/end coordinates, not size
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+        arrow_shape.start.0,   // FIXED: was using size.0, size.1
+        arrow_shape.start.1,
+        arrow_shape.end.0,     
+        arrow_shape.end.1,
+        arrow_shape.arrow_options.stroke_color,
+        arrow_shape.arrow_options.stroke_width
+    ));
+    
+    // TODO: Add actual arrow head rendering
     svg.push_str("</g>");
 }
 
 fn render_ellipse(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
-    let size = session.get_size(entity_id.clone());
     let ellipse_shape = session.get_ellipse(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
-     size.0/2.0, 
-     size.1/2.0, 
-     size.0/2.0, 
-     size.1/2.0, 
-     ellipse_shape.ellipse_options.stroke_color,
-     ellipse_shape.ellipse_options.stroke_width,
-     ellipse_shape.ellipse_options.fill_color));
+    
+    // POTENTIAL ISSUE: Using size/2 instead of actual ellipse center and radius
+    // Current code: cx=size.0/2, cy=size.1/2, rx=size.0/2, ry=size.1/2
+    // Should use: cx=ellipse_shape.center.0, cy=ellipse_shape.center.1, rx=ellipse_shape.radius.0, ry=ellipse_shape.radius.1
+    
+    svg.push_str(&format!(
+        r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
+        ellipse_shape.center.0,    // FIXED: Use actual center
+        ellipse_shape.center.1,    // FIXED: Use actual center
+        ellipse_shape.radius.0,    // FIXED: Use actual radius
+        ellipse_shape.radius.1,    // FIXED: Use actual radius
+        ellipse_shape.ellipse_options.stroke_color,
+        ellipse_shape.ellipse_options.stroke_width,
+        ellipse_shape.ellipse_options.fill_color
+    ));
+    
     svg.push_str("</g>");
 }
 
@@ -408,10 +430,21 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     svg.push_str("</g>");
 }
 
+fn escape_xml(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+// Then update the render_text function to use it:
+
 fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let text_shape = session.get_text(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
     let size = session.get_size(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" data-debug="{}" >"#,
         pos.0, pos.1,
@@ -420,7 +453,6 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
             pos.0, pos.1)
     ));
 
-    //render parent text container
     svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}px" font-family="{}" >"#,
         0,
         text_shape.text_options.text_color,
@@ -432,25 +464,26 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
         let line = session.get_text_line(line_id.clone());
         let pos = session.get_position(line.entity.clone());
         let lineSize = session.get_size(line.entity.clone());
+        
         svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}px" font-family="{}" alignment-baseline="hanging" data-debug="{}" >"#,
         pos.0,
         pos.1,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family,
-        //debug info
         format!("size: {}, {}, pos: {}, {}",
             lineSize.0, lineSize.1,
             pos.0, pos.1)
         ));
-        let txt = if line.text.trim().is_empty() {
-            "&#8203;".to_string()  // Create a new String directly
+        
+        // FIXED: Escape XML special characters in text content
+        let escaped_text = if line.text.trim().is_empty() {
+            "&#8203;".to_string()  // Zero-width space for empty lines
         } else {
-            line.text.clone()  // Clone the original
+            escape_xml(&line.text)  // Escape XML characters
         };
-        println!("text:::");
-        println!("text {}", txt);
-        svg.push_str(&txt);
+        
+        svg.push_str(&escaped_text);
         svg.push_str("</tspan>");
     }
     svg.push_str("</text>");
@@ -484,9 +517,7 @@ fn render_horizontal_stack(session: &DiagramBuilder, svg: &mut String, entity_id
     }
     svg.push_str("</g>");
 }
-
-
-// Add this function to render arcs
+// Fixed render_arc function for svg_renderer/src/lib.rs
 fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     use std::f32::consts::PI;
     
@@ -502,7 +533,7 @@ fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
     
-    // Calculate start and end points
+    // Calculate start and end points RELATIVE TO THE CENTER (not absolute)
     let start_x = arc_shape.center.0 + arc_shape.radius * start_rad.cos();
     let start_y = arc_shape.center.1 + arc_shape.radius * start_rad.sin();
     let end_x = arc_shape.center.0 + arc_shape.radius * end_rad.cos();
@@ -516,18 +547,18 @@ fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     
     svg.push_str(&format!(
         r#"<g transform="translate({} {})">"#,
-        pos.0, pos.1
+        pos.0, pos.1  // This translates to the layout position
     ));
     
     if arc_shape.arc_options.filled {
         // For filled arcs, create a path that includes the center (pie slice)
         svg.push_str(&format!(
             r#"<path d="M {} {} L {} {} A {} {} 0 {} {} {} {} Z" fill="{}" stroke="{}" stroke-width="{}" />"#,
-            arc_shape.center.0 - pos.0, arc_shape.center.1 - pos.1, // Move to center
-            start_x - pos.0, start_y - pos.1, // Line to start point
+            arc_shape.center.0, arc_shape.center.1, // Move to center (relative to translated position)
+            start_x, start_y, // Line to start point
             arc_shape.radius, arc_shape.radius, // Arc radii
             large_arc_flag, sweep_flag, // Arc flags
-            end_x - pos.0, end_y - pos.1, // Arc end point
+            end_x, end_y, // Arc end point
             arc_shape.arc_options.fill_color,
             arc_shape.arc_options.stroke_color,
             arc_shape.arc_options.stroke_width
@@ -536,10 +567,10 @@ fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
         // For unfilled arcs, just draw the arc curve
         svg.push_str(&format!(
             r#"<path d="M {} {} A {} {} 0 {} {} {} {}" fill="none" stroke="{}" stroke-width="{}" />"#,
-            start_x - pos.0, start_y - pos.1, // Move to start point
+            start_x, start_y, // Move to start point (NO subtraction)
             arc_shape.radius, arc_shape.radius, // Arc radii
             large_arc_flag, sweep_flag, // Arc flags
-            end_x - pos.0, end_y - pos.1, // Arc end point
+            end_x, end_y, // Arc end point (NO subtraction)
             arc_shape.arc_options.stroke_color,
             arc_shape.arc_options.stroke_width
         ));

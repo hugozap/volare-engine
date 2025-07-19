@@ -544,39 +544,48 @@ impl JsonLinesParser {
                 ))
             }
 
-            "semicircle" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (0.0, 0.0),
-                );
-                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
-                let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
+            // Complete fixed semicircle section for parser.rs
 
-                let options = ArcOptions {
-                    fill_color: get_string_attr(
-                        &entity.attributes,
-                        &["fill", "fill_color"],
-                        "none",
-                    ),
-                    stroke_color: get_string_attr(
-                        &entity.attributes,
-                        &["stroke", "stroke_color"],
-                        "black",
-                    ),
-                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
-                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
-                };
+"semicircle" => {
+    let center = get_point_attr(
+        &entity.attributes,
+        &["cx", "center_x"],
+        &["cy", "center_y"],
+        (0.0, 0.0),
+    );
+    let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+    let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
 
-                Ok(builder.new_semicircle(
-                    entity_id.to_string(),
-                    center,
-                    radius,
-                    facing_up,
-                    options,
-                ))
-            }
+    let (start, end) = if facing_up {
+        (180.0, 360.0) // FIXED: Top semicircle should be 180° to 360°
+    } else {
+        (0.0, 180.0) // FIXED: Bottom semicircle should be 0° to 180°
+    };
+
+    let options = ArcOptions {
+        fill_color: get_string_attr(
+            &entity.attributes,
+            &["fill", "fill_color"],
+            "none",
+        ),
+        stroke_color: get_string_attr(
+            &entity.attributes,
+            &["stroke", "stroke_color"],
+            "black",
+        ),
+        stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+        filled: get_bool_attr(&entity.attributes, &["filled"], false),
+    };
+
+    Ok(builder.new_arc(
+        entity_id.to_string(),
+        center,
+        radius,
+        start,
+        end,
+        options,
+    ))
+}
 
             "quarter_circle" => {
                 let center = get_point_attr(

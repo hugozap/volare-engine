@@ -314,6 +314,7 @@ fn render_node(
         _ => {}
     }
 }
+// Fixed render_arc function for image_renderer/src/lib.rs
 
 fn render_arc(
     session: &DiagramBuilder,
@@ -324,25 +325,28 @@ fn render_arc(
     scale: Float,
 ) {
     use std::f32::consts::PI;
-    
+
     let arc_shape = session.get_arc(entity_id.clone());
     let size = session.get_size(entity_id.clone());
-    
+
     // Apply scaling factor to dimensions
     let scaled_radius = arc_shape.radius * scale;
-    let center_x = (pos.0 + arc_shape.center.0 * scale) as i32;
-    let center_y = (pos.1 + arc_shape.center.1 * scale) as i32;
-    
+
+    // FIXED: Use the arc's center coordinates directly, don't add pos again
+    // The pos parameter already positions this arc correctly via the transform system
+    let center_x = (arc_shape.center.0 * scale) as i32;
+    let center_y = (arc_shape.center.1 * scale) as i32;
+
     // Get colors
     let stroke_color = parse_color(&arc_shape.arc_options.stroke_color);
     let fill_color = parse_color(&arc_shape.arc_options.fill_color);
     let stroke_width = arc_shape.arc_options.stroke_width * scale;
-    
+
     // Get normalized angles and convert to radians
     let (start_angle, end_angle) = arc_shape.normalize_angles();
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
-    
+
     // For filled arcs, we need to fill the sector
     if arc_shape.arc_options.filled {
         render_filled_arc_sector(
@@ -384,7 +388,7 @@ fn render_filled_arc_sector(
     stroke_width: Float,
 ) {
     let radius_i = radius as i32;
-    
+
     // Fill the sector by checking each pixel in the bounding box
     for y in (center_y - radius_i)..=(center_y + radius_i) {
         for x in (center_x - radius_i)..=(center_x + radius_i) {
@@ -392,23 +396,27 @@ fn render_filled_arc_sector(
                 let dx = (x - center_x) as Float;
                 let dy = (y - center_y) as Float;
                 let distance = (dx * dx + dy * dy).sqrt();
-                
+
                 if distance <= radius {
                     // Calculate angle of this pixel
                     let angle = dy.atan2(dx);
                     let angle_deg = angle * 180.0 / std::f32::consts::PI;
-                    let normalized_angle = if angle_deg < 0.0 { angle_deg + 360.0 } else { angle_deg };
-                    
+                    let normalized_angle = if angle_deg < 0.0 {
+                        angle_deg + 360.0
+                    } else {
+                        angle_deg
+                    };
+
                     // Check if this angle is within our arc
                     let start_deg = start_rad * 180.0 / std::f32::consts::PI;
                     let end_deg = end_rad * 180.0 / std::f32::consts::PI;
-                    
+
                     let angle_in_arc = if end_deg > start_deg {
                         normalized_angle >= start_deg && normalized_angle <= end_deg
                     } else {
                         normalized_angle >= start_deg || normalized_angle <= end_deg
                     };
-                    
+
                     if angle_in_arc {
                         imgbuf.put_pixel(x as u32, y as u32, fill_color);
                     }
@@ -416,18 +424,43 @@ fn render_filled_arc_sector(
             }
         }
     }
-    
+
     // Draw the arc outline
-    render_arc_curve(imgbuf, center_x, center_y, radius, start_rad, end_rad, stroke_color, stroke_width);
-    
+    render_arc_curve(
+        imgbuf,
+        center_x,
+        center_y,
+        radius,
+        start_rad,
+        end_rad,
+        stroke_color,
+        stroke_width,
+    );
+
     // Draw lines from center to arc endpoints for filled sectors
     let start_x = center_x + (radius * start_rad.cos()) as i32;
     let start_y = center_y + (radius * start_rad.sin()) as i32;
     let end_x = center_x + (radius * end_rad.cos()) as i32;
     let end_y = center_y + (radius * end_rad.sin()) as i32;
-    
-    draw_anti_aliased_line(imgbuf, center_x, center_y, start_x, start_y, stroke_color, stroke_width);
-    draw_anti_aliased_line(imgbuf, center_x, center_y, end_x, end_y, stroke_color, stroke_width);
+
+    draw_anti_aliased_line(
+        imgbuf,
+        center_x,
+        center_y,
+        start_x,
+        start_y,
+        stroke_color,
+        stroke_width,
+    );
+    draw_anti_aliased_line(
+        imgbuf,
+        center_x,
+        center_y,
+        end_x,
+        end_y,
+        stroke_color,
+        stroke_width,
+    );
 }
 
 // Helper function to render just the arc curve
@@ -448,12 +481,12 @@ fn render_arc_curve(
     } else {
         (2.0 * std::f32::consts::PI) - start_rad + end_rad
     };
-    
+
     let angle_step = angle_range / num_steps as Float;
-    
+
     let mut prev_x = center_x + (radius * start_rad.cos()) as i32;
     let mut prev_y = center_y + (radius * start_rad.sin()) as i32;
-    
+
     for i in 1..=num_steps {
         let current_angle = if end_rad > start_rad {
             start_rad + angle_step * i as Float
@@ -465,12 +498,20 @@ fn render_arc_curve(
                 angle
             }
         };
-        
+
         let current_x = center_x + (radius * current_angle.cos()) as i32;
         let current_y = center_y + (radius * current_angle.sin()) as i32;
-        
-        draw_anti_aliased_line(imgbuf, prev_x, prev_y, current_x, current_y, stroke_color, stroke_width);
-        
+
+        draw_anti_aliased_line(
+            imgbuf,
+            prev_x,
+            prev_y,
+            current_x,
+            current_y,
+            stroke_color,
+            stroke_width,
+        );
+
         prev_x = current_x;
         prev_y = current_y;
     }

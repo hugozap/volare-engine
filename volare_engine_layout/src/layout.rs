@@ -1,12 +1,12 @@
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
-use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
     ShapeLine, ShapeText, Table, VerticalStack,
 };
+use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
@@ -16,7 +16,7 @@ The wrapped element position is relative to the box position.
 */
 pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
-    
+
     // Get the wrapped element dimensions
     let wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
@@ -201,20 +201,32 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
  * The position of the ellipse is the top left corner of the bounding box
  */
 pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
-    let w = shape_ellipse.radius.0 * 2.0;
-    let h = shape_ellipse.radius.1 * 2.0;
-    session.set_size(shape_ellipse.entity.clone(), w, h);
+    // The ellipse size should be the full diameter
+    let width = shape_ellipse.radius.0 * 2.0;
+    let height = shape_ellipse.radius.1 * 2.0;
+    
+    // Set the size for layout spacing calculations
+    session.set_size(shape_ellipse.entity.clone(), width, height);
+    
+    // Position at (0,0) - the layout system will position this appropriately
+    session.set_position(shape_ellipse.entity.clone(), 0.0, 0.0);
+    
+    // CRITICAL: The ellipse center coordinates (cx, cy) in the JSONL should be
+    // set to (radius_x, radius_y) so the ellipse is centered in its bounding box
+    // 
+    // For example:
+    // - rx=20, ry=20 → cx should be 20, cy should be 20 (for a 40x40 box)
+    // - rx=30, ry=15 → cx should be 30, cy should be 15 (for a 60x30 box)
 }
-
 pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
     // If the rect has a fixed size, use that
     let width = match rect.rect_options.width_behavior {
         SizeBehavior::Fixed(w) => w,
-        _ => 0.0
+        _ => 0.0,
     };
     let height = match rect.rect_options.height_behavior {
         SizeBehavior::Fixed(h) => h,
-        _ => 0.0
+        _ => 0.0,
     };
 
     session.set_size(rect.entity.clone(), width, height);
@@ -224,24 +236,19 @@ pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
  * Sets the image entity size to the preferred size
  */
 pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
-
     let width = match shape_image.width_behavior {
         SizeBehavior::Fixed(val) => val,
         SizeBehavior::Content => 100.0, // TODO: Obtener size de la data de la imagen
-        _ => 100.0
+        _ => 100.0,
     };
 
-     let height = match shape_image.height_behavior {
+    let height = match shape_image.height_behavior {
         SizeBehavior::Fixed(val) => val,
         SizeBehavior::Content => 100.0, // TODO: Obtener size de la data de la imagen
-        _ => 100.0
+        _ => 100.0,
     };
 
-    session.set_size(
-        shape_image.entity.clone(),
-        width,
-        height,
-    );
+    session.set_size(shape_image.entity.clone(), width, height);
 }
 
 /**
@@ -262,17 +269,17 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     }
     session.set_size(vertical_stack.entity.clone(), width, y);
 
-      // Second pass: only adjust x positions if alignment is specified
-        for elem in vertical_stack.elements.iter() {
-            let elem_size = session.get_size(elem.clone());
-            let current_pos = session.get_position(elem.clone());
-            let x = match vertical_stack.horizontal_alignment {
-                HorizontalAlignment::Left => 0.0,
-                HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
-                HorizontalAlignment::Right => width - elem_size.0,
-            };
-            session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y   
-        }
+    // Second pass: only adjust x positions if alignment is specified
+    for elem in vertical_stack.elements.iter() {
+        let elem_size = session.get_size(elem.clone());
+        let current_pos = session.get_position(elem.clone());
+        let x = match vertical_stack.horizontal_alignment {
+            HorizontalAlignment::Left => 0.0,
+            HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
+            HorizontalAlignment::Right => width - elem_size.0,
+        };
+        session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y
+    }
 }
 
 pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
@@ -289,16 +296,16 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
     session.set_size(horizontal_stack.entity.clone(), x, height);
 
     // Second pass: only adjust y positions, keep existing x positions
-        for elem in horizontal_stack.elements.iter() {
-            let elem_size = session.get_size(elem.clone());
-            let current_pos = session.get_position(elem.clone()); // Get the x we already set
-            let y = match horizontal_stack.vertical_alignment {
-                VerticalAlignment::Top => 0.0,
-                VerticalAlignment::Center => (height - elem_size.1) / 2.0,
-                VerticalAlignment::Bottom => height - elem_size.1,
-            };
-            session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
-        }
+    for elem in horizontal_stack.elements.iter() {
+        let elem_size = session.get_size(elem.clone());
+        let current_pos = session.get_position(elem.clone()); // Get the x we already set
+        let y = match horizontal_stack.vertical_alignment {
+            VerticalAlignment::Top => 0.0,
+            VerticalAlignment::Center => (height - elem_size.1) / 2.0,
+            VerticalAlignment::Bottom => height - elem_size.1,
+        };
+        session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
+    }
 }
 
 /**
@@ -492,34 +499,36 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 
+// BETTER FIX: Adjust the arc layout to work with existing renderer expectations
 
 /**
  * Updates the size of the arc entity based on the radius and angle sweep
- * The arc's bounding box is calculated from its center, radius, and angle range
+ * Sets position to (0,0) since arcs use their cx,cy for center positioning
+ * The size represents the full space needed for the arc
  */
 pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     use std::f32::consts::PI;
-    
+
     let radius = shape_arc.radius;
     let (start_angle, end_angle) = shape_arc.normalize_angles();
-    
+
     // Convert degrees to radians
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
-    
-    // Calculate the points at start and end angles
+
+    // Calculate the points at start and end angles relative to center
     let start_x = shape_arc.center.0 + radius * start_rad.cos();
     let start_y = shape_arc.center.1 + radius * start_rad.sin();
     let end_x = shape_arc.center.0 + radius * end_rad.cos();
     let end_y = shape_arc.center.1 + radius * end_rad.sin();
-    
+
     // For a more accurate bounding box, we need to consider if the arc crosses
     // the cardinal directions (0°, 90°, 180°, 270°)
     let mut min_x = start_x.min(end_x);
     let mut max_x = start_x.max(end_x);
     let mut min_y = start_y.min(end_y);
     let mut max_y = start_y.max(end_y);
-    
+
     // Check if arc crosses cardinal directions and expand bounding box accordingly
     let sweep = shape_arc.angle_sweep();
     let angles_to_check = if end_angle > start_angle {
@@ -528,38 +537,44 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
         // Arc crosses 0° (wraps around)
         vec![0.0, 90.0, 180.0, 270.0, 360.0]
     };
-    
+
     for angle in angles_to_check {
         let normalized_angle = angle % 360.0;
-        
+
         // Check if this cardinal angle is within our arc
         let angle_in_arc = if end_angle > start_angle {
             normalized_angle >= start_angle && normalized_angle <= end_angle
         } else {
             normalized_angle >= start_angle || normalized_angle <= end_angle
         };
-        
+
         if angle_in_arc {
             let rad = normalized_angle * PI / 180.0;
             let x = shape_arc.center.0 + radius * rad.cos();
             let y = shape_arc.center.1 + radius * rad.sin();
-            
+
             min_x = min_x.min(x);
             max_x = max_x.max(x);
             min_y = min_y.min(y);
             max_y = max_y.max(y);
         }
     }
-    
+
     // Calculate width and height from bounding box
     let width = max_x - min_x;
     let height = max_y - min_y;
-    
-    // Set the position to the top-left corner of the bounding box
-    session.set_position(shape_arc.entity.clone(), min_x, min_y);
-    session.set_size(shape_arc.entity.clone(), width, height);
-}
 
+    // FIXED: Set position to (0,0) and let the arc use its cx,cy for positioning
+    // This matches how other shapes work - they render relative to their position
+    session.set_position(shape_arc.entity.clone(), 0.0, 0.0);
+
+    // The size should be large enough to contain the entire arc
+    // Add padding to ensure the arc fits regardless of center position
+    let total_width = (shape_arc.center.0 + radius).max(width);
+    let total_height = (shape_arc.center.1 + radius).max(height);
+
+    session.set_size(shape_arc.entity.clone(), total_width, total_height);
+}
 
 pub struct BoundingBox {
     x: Float,
@@ -569,9 +584,6 @@ pub struct BoundingBox {
 }
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
-
-    
-
     //start with the bottom elements
     for child in &root.children {
         println!("Layout child: {:?}", child);
@@ -603,10 +615,7 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::RectShape => {
             //get the Rect entity
             let rect = session.get_rectangle(root.entity_id.clone()).clone();
-            layout_rect(
-                session,
-                &rect
-            );
+            layout_rect(session, &rect);
         }
 
         EntityType::LineShape => {
@@ -663,9 +672,9 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::ArcShape => {
-        let arc = session.get_arc(root.entity_id.clone()).clone();
-        layout_arc(session, &arc);
-    }
+            let arc = session.get_arc(root.entity_id.clone()).clone();
+            layout_arc(session, &arc);
+        }
 
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
@@ -761,11 +770,19 @@ fn test_box_fixed_size() {
     // Assert that the text is centered within the box
     assert_eq!(
         text_position.0,
-        box_options.padding + (box_options.width_behavior.unwrap_fixed().unwrap() - box_options.padding * 2.0 - text_size.0) / 2.0
+        box_options.padding
+            + (box_options.width_behavior.unwrap_fixed().unwrap()
+                - box_options.padding * 2.0
+                - text_size.0)
+                / 2.0
     );
     assert_eq!(
         text_position.1,
-        box_options.padding + (box_options.height_behavior.unwrap_fixed().unwrap() - box_options.padding * 2.0 - text_size.1) / 2.0
+        box_options.padding
+            + (box_options.height_behavior.unwrap_fixed().unwrap()
+                - box_options.padding * 2.0
+                - text_size.1)
+                / 2.0
     );
     assert_eq!(box_position, (0.0, 0.0));
 
