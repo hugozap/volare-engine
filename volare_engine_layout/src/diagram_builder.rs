@@ -37,6 +37,7 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
+    arcs : HashMap<EntityID, ShapeArc>,
     pub custom_components: CustomComponentRegistry,
 }
 
@@ -94,6 +95,7 @@ impl DiagramBuilder {
             images: HashMap::new(),
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
+            arcs: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
         }
     }
@@ -210,6 +212,70 @@ impl DiagramBuilder {
         };
         node.children.push(Box::new(child.clone()));
         node
+    }
+
+
+    // Add the new_arc method
+    pub fn new_arc(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        start_angle: Float,
+        end_angle: Float,
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        let arc_id = self.new_entity(id, EntityType::ArcShape);
+        let arc = ShapeArc::new(arc_id.clone(), center, radius, start_angle, end_angle, options);
+        self.arcs.insert(arc_id.clone(), arc);
+        DiagramTreeNode::new(EntityType::ArcShape, arc_id)
+    }
+
+    // Add convenience methods for common arc types
+    pub fn new_arc_degrees(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        start_degrees: Float,
+        end_degrees: Float,
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        self.new_arc(id, center, radius, start_degrees, end_degrees, options)
+    }
+
+    pub fn new_semicircle(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        facing_up: bool,
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        let (start, end) = if facing_up {
+            (0.0, 180.0) // Top semicircle
+        } else {
+            (180.0, 360.0) // Bottom semicircle
+        };
+        self.new_arc(id, center, radius, start, end, options)
+    }
+
+    pub fn new_quarter_circle(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        quadrant: u8, // 1=top-right, 2=top-left, 3=bottom-left, 4=bottom-right
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        let (start, end) = match quadrant {
+            1 => (0.0, 90.0),     // Top-right
+            2 => (90.0, 180.0),   // Top-left
+            3 => (180.0, 270.0),  // Bottom-left
+            4 => (270.0, 360.0),  // Bottom-right
+            _ => (0.0, 90.0),     // Default to top-right
+        };
+        self.new_arc(id, center, radius, start, end, options)
     }
 
     // Creates a new Vertical stack.
@@ -570,6 +636,11 @@ impl DiagramBuilder {
     pub fn get_free_container_mut(&mut self, id: EntityID) -> &mut FreeContainer {
         self.free_containers.get_mut(&id).unwrap()
     }
+
+     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
+        &self.arcs[&id]
+    }
+    
 
     pub fn get_custom_component(
         &self,

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 
-use crate::{components::*, DiagramBuilder, diagram_builder::*};
+use crate::{components::*, diagram_builder::*, DiagramBuilder};
 
 /// Simplified JSON Lines entity with only essential fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +87,12 @@ fn get_array_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<String>> 
     })
 }
 
-fn get_point_attr(attrs: &Map<String, Value>, x_keys: &[&str], y_keys: &[&str], default: (Float, Float)) -> (Float, Float) {
+fn get_point_attr(
+    attrs: &Map<String, Value>,
+    x_keys: &[&str],
+    y_keys: &[&str],
+    default: (Float, Float),
+) -> (Float, Float) {
     let x = get_float_attr(attrs, x_keys, default.0 as f64);
     let y = get_float_attr(attrs, y_keys, default.1 as f64);
     (x, y)
@@ -269,16 +274,15 @@ impl JsonLinesParser {
             .get(entity_id)
             .ok_or_else(|| JsonLinesError::EntityNotFound(entity_id.to_string()))?;
 
-            // Clone the entity type to avoid borrow conflicts
-            let component_type = entity.entity_type.clone();
-            let attributes = entity.attributes.clone();
+        // Clone the entity type to avoid borrow conflicts
+        let component_type = entity.entity_type.clone();
+        let attributes = entity.attributes.clone();
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
-            return builder.create_custom_component(
-                &component_type,
-                &attributes,
-            ).map_err(|e| JsonLinesError::InvalidStructure(e));
+            return builder
+                .create_custom_component(&component_type, &attributes)
+                .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 
         // Handle built-in components using attribute helpers
@@ -286,12 +290,18 @@ impl JsonLinesParser {
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
-                    return Err(JsonLinesError::MissingAttribute("content or text".to_string()));
+                    return Err(JsonLinesError::MissingAttribute(
+                        "content or text".to_string(),
+                    ));
                 }
 
                 let options = TextOptions {
                     font_size: get_float_attr(&entity.attributes, &["font_size"], 12.0),
-                    text_color: get_string_attr(&entity.attributes, &["color", "text_color"], "black"),
+                    text_color: get_string_attr(
+                        &entity.attributes,
+                        &["color", "text_color"],
+                        "black",
+                    ),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
@@ -318,11 +328,23 @@ impl JsonLinesParser {
                 let options = BoxOptions {
                     padding: get_float_attr(&entity.attributes, &["padding"], 0.0),
                     fill_color: {
-                        let color = get_string_attr(&entity.attributes, &["background", "background_color", "fill"], "white");
+                        let color = get_string_attr(
+                            &entity.attributes,
+                            &["background", "background_color", "fill"],
+                            "white",
+                        );
                         Fill::Color(color)
                     },
-                    stroke_color: get_string_attr(&entity.attributes, &["border_color", "stroke_color"], "black"),
-                    stroke_width: get_float_attr(&entity.attributes, &["border_width", "stroke_width"], 1.0),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["border_color", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(
+                        &entity.attributes,
+                        &["border_width", "stroke_width"],
+                        1.0,
+                    ),
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                     width_behavior,
                     height_behavior,
@@ -332,7 +354,13 @@ impl JsonLinesParser {
             }
 
             "vstack" => {
-                let halign = match get_string_attr(&entity.attributes, &["h_align", "horizontal_alignment"], "center").as_str() {
+                let halign = match get_string_attr(
+                    &entity.attributes,
+                    &["h_align", "horizontal_alignment"],
+                    "center",
+                )
+                .as_str()
+                {
                     "left" => HorizontalAlignment::Left,
                     "center" => HorizontalAlignment::Center,
                     "right" => HorizontalAlignment::Right,
@@ -347,11 +375,17 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_vstack(entity_id.to_string(),child_nodes?, halign))
+                Ok(builder.new_vstack(entity_id.to_string(), child_nodes?, halign))
             }
 
             "hstack" => {
-                let valign = match get_string_attr(&entity.attributes, &["v_align", "vertical_alignment"], "center").as_str() {
+                let valign = match get_string_attr(
+                    &entity.attributes,
+                    &["v_align", "vertical_alignment"],
+                    "center",
+                )
+                .as_str()
+                {
                     "top" => VerticalAlignment::Top,
                     "center" => VerticalAlignment::Center,
                     "bottom" => VerticalAlignment::Bottom,
@@ -366,7 +400,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_hstack(entity_id.to_string(),child_nodes?, valign))
+                Ok(builder.new_hstack(entity_id.to_string(), child_nodes?, valign))
             }
 
             "group" => {
@@ -378,7 +412,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_group(entity_id.to_string(),child_nodes?))
+                Ok(builder.new_group(entity_id.to_string(), child_nodes?))
             }
 
             "rect" => {
@@ -389,40 +423,193 @@ impl JsonLinesParser {
                     width_behavior,
                     height_behavior,
                     fill_color: {
-                        let color = get_string_attr(&entity.attributes, &["background", "background_color", "fill"], "white");
+                        let color = get_string_attr(
+                            &entity.attributes,
+                            &["background", "background_color", "fill"],
+                            "white",
+                        );
                         Fill::Color(color)
                     },
-                    stroke_color: get_string_attr(&entity.attributes, &["border_color", "stroke_color"], "black"),
-                    stroke_width: get_float_attr(&entity.attributes, &["border_width", "stroke_width"], 1.0),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["border_color", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(
+                        &entity.attributes,
+                        &["border_width", "stroke_width"],
+                        1.0,
+                    ),
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                 };
 
-                Ok(builder.new_rectangle(entity_id.to_string(),options))
+                Ok(builder.new_rectangle(entity_id.to_string(), options))
             }
 
             "line" => {
-                let start_point = get_point_attr(&entity.attributes, &["start_x", "x1"], &["start_y", "y1"], (0.0, 0.0));
-                let end_point = get_point_attr(&entity.attributes, &["end_x", "x2"], &["end_y", "y2"], (0.0, 0.0));
+                let start_point = get_point_attr(
+                    &entity.attributes,
+                    &["start_x", "x1"],
+                    &["start_y", "y1"],
+                    (0.0, 0.0),
+                );
+                let end_point = get_point_attr(
+                    &entity.attributes,
+                    &["end_x", "x2"],
+                    &["end_y", "y2"],
+                    (0.0, 0.0),
+                );
 
                 let options = LineOptions {
-                    stroke_color: get_string_attr(&entity.attributes, &["stroke_color", "color"], "black"),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke_color", "color"],
+                        "black",
+                    ),
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                Ok(builder.new_line(entity_id.to_string(),start_point, end_point, options))
+                Ok(builder.new_line(entity_id.to_string(), start_point, end_point, options))
             }
 
             "ellipse" => {
-                let center = get_point_attr(&entity.attributes, &["cx", "center_x"], &["cy", "center_y"], (50.0, 50.0));
-                let radius = get_point_attr(&entity.attributes, &["rx", "radius_x"], &["ry", "radius_y"], (25.0, 25.0));
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (50.0, 50.0),
+                );
+                let radius = get_point_attr(
+                    &entity.attributes,
+                    &["rx", "radius_x"],
+                    &["ry", "radius_y"],
+                    (25.0, 25.0),
+                );
 
                 let options = EllipseOptions {
-                    fill_color: get_string_attr(&entity.attributes, &["fill", "fill_color", "background"], "white"),
-                    stroke_color: get_string_attr(&entity.attributes, &["stroke", "stroke_color", "border_color"], "black"),
-                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width", "border_width"], 1.0),
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color", "background"],
+                        "white",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color", "border_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(
+                        &entity.attributes,
+                        &["stroke_width", "border_width"],
+                        1.0,
+                    ),
                 };
 
-                Ok(builder.new_elipse(entity_id.to_string(),center, radius, options))
+                Ok(builder.new_elipse(entity_id.to_string(), center, radius, options))
+            }
+
+            "arc" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let start_angle =
+                    get_float_attr(&entity.attributes, &["start_angle", "start"], 0.0);
+                let end_angle = get_float_attr(&entity.attributes, &["end_angle", "end"], 90.0);
+
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
+
+                Ok(builder.new_arc(
+                    entity_id.to_string(),
+                    center,
+                    radius,
+                    start_angle,
+                    end_angle,
+                    options,
+                ))
+            }
+
+            "semicircle" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
+
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
+
+                Ok(builder.new_semicircle(
+                    entity_id.to_string(),
+                    center,
+                    radius,
+                    facing_up,
+                    options,
+                ))
+            }
+
+            "quarter_circle" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let quadrant = get_int_attr(&entity.attributes, &["quadrant"], 1) as u8;
+
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
+
+                Ok(builder.new_quarter_circle(
+                    entity_id.to_string(),
+                    center,
+                    radius,
+                    quadrant,
+                    options,
+                ))
             }
 
             "image" => {
@@ -433,11 +620,21 @@ impl JsonLinesParser {
                 let file_path = get_string_attr(&entity.attributes, &["file_path"], "");
 
                 if !src.is_empty() {
-                    Ok(builder.new_image(entity_id.to_string(),&src, (width_behavior, height_behavior)))
+                    Ok(builder.new_image(
+                        entity_id.to_string(),
+                        &src,
+                        (width_behavior, height_behavior),
+                    ))
                 } else if !file_path.is_empty() {
-                    Ok(builder.new_image_from_file(entity_id.to_string(),&file_path, (width_behavior, height_behavior)))
+                    Ok(builder.new_image_from_file(
+                        entity_id.to_string(),
+                        &file_path,
+                        (width_behavior, height_behavior),
+                    ))
                 } else {
-                    Err(JsonLinesError::MissingAttribute("src or file_path".to_string()))
+                    Err(JsonLinesError::MissingAttribute(
+                        "src or file_path".to_string(),
+                    ))
                 }
             }
 
@@ -452,14 +649,23 @@ impl JsonLinesParser {
                     .collect();
 
                 let options = TableOptions {
-                    header_fill_color: get_string_attr(&entity.attributes, &["header_fill_color", "header_background"], "lightgray"),
-                    fill_color: get_string_attr(&entity.attributes, &["fill_color", "background"], "white"),
+                    header_fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["header_fill_color", "header_background"],
+                        "lightgray",
+                    ),
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill_color", "background"],
+                        "white",
+                    ),
                     border_color: get_string_attr(&entity.attributes, &["border_color"], "black"),
                     border_width: get_int_attr(&entity.attributes, &["border_width"], 1) as usize,
-                    cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20) as usize,
+                    cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20)
+                        as usize,
                 };
 
-                Ok(builder.new_table(entity_id.to_string(),child_nodes?, cols, options))
+                Ok(builder.new_table(entity_id.to_string(), child_nodes?, cols, options))
             }
 
             "polyline" => {
@@ -467,11 +673,15 @@ impl JsonLinesParser {
                     .ok_or_else(|| JsonLinesError::MissingAttribute("points".to_string()))?;
 
                 let options = LineOptions {
-                    stroke_color: get_string_attr(&entity.attributes, &["stroke_color", "color"], "black"),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke_color", "color"],
+                        "black",
+                    ),
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                Ok(builder.new_polyline(entity_id.to_string(),points, options))
+                Ok(builder.new_polyline(entity_id.to_string(), points, options))
             }
 
             "free_container" => {
@@ -486,11 +696,12 @@ impl JsonLinesParser {
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
 
                     let child_node = self.build_entity(&child_id, builder)?;
-                    let position = get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
+                    let position =
+                        get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
                     positioned_children.push((child_node, position));
                 }
 
-                Ok(builder.new_free_container(entity_id.to_string(),positioned_children))
+                Ok(builder.new_free_container(entity_id.to_string(), positioned_children))
             }
 
             _ => Err(JsonLinesError::UnknownEntityType(
@@ -525,22 +736,20 @@ impl JsonLinesParser {
 /// Builder for creating JSON Lines diagrams
 pub struct JsonLinesBuilder {
     entities: Vec<JsonEntity>,
-    id_counter: usize,
 }
 
 impl JsonLinesBuilder {
     pub fn new() -> Self {
         Self {
             entities: Vec::new(),
-            id_counter: 0,
         }
     }
 
     /// Create a text entity
-    pub fn text(&mut self, id: String,  content: &str) -> String {
+    pub fn text(&mut self, id: String, content: &str) -> String {
         let mut attrs = Map::new();
         attrs.insert("content".to_string(), Value::String(content.to_string()));
-        
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "text".to_string(),
@@ -550,13 +759,21 @@ impl JsonLinesBuilder {
     }
 
     /// Create a styled text entity
-    pub fn text_styled(&mut self,id: String, content: &str, font_size: f64, color: &str) -> String {
- 
+    pub fn text_styled(
+        &mut self,
+        id: String,
+        content: &str,
+        font_size: f64,
+        color: &str,
+    ) -> String {
         let mut attrs = Map::new();
         attrs.insert("content".to_string(), Value::String(content.to_string()));
-        attrs.insert("font_size".to_string(), Value::Number(serde_json::Number::from_f64(font_size).unwrap()));
+        attrs.insert(
+            "font_size".to_string(),
+            Value::Number(serde_json::Number::from_f64(font_size).unwrap()),
+        );
         attrs.insert("color".to_string(), Value::String(color.to_string()));
-        
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "text".to_string(),
@@ -566,13 +783,27 @@ impl JsonLinesBuilder {
     }
 
     /// Create a box entity
-    pub fn box_with(&mut self,id: String, child: String, padding: f64, background: &str) -> String {
-      
+    pub fn box_with(
+        &mut self,
+        id: String,
+        child: String,
+        padding: f64,
+        background: &str,
+    ) -> String {
         let mut attrs = Map::new();
-        attrs.insert("children".to_string(), Value::Array(vec![Value::String(child)]));
-        attrs.insert("padding".to_string(), Value::Number(serde_json::Number::from_f64(padding).unwrap()));
-        attrs.insert("background".to_string(), Value::String(background.to_string()));
-        
+        attrs.insert(
+            "children".to_string(),
+            Value::Array(vec![Value::String(child)]),
+        );
+        attrs.insert(
+            "padding".to_string(),
+            Value::Number(serde_json::Number::from_f64(padding).unwrap()),
+        );
+        attrs.insert(
+            "background".to_string(),
+            Value::String(background.to_string()),
+        );
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "box".to_string(),
@@ -583,10 +814,12 @@ impl JsonLinesBuilder {
 
     /// Create a vertical stack
     pub fn vstack(&mut self, id: String, children: Vec<String>) -> String {
-  
         let mut attrs = Map::new();
-        attrs.insert("children".to_string(), Value::Array(children.into_iter().map(Value::String).collect()));
-        
+        attrs.insert(
+            "children".to_string(),
+            Value::Array(children.into_iter().map(Value::String).collect()),
+        );
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "vstack".to_string(),
@@ -597,10 +830,12 @@ impl JsonLinesBuilder {
 
     /// Create a horizontal stack
     pub fn hstack(&mut self, id: String, children: Vec<String>) -> String {
-    
         let mut attrs = Map::new();
-        attrs.insert("children".to_string(), Value::Array(children.into_iter().map(Value::String).collect()));
-        
+        attrs.insert(
+            "children".to_string(),
+            Value::Array(children.into_iter().map(Value::String).collect()),
+        );
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "hstack".to_string(),
@@ -610,13 +845,18 @@ impl JsonLinesBuilder {
     }
 
     /// Create a rectangle
-    pub fn rect(&mut self,id: String, width: f64, height: f64, color: &str) -> String {
-      
+    pub fn rect(&mut self, id: String, width: f64, height: f64, color: &str) -> String {
         let mut attrs = Map::new();
-        attrs.insert("width".to_string(), Value::Number(serde_json::Number::from_f64(width).unwrap()));
-        attrs.insert("height".to_string(), Value::Number(serde_json::Number::from_f64(height).unwrap()));
+        attrs.insert(
+            "width".to_string(),
+            Value::Number(serde_json::Number::from_f64(width).unwrap()),
+        );
+        attrs.insert(
+            "height".to_string(),
+            Value::Number(serde_json::Number::from_f64(height).unwrap()),
+        );
         attrs.insert("background".to_string(), Value::String(color.to_string()));
-        
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "rect".to_string(),
@@ -626,8 +866,12 @@ impl JsonLinesBuilder {
     }
 
     /// Create a custom component entity
-    pub fn custom_component(&mut self,id:String,  component_type: &str, attributes: Map<String, Value>) -> String {
-        
+    pub fn custom_component(
+        &mut self,
+        id: String,
+        component_type: &str,
+        attributes: Map<String, Value>,
+    ) -> String {
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: component_type.to_string(),
@@ -697,8 +941,8 @@ impl std::error::Error for JsonLinesError {}
 
 #[cfg(test)]
 mod tests {
-    use crate::DiagramBuilder;
     use super::*;
+    use crate::DiagramBuilder;
     use serde_json::json;
 
     #[test]
@@ -729,11 +973,11 @@ mod tests {
 
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 
@@ -748,9 +992,12 @@ mod tests {
             assert!(attrs.contains_key("custom_prop"));
             assert!(attrs.contains_key("width"));
             assert!(attrs.contains_key("background"));
-            
+
             // Return a dummy node for testing
-            Ok(DiagramTreeNode::new(EntityType::TextShape, "test_component".to_string()))
+            Ok(DiagramTreeNode::new(
+                EntityType::TextShape,
+                "test_component".to_string(),
+            ))
         }
 
         let mut builder = DiagramBuilder::new();
@@ -758,11 +1005,11 @@ mod tests {
         builder.register_custom_component("test_comp", test_component);
 
         let input = r#"{"id":"test1","type":"test_comp","width":200,"background":"blue","custom_prop":"value"}"#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 
@@ -809,14 +1056,14 @@ mod tests {
     fn test_complex_attributes() {
         // Test points for polyline
         let input = r#"{"id":"poly1","type":"polyline","points":[[0,0],[10,10],[20,0]],"stroke_color":"red"}"#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 
@@ -827,14 +1074,14 @@ mod tests {
 {"id":"box1","type":"box","width":"content","height":100,"children":["text1"]}
 {"id":"text1","type":"text","content":"Auto-sized"}
 "#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 }

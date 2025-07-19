@@ -97,12 +97,18 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
             render_rectangle(session, &mut svg, entity_id, node);
         }
 
+        EntityType::ArcShape => {
+            render_arc(session, &mut svg, entity_id, node);
+        }
+
         _ => {}
         
     }
 
     svg
 }
+
+
 fn render_polyline(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let size = session.get_size(entity_id.clone());
     let polyline_shape = session.get_polyline(node.entity_id.clone());
@@ -479,6 +485,100 @@ fn render_horizontal_stack(session: &DiagramBuilder, svg: &mut String, entity_id
     svg.push_str("</g>");
 }
 
+
+// Add this function to render arcs
+fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
+    use std::f32::consts::PI;
+    
+    let arc_shape = session.get_arc(node.entity_id.clone());
+    let pos = session.get_position(entity_id.clone());
+    let size = session.get_size(entity_id.clone());
+    
+    // Get normalized angles
+    let (start_angle, end_angle) = arc_shape.normalize_angles();
+    let sweep = arc_shape.angle_sweep();
+    
+    // Convert to radians for calculations
+    let start_rad = start_angle * PI / 180.0;
+    let end_rad = end_angle * PI / 180.0;
+    
+    // Calculate start and end points
+    let start_x = arc_shape.center.0 + arc_shape.radius * start_rad.cos();
+    let start_y = arc_shape.center.1 + arc_shape.radius * start_rad.sin();
+    let end_x = arc_shape.center.0 + arc_shape.radius * end_rad.cos();
+    let end_y = arc_shape.center.1 + arc_shape.radius * end_rad.sin();
+    
+    // Determine if this is a large arc (> 180 degrees)
+    let large_arc_flag = if sweep > 180.0 { 1 } else { 0 };
+    
+    // Always sweep in positive direction (clockwise in SVG coordinates)
+    let sweep_flag = 1;
+    
+    svg.push_str(&format!(
+        r#"<g transform="translate({} {})">"#,
+        pos.0, pos.1
+    ));
+    
+    if arc_shape.arc_options.filled {
+        // For filled arcs, create a path that includes the center (pie slice)
+        svg.push_str(&format!(
+            r#"<path d="M {} {} L {} {} A {} {} 0 {} {} {} {} Z" fill="{}" stroke="{}" stroke-width="{}" />"#,
+            arc_shape.center.0 - pos.0, arc_shape.center.1 - pos.1, // Move to center
+            start_x - pos.0, start_y - pos.1, // Line to start point
+            arc_shape.radius, arc_shape.radius, // Arc radii
+            large_arc_flag, sweep_flag, // Arc flags
+            end_x - pos.0, end_y - pos.1, // Arc end point
+            arc_shape.arc_options.fill_color,
+            arc_shape.arc_options.stroke_color,
+            arc_shape.arc_options.stroke_width
+        ));
+    } else {
+        // For unfilled arcs, just draw the arc curve
+        svg.push_str(&format!(
+            r#"<path d="M {} {} A {} {} 0 {} {} {} {}" fill="none" stroke="{}" stroke-width="{}" />"#,
+            start_x - pos.0, start_y - pos.1, // Move to start point
+            arc_shape.radius, arc_shape.radius, // Arc radii
+            large_arc_flag, sweep_flag, // Arc flags
+            end_x - pos.0, end_y - pos.1, // Arc end point
+            arc_shape.arc_options.stroke_color,
+            arc_shape.arc_options.stroke_width
+        ));
+    }
+    
+    svg.push_str("</g>");
+}
+
+
+#[test]
+fn test_render_arc() {
+    let mut session = DiagramBuilder::new();
+    let options = ArcOptions {
+        fill_color: "blue".to_string(),
+        stroke_color: "black".to_string(),
+        stroke_width: 2.0,
+        filled: false,
+    };
+    
+    let arc = session.new_arc(
+        "arc".to_string(),
+        (50.0, 50.0), // center
+        30.0,         // radius
+        0.0,          // start angle
+        90.0,         // end angle
+        options
+    );
+    
+    let node = render_node(&arc, &session);
+
+
+    assertIsSameSVG(
+        &node,
+        r##"<g transform="translate(0 0)">
+            <path d="M 80 50 A 30 30 0 0 1 50 80" fill="none" stroke="black" stroke-width="2" />
+        </g>"##
+    );
+    assert!(node.contains("stroke=\"black\""));
+}
 
 //test that groups are rendered correctly
 #[test]

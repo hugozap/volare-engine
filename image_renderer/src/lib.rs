@@ -4,11 +4,11 @@ use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use rusttype::{Font, Scale};
-use volare_engine_layout::Float;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use volare_engine_layout::Float;
 
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, Fill, Renderer,
@@ -101,7 +101,12 @@ fn render_node(
     let size = session.get_size(entity_id.clone());
     println!(
         "Rendering node type: {:?}, id: {}, pos: ({:.1}, {:.1}), size: ({:.1}, {:.1})",
-        node.entity_type, entity_id.clone(), abs_pos.0, abs_pos.1, size.0, size.1
+        node.entity_type,
+        entity_id.clone(),
+        abs_pos.0,
+        abs_pos.1,
+        size.0,
+        size.1
     );
 
     match node.entity_type {
@@ -300,8 +305,174 @@ fn render_node(
         EntityType::FreeContainer => {
             render_free_container(session, imgbuf, entity_id.clone(), node, abs_pos, scale);
         }
+
+        EntityType::ArcShape => {
+            render_arc(session, imgbuf, entity_id.clone(), node, abs_pos, scale);
+        }
+
         // For this initial implementation, we'll skip other shapes
         _ => {}
+    }
+}
+
+fn render_arc(
+    session: &DiagramBuilder,
+    imgbuf: &mut RgbaImage,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+    pos: (Float, Float),
+    scale: Float,
+) {
+    use std::f32::consts::PI;
+    
+    let arc_shape = session.get_arc(entity_id.clone());
+    let size = session.get_size(entity_id.clone());
+    
+    // Apply scaling factor to dimensions
+    let scaled_radius = arc_shape.radius * scale;
+    let center_x = (pos.0 + arc_shape.center.0 * scale) as i32;
+    let center_y = (pos.1 + arc_shape.center.1 * scale) as i32;
+    
+    // Get colors
+    let stroke_color = parse_color(&arc_shape.arc_options.stroke_color);
+    let fill_color = parse_color(&arc_shape.arc_options.fill_color);
+    let stroke_width = arc_shape.arc_options.stroke_width * scale;
+    
+    // Get normalized angles and convert to radians
+    let (start_angle, end_angle) = arc_shape.normalize_angles();
+    let start_rad = start_angle * PI / 180.0;
+    let end_rad = end_angle * PI / 180.0;
+    
+    // For filled arcs, we need to fill the sector
+    if arc_shape.arc_options.filled {
+        render_filled_arc_sector(
+            imgbuf,
+            center_x,
+            center_y,
+            scaled_radius,
+            start_rad,
+            end_rad,
+            fill_color,
+            stroke_color,
+            stroke_width,
+        );
+    } else {
+        // For unfilled arcs, just draw the arc curve
+        render_arc_curve(
+            imgbuf,
+            center_x,
+            center_y,
+            scaled_radius,
+            start_rad,
+            end_rad,
+            stroke_color,
+            stroke_width,
+        );
+    }
+}
+
+// Helper function to render a filled arc sector (pie slice)
+fn render_filled_arc_sector(
+    imgbuf: &mut RgbaImage,
+    center_x: i32,
+    center_y: i32,
+    radius: Float,
+    start_rad: Float,
+    end_rad: Float,
+    fill_color: Rgba<u8>,
+    stroke_color: Rgba<u8>,
+    stroke_width: Float,
+) {
+    let radius_i = radius as i32;
+    
+    // Fill the sector by checking each pixel in the bounding box
+    for y in (center_y - radius_i)..=(center_y + radius_i) {
+        for x in (center_x - radius_i)..=(center_x + radius_i) {
+            if x >= 0 && x < imgbuf.width() as i32 && y >= 0 && y < imgbuf.height() as i32 {
+                let dx = (x - center_x) as Float;
+                let dy = (y - center_y) as Float;
+                let distance = (dx * dx + dy * dy).sqrt();
+                
+                if distance <= radius {
+                    // Calculate angle of this pixel
+                    let angle = dy.atan2(dx);
+                    let angle_deg = angle * 180.0 / std::f32::consts::PI;
+                    let normalized_angle = if angle_deg < 0.0 { angle_deg + 360.0 } else { angle_deg };
+                    
+                    // Check if this angle is within our arc
+                    let start_deg = start_rad * 180.0 / std::f32::consts::PI;
+                    let end_deg = end_rad * 180.0 / std::f32::consts::PI;
+                    
+                    let angle_in_arc = if end_deg > start_deg {
+                        normalized_angle >= start_deg && normalized_angle <= end_deg
+                    } else {
+                        normalized_angle >= start_deg || normalized_angle <= end_deg
+                    };
+                    
+                    if angle_in_arc {
+                        imgbuf.put_pixel(x as u32, y as u32, fill_color);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Draw the arc outline
+    render_arc_curve(imgbuf, center_x, center_y, radius, start_rad, end_rad, stroke_color, stroke_width);
+    
+    // Draw lines from center to arc endpoints for filled sectors
+    let start_x = center_x + (radius * start_rad.cos()) as i32;
+    let start_y = center_y + (radius * start_rad.sin()) as i32;
+    let end_x = center_x + (radius * end_rad.cos()) as i32;
+    let end_y = center_y + (radius * end_rad.sin()) as i32;
+    
+    draw_anti_aliased_line(imgbuf, center_x, center_y, start_x, start_y, stroke_color, stroke_width);
+    draw_anti_aliased_line(imgbuf, center_x, center_y, end_x, end_y, stroke_color, stroke_width);
+}
+
+// Helper function to render just the arc curve
+fn render_arc_curve(
+    imgbuf: &mut RgbaImage,
+    center_x: i32,
+    center_y: i32,
+    radius: Float,
+    start_rad: Float,
+    end_rad: Float,
+    stroke_color: Rgba<u8>,
+    stroke_width: Float,
+) {
+    // Calculate the angle step based on radius for smooth curves
+    let num_steps = (radius * 2.0).max(60.0) as i32; // More steps for larger arcs
+    let angle_range = if end_rad > start_rad {
+        end_rad - start_rad
+    } else {
+        (2.0 * std::f32::consts::PI) - start_rad + end_rad
+    };
+    
+    let angle_step = angle_range / num_steps as Float;
+    
+    let mut prev_x = center_x + (radius * start_rad.cos()) as i32;
+    let mut prev_y = center_y + (radius * start_rad.sin()) as i32;
+    
+    for i in 1..=num_steps {
+        let current_angle = if end_rad > start_rad {
+            start_rad + angle_step * i as Float
+        } else {
+            let angle = start_rad + angle_step * i as Float;
+            if angle > 2.0 * std::f32::consts::PI {
+                angle - 2.0 * std::f32::consts::PI
+            } else {
+                angle
+            }
+        };
+        
+        let current_x = center_x + (radius * current_angle.cos()) as i32;
+        let current_y = center_y + (radius * current_angle.sin()) as i32;
+        
+        draw_anti_aliased_line(imgbuf, prev_x, prev_y, current_x, current_y, stroke_color, stroke_width);
+        
+        prev_x = current_x;
+        prev_y = current_y;
     }
 }
 
@@ -385,7 +556,12 @@ fn render_box(
         // Log child details
         println!(
             "Rendering box child: id={}, type={:?}, box_pos=({:.1},{:.1}), child_pos=({:.1},{:.1})",
-            child_id.clone(), child.entity_type, pos.0, pos.1, child_pos.0, child_pos.1
+            child_id.clone(),
+            child.entity_type,
+            pos.0,
+            pos.1,
+            child_pos.0,
+            child_pos.1
         );
 
         // Get absolute position for child relative to box
@@ -720,7 +896,9 @@ fn render_free_container(
     println!("==================================================");
     println!(
         "Rendering FreeContainer: id={}, pos=({:.1}, {:.1})",
-        entity_id.clone(), pos.0, pos.1
+        entity_id.clone(),
+        pos.0,
+        pos.1
     );
 
     // Unscale the position (since render_node applies scaling for us)
@@ -806,7 +984,10 @@ fn render_free_container(
             let child_size = session.get_size(child_id.clone());
             println!(
                 "Child[{}]: id={}, size=({:.1},{:.1})",
-                i, child_id.clone(), child_size.0, child_size.1
+                i,
+                child_id.clone(),
+                child_size.0,
+                child_size.1
             );
 
             // The key fix: since render_node applies pos and scaling again,

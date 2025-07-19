@@ -16,6 +16,7 @@ resvg = "0.25.0"
 rusttype = "0.9.3"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
+uuid = { version = "1.8", features = ["v4"] }
 
 [[bin]]
 name = "textdemo"
@@ -118,14 +119,198 @@ pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (Float, Fl
     (width as Float, height as Float)
 }
 
+===/src/bin/city.rs===
+// src/bin/intricate_city.rs
+// Demo program that generates an intricate city using only polylines, rects, and free containers
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🏙️ Generando Ciudad Intrincada...\n");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("intricate_city");
+    std::fs::create_dir_all(&output_dir)?;
+
+    // Generate the intricate city
+    generate_intricate_city(&output_dir)?;
+
+    println!("\n✅ Ciudad generada exitosamente!");
+    println!("📁 Archivo guardado en: {}", output_dir.display());
+
+    Ok(())
+}
+
+fn generate_intricate_city(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":1400,"height":900,"background":"#E6F3FF","children":["metro_grid","financial_district","tech_campus","cultural_quarter","harbor","mountain_range","sky_bridges","monorail","shopping_centers"]}
+
+{"id":"metro_grid","type":"free_container","width":1400,"height":900,"children":["metro_line_1","metro_line_2","metro_line_3","metro_line_4","station_markers"],"x":0,"y":0}
+{"id":"metro_line_1","type":"polyline","points":[[0,200],[300,205],[600,200],[900,205],[1200,200],[1400,205]],"stroke_color":"#FF6B6B","stroke_width":6,"x":0,"y":0}
+{"id":"metro_line_2","type":"polyline","points":[[0,450],[350,455],[700,450],[1050,455],[1400,450]],"stroke_color":"#4ECDC4","stroke_width":6,"x":0,"y":0}
+{"id":"metro_line_3","type":"polyline","points":[[200,0],[205,200],[200,400],[205,600],[200,800],[205,900]],"stroke_color":"#45B7D1","stroke_width":6,"x":0,"y":0}
+{"id":"metro_line_4","type":"polyline","points":[[800,0],[805,200],[800,400],[805,600],[800,800],[805,900]],"stroke_color":"#96CEB4","stroke_width":6,"x":0,"y":0}
+{"id":"station_markers","type":"hstack","children":["station_1","station_2","station_3","station_4","station_5"],"v_align":"center","x":180,"y":180}
+{"id":"station_1","type":"rect","width":12,"height":12,"background":"white","border_color":"black"}
+{"id":"station_2","type":"rect","width":12,"height":12,"background":"white","border_color":"black"}
+{"id":"station_3","type":"rect","width":12,"height":12,"background":"white","border_color":"black"}
+{"id":"station_4","type":"rect","width":12,"height":12,"background":"white","border_color":"black"}
+{"id":"station_5","type":"rect","width":12,"height":12,"background":"white","border_color":"black"}
+
+{"id":"financial_district","type":"vstack","children":["fd_tier_1","fd_tier_2","fd_tier_3","fd_plaza"],"h_align":"center","x":50,"y":50}
+{"id":"fd_tier_1","type":"hstack","children":["tower_mega","tower_alpha","tower_beta"],"v_align":"bottom"}
+{"id":"tower_mega","type":"rect","width":45,"height":180,"background":"#2C3E50"}
+{"id":"tower_alpha","type":"rect","width":40,"height":160,"background":"#34495E"}
+{"id":"tower_beta","type":"rect","width":35,"height":140,"background":"#7F8C8D"}
+{"id":"fd_tier_2","type":"hstack","children":["bank_central","office_prime","office_gold"],"v_align":"bottom"}
+{"id":"bank_central","type":"rect","width":50,"height":80,"background":"#F39C12"}
+{"id":"office_prime","type":"rect","width":30,"height":100,"background":"#E74C3C"}
+{"id":"office_gold","type":"rect","width":35,"height":90,"background":"#9B59B6"}
+{"id":"fd_tier_3","type":"hstack","children":["retail_1","retail_2","retail_3","retail_4"],"v_align":"center"}
+{"id":"retail_1","type":"rect","width":25,"height":25,"background":"#E67E22"}
+{"id":"retail_2","type":"rect","width":25,"height":25,"background":"#E74C3C"}
+{"id":"retail_3","type":"rect","width":25,"height":25,"background":"#9B59B6"}
+{"id":"retail_4","type":"rect","width":25,"height":25,"background":"#3498DB"}
+{"id":"fd_plaza","type":"rect","width":200,"height":15,"background":"#BDC3C7"}
+
+{"id":"tech_campus","type":"free_container","width":300,"height":250,"children":["campus_layout","innovation_labs","data_centers"],"x":500,"y":100}
+{"id":"campus_layout","type":"vstack","children":["tech_buildings","tech_courtyard","parking_structure"],"h_align":"center","x":0,"y":0}
+{"id":"tech_buildings","type":"hstack","children":["lab_a","lab_b","lab_c","lab_d"],"v_align":"bottom"}
+{"id":"lab_a","type":"rect","width":40,"height":80,"background":"#1ABC9C"}
+{"id":"lab_b","type":"rect","width":35,"height":70,"background":"#16A085"}
+{"id":"lab_c","type":"rect","width":45,"height":85,"background":"#3498DB"}
+{"id":"lab_d","type":"rect","width":38,"height":75,"background":"#2980B9"}
+{"id":"tech_courtyard","type":"rect","width":180,"height":40,"background":"#2ECC71"}
+{"id":"parking_structure","type":"hstack","children":["parking_level_1","parking_level_2","parking_level_3"],"v_align":"center"}
+{"id":"parking_level_1","type":"rect","width":50,"height":15,"background":"#95A5A6"}
+{"id":"parking_level_2","type":"rect","width":50,"height":15,"background":"#7F8C8D"}
+{"id":"parking_level_3","type":"rect","width":50,"height":15,"background":"#95A5A6"}
+{"id":"innovation_labs","type":"polyline","points":[[0,0],[50,20],[100,10],[150,30],[200,15],[250,25],[300,20]],"stroke_color":"#E74C3C","stroke_width":3,"x":0,"y":50}
+{"id":"data_centers","type":"vstack","children":["server_1","server_2"],"h_align":"right","x":220,"y":180}
+{"id":"server_1","type":"rect","width":60,"height":30,"background":"#34495E"}
+{"id":"server_2","type":"rect","width":60,"height":25,"background":"#2C3E50"}
+
+{"id":"cultural_quarter","type":"free_container","width":280,"height":200,"children":["museums","theaters","galleries"],"x":900,"y":250}
+{"id":"museums","type":"vstack","children":["museum_art","museum_history","museum_science"],"h_align":"left","x":0,"y":0}
+{"id":"museum_art","type":"hstack","children":["art_wing_1","art_wing_2","art_central"],"v_align":"center"}
+{"id":"art_wing_1","type":"rect","width":30,"height":40,"background":"#8E44AD"}
+{"id":"art_wing_2","type":"rect","width":30,"height":40,"background":"#9B59B6"}
+{"id":"art_central","type":"rect","width":50,"height":60,"background":"#663399"}
+{"id":"museum_history","type":"rect","width":120,"height":35,"background":"#D35400"}
+{"id":"museum_science","type":"hstack","children":["planetarium","exhibits","imax"],"v_align":"center"}
+{"id":"planetarium","type":"rect","width":25,"height":25,"background":"#2C3E50"}
+{"id":"exhibits","type":"rect","width":60,"height":30,"background":"#34495E"}
+{"id":"imax","type":"rect","width":35,"height":28,"background":"#2C3E50"}
+{"id":"theaters","type":"hstack","children":["opera_house","concert_hall"],"v_align":"bottom","x":140,"y":20}
+{"id":"opera_house","type":"vstack","children":["opera_dome","opera_base"],"h_align":"center"}
+{"id":"opera_dome","type":"rect","width":40,"height":20,"background":"#E67E22"}
+{"id":"opera_base","type":"rect","width":60,"height":40,"background":"#D35400"}
+{"id":"concert_hall","type":"rect","width":45,"height":70,"background":"#F39C12"}
+{"id":"galleries","type":"polyline","points":[[0,150],[40,160],[80,150],[120,160],[160,150],[200,160],[240,150],[280,160]],"stroke_color":"#9B59B6","stroke_width":4,"x":0,"y":0}
+
+{"id":"harbor","type":"free_container","width":400,"height":300,"children":["waterfront","docks","marina","lighthouse"],"x":1000,"y":600}
+{"id":"waterfront","type":"rect","width":400,"height":300,"background":"#3498DB","x":0,"y":0}
+{"id":"docks","type":"vstack","children":["pier_1","pier_2","pier_3"],"h_align":"left","x":20,"y":50}
+{"id":"pier_1","type":"hstack","children":["dock_a","dock_b","dock_c"],"v_align":"center"}
+{"id":"dock_a","type":"rect","width":60,"height":8,"background":"#8B4513"}
+{"id":"dock_b","type":"rect","width":60,"height":8,"background":"#A0522D"}
+{"id":"dock_c","type":"rect","width":60,"height":8,"background":"#8B4513"}
+{"id":"pier_2","type":"rect","width":200,"height":10,"background":"#654321"}
+{"id":"pier_3","type":"hstack","children":["slip_1","slip_2","slip_3","slip_4"],"v_align":"center"}
+{"id":"slip_1","type":"rect","width":40,"height":6,"background":"#8B4513"}
+{"id":"slip_2","type":"rect","width":40,"height":6,"background":"#A0522D"}
+{"id":"slip_3","type":"rect","width":40,"height":6,"background":"#8B4513"}
+{"id":"slip_4","type":"rect","width":40,"height":6,"background":"#A0522D"}
+{"id":"marina","type":"polyline","points":[[50,200],[80,220],[120,210],[160,230],[200,220],[240,240],[280,230]],"stroke_color":"white","stroke_width":2,"x":0,"y":0}
+{"id":"lighthouse","type":"vstack","children":["lighthouse_base","lighthouse_tower","lighthouse_light"],"h_align":"center","x":350,"y":180}
+{"id":"lighthouse_base","type":"rect","width":20,"height":30,"background":"#E74C3C"}
+{"id":"lighthouse_tower","type":"rect","width":12,"height":60,"background":"white"}
+{"id":"lighthouse_light","type":"rect","width":16,"height":8,"background":"#F1C40F"}
+
+{"id":"mountain_range","type":"polyline","points":[[0,0],[100,50],[200,20],[300,80],[400,30],[500,90],[600,40],[700,100],[800,50],[900,110],[1000,60],[1100,120],[1200,70],[1300,130],[1400,80]],"stroke_color":"#7D6E3E","stroke_width":30,"x":0,"y":0}
+
+{"id":"sky_bridges","type":"free_container","width":1400,"height":900,"children":["bridge_network","aerial_walkways"],"x":0,"y":0}
+{"id":"bridge_network","type":"hstack","children":["sky_bridge_1","sky_bridge_2","sky_bridge_3"],"v_align":"center","x":100,"y":150}
+{"id":"sky_bridge_1","type":"polyline","points":[[0,0],[150,10],[300,0]],"stroke_color":"#BDC3C7","stroke_width":4,"x":0,"y":0}
+{"id":"sky_bridge_2","type":"polyline","points":[[0,0],[200,15],[400,0]],"stroke_color":"#95A5A6","stroke_width":4,"x":0,"y":0}
+{"id":"sky_bridge_3","type":"polyline","points":[[0,0],[180,8],[360,0]],"stroke_color":"#BDC3C7","stroke_width":4,"x":0,"y":0}
+{"id":"aerial_walkways","type":"vstack","children":["walkway_level_1","walkway_level_2"],"h_align":"center","x":600,"y":100}
+{"id":"walkway_level_1","type":"polyline","points":[[0,0],[100,5],[200,0],[300,5],[400,0]],"stroke_color":"#ECF0F1","stroke_width":3,"x":0,"y":0}
+{"id":"walkway_level_2","type":"polyline","points":[[50,0],[150,8],[250,0],[350,8],[450,0]],"stroke_color":"#BDC3C7","stroke_width":3,"x":0,"y":0}
+
+{"id":"monorail","type":"polyline","points":[[0,350],[200,355],[400,350],[600,355],[800,350],[1000,355],[1200,350],[1400,355]],"stroke_color":"#2C3E50","stroke_width":8,"x":0,"y":0}
+
+{"id":"shopping_centers","type":"free_container","width":600,"height":400,"children":["mall_complex","outdoor_plaza","market_district"],"x":250,"y":500}
+{"id":"mall_complex","type":"vstack","children":["mall_upper","mall_main","mall_food_court"],"h_align":"center","x":0,"y":0}
+{"id":"mall_upper","type":"hstack","children":["store_1","store_2","store_3","store_4","store_5"],"v_align":"center"}
+{"id":"store_1","type":"rect","width":40,"height":30,"background":"#E91E63"}
+{"id":"store_2","type":"rect","width":35,"height":30,"background":"#9C27B0"}
+{"id":"store_3","type":"rect","width":45,"height":30,"background":"#673AB7"}
+{"id":"store_4","type":"rect","width":38,"height":30,"background":"#3F51B5"}
+{"id":"store_5","type":"rect","width":42,"height":30,"background":"#2196F3"}
+{"id":"mall_main","type":"rect","width":250,"height":40,"background":"#F5F5F5"}
+{"id":"mall_food_court","type":"hstack","children":["restaurant_1","restaurant_2","restaurant_3","seating"],"v_align":"center"}
+{"id":"restaurant_1","type":"rect","width":50,"height":25,"background":"#FF5722"}
+{"id":"restaurant_2","type":"rect","width":45,"height":25,"background":"#FF9800"}
+{"id":"restaurant_3","type":"rect","width":40,"height":25,"background":"#FFC107"}
+{"id":"seating","type":"rect","width":80,"height":25,"background":"#FFEB3B"}
+{"id":"outdoor_plaza","type":"free_container","width":200,"height":150,"children":["plaza_fountains","plaza_vendors"],"x":300,"y":50}
+{"id":"plaza_fountains","type":"vstack","children":["fountain_main","fountain_small_1","fountain_small_2"],"h_align":"center","x":50,"y":20}
+{"id":"fountain_main","type":"rect","width":30,"height":30,"background":"#00BCD4"}
+{"id":"fountain_small_1","type":"rect","width":15,"height":15,"background":"#26C6DA"}
+{"id":"fountain_small_2","type":"rect","width":15,"height":15,"background":"#26C6DA"}
+{"id":"plaza_vendors","type":"hstack","children":["vendor_1","vendor_2","vendor_3"],"v_align":"center","x":20,"y":100}
+{"id":"vendor_1","type":"rect","width":25,"height":15,"background":"#4CAF50"}
+{"id":"vendor_2","type":"rect","width":25,"height":15,"background":"#8BC34A"}
+{"id":"vendor_3","type":"rect","width":25,"height":15,"background":"#CDDC39"}
+{"id":"market_district","type":"polyline","points":[[400,200],[450,220],[500,200],[550,220],[600,200]],"stroke_color":"#795548","stroke_width":6,"x":0,"y":0}"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("intricate_city.svg"), "Ciudad Intrincada")
+}
+
+// Helper function to generate SVG from JSONL
+fn generate_svg_from_jsonl(
+    jsonl_input: &str,
+    output_path: std::path::PathBuf,
+    description: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("  📄 Generando: {}", description);
+
+    // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(jsonl_input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+    println!("    ✅ Guardado: {}", output_path.file_name().unwrap().to_str().unwrap());
+
+    Ok(())
+}
+
 ===/src/bin/custom_components.rs===
 // src/bin/custom_component_demo.rs
 // Demo program showing how to register and use custom components
 
 use demo::measure_text::measure_text_svg_character_advance;
-use volare_engine_layout::*;
 use serde_json::{json, Map, Value};
-use std::fs::File;
+use std::{fmt::format, fs::File};
+use volare_engine_layout::*;
 
 // Helper function to extract attributes (since we can't access CustomComponentRegistry helpers directly)
 fn get_string_attr(attrs: &Map<String, Value>, key: &str, default: &str) -> String {
@@ -137,24 +322,15 @@ fn get_string_attr(attrs: &Map<String, Value>, key: &str, default: &str) -> Stri
 }
 
 fn get_float_attr(attrs: &Map<String, Value>, key: &str, default: f64) -> Float {
-    attrs
-        .get(key)
-        .and_then(|v| v.as_f64())
-        .unwrap_or(default) as Float
+    attrs.get(key).and_then(|v| v.as_f64()).unwrap_or(default) as Float
 }
 
 fn get_bool_attr(attrs: &Map<String, Value>, key: &str, default: bool) -> bool {
-    attrs
-        .get(key)
-        .and_then(|v| v.as_bool())
-        .unwrap_or(default)
+    attrs.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
 }
 
 fn get_int_attr(attrs: &Map<String, Value>, key: &str, default: i64) -> i64 {
-    attrs
-        .get(key)
-        .and_then(|v| v.as_i64())
-        .unwrap_or(default)
+    attrs.get(key).and_then(|v| v.as_i64()).unwrap_or(default)
 }
 
 /// Custom Component 1: Badge
@@ -172,6 +348,11 @@ fn create_badge_component(
     let font_size = get_float_attr(attrs, "font_size", 12.0);
     let padding = get_float_attr(attrs, "padding", 8.0);
 
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        id =  uuid::Uuid::new_v4().to_string()
+    }
+
     // Create text element
     let text_options = TextOptions {
         font_family: "AnonymicePro Nerd Font".to_string(),
@@ -180,7 +361,9 @@ fn create_badge_component(
         line_width: 200,
         line_spacing: 0.0,
     };
-    let text_node = builder.new_text(&text, text_options);
+    let text_node = builder.new_text(
+        format!("{}_text", id),
+        &text, text_options);
 
     // Wrap in rounded box
     let box_options = BoxOptions {
@@ -188,11 +371,13 @@ fn create_badge_component(
         stroke_color: "transparent".to_string(),
         stroke_width: 0.0,
         padding,
-        border_radius: font_size, // Make it pill-shaped
-        width_behavior: SizeBehavior::Content, // Auto width based on text
-        height_behavior: SizeBehavior::Content, // Auto height based on text    
+        border_radius: font_size,               // Make it pill-shaped
+        width_behavior: SizeBehavior::Content,  // Auto width based on text
+        height_behavior: SizeBehavior::Content, // Auto height based on text
     };
-    let badge = builder.new_box(text_node, box_options);
+    let badge = builder.new_box(
+        id,
+        text_node, box_options);
 
     println!("✅ Badge '{}' created successfully", text);
     Ok(badge)
@@ -211,6 +396,16 @@ fn create_alert_component(
     let message = get_string_attr(attrs, "message", "Alert message");
     let width = get_float_attr(attrs, "width", 300.0);
     let show_icon = get_bool_attr(attrs, "show_icon", true);
+    let mut id = get_string_attr(attrs, "id", "");
+
+    if id.is_empty() {
+        id = uuid::Uuid::new_v4().to_string()
+    }
+
+    //TODO aqui seria util tener
+    // let context = builder.CreateComponentContext(id)
+    // y todos los elems internos les asigna prefijo el id
+    // util para no tener que concatenarlos
 
     // Define alert styles
     let (bg_color, border_color, icon) = match alert_type.as_str() {
@@ -224,58 +419,86 @@ fn create_alert_component(
 
     // Create header with optional icon
     if show_icon {
-        let icon_text = builder.new_text(icon, TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 18.0,
-            text_color: border_color.to_string(),
-            line_width: 50,
-            line_spacing: 0.0,
-        });
+        let icon_text = builder.new_text(
+            format!("{}_showicon", id),
+            icon,
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: 18.0,
+                text_color: border_color.to_string(),
+                line_width: 50,
+                line_spacing: 0.0,
+            },
+        );
 
-        let title_text = builder.new_text(&title, TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            text_color: "#333".to_string(),
-            line_width: (width - 50.0) as usize,
-            line_spacing: 0.0,
-        });
+        let title_text = builder.new_text(
+            format!("{}_title", id),
+            &title,
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: 16.0,
+                text_color: "#333".to_string(),
+                line_width: (width - 50.0) as usize,
+                line_spacing: 0.0,
+            },
+        );
 
-        let header = builder.new_hstack(vec![icon_text, title_text], VerticalAlignment::Center);
+        let header = builder.new_hstack(
+            format!("{}_header", id),
+            vec![icon_text, title_text],
+            VerticalAlignment::Center,
+        );
         children.push(header);
     } else {
-        let title_text = builder.new_text(&title, TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            text_color: "#333".to_string(),
-            line_width: width as usize,
-            line_spacing: 0.0,
-        });
+        let title_text = builder.new_text(
+            format!("{}_title", id),
+            &title,
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: 16.0,
+                text_color: "#333".to_string(),
+                line_width: width as usize,
+                line_spacing: 0.0,
+            },
+        );
         children.push(title_text);
     }
 
     // Add message
-    let message_text = builder.new_text(&message, TextOptions {
-        font_family: "AnonymicePro Nerd Font".to_string(),
-        font_size: 14.0,
-        text_color: "#666".to_string(),
-        line_width: width as usize,
-        line_spacing: 2.0,
-    });
+    let message_text = builder.new_text(
+        format!("{}_addmsg", id),
+        &message,
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 14.0,
+            text_color: "#666".to_string(),
+            line_width: width as usize,
+            line_spacing: 2.0,
+        },
+    );
     children.push(message_text);
 
     // Create vertical layout
-    let content = builder.new_vstack(children, HorizontalAlignment::Left);
+    let content = builder.new_vstack(
+        format!("{}_contentstack", id),
+        children,
+        HorizontalAlignment::Left,
+    );
 
     // Wrap in styled box
-    let alert_box = builder.new_box(content, BoxOptions {
-        fill_color: Fill::Color(bg_color.to_string()),
-        stroke_color: border_color.to_string(),
-        stroke_width: 1.0,
-        padding: 16.0,
-        border_radius: 8.0,
-        width_behavior: SizeBehavior::Fixed(width),
-        height_behavior: SizeBehavior::Content, // Auto height based on content
-    });
+    let alert_box = builder.new_box(
+        id,
+        content,
+        BoxOptions {
+            fill_color: Fill::Color(bg_color.to_string()),
+            stroke_color: border_color.to_string(),
+            stroke_width: 1.0,
+            padding: 16.0,
+            border_radius: 8.0,
+            width_behavior: SizeBehavior::Fixed(width),
+            height_behavior: SizeBehavior::Content, // Auto height based on content
+        },
+    );
 
     println!("✅ Alert '{}' ({}) created successfully", title, alert_type);
     Ok(alert_box)
@@ -295,52 +518,67 @@ fn create_progress_bar_component(
     let bg_color = get_string_attr(attrs, "bg_color", "lightgray");
     let fill_color = get_string_attr(attrs, "fill_color", "blue");
     let show_text = get_bool_attr(attrs, "show_text", false);
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        // Generate a unique ID if not provided
+         id = format!("progress_bar_{}", uuid::Uuid::new_v4());
+    }
 
     // Create background bar
-    let bg_rect = builder.new_rectangle(RectOptions {
-        width_behavior: SizeBehavior::Fixed(width),
-        height_behavior: SizeBehavior::Fixed(height),
-        fill_color: Fill::Color(bg_color),
-        stroke_color: "transparent".to_string(),
-        stroke_width: 0.0,
-        border_radius: height / 2.0,
-    });
+    let bg_rect = builder.new_rectangle(
+        format!("bg_{}", id),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(width),
+            height_behavior: SizeBehavior::Fixed(height),
+            fill_color: Fill::Color(bg_color),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            border_radius: height / 2.0,
+        },
+    );
 
     // Create progress fill
     let fill_width = width * progress;
-    let fill_rect = builder.new_rectangle(RectOptions {
-        width_behavior: SizeBehavior::Fixed(fill_width),
-        height_behavior: SizeBehavior::Fixed(height),
-        fill_color: Fill::Color(fill_color),
-        stroke_color: "transparent".to_string(),
-        stroke_width: 0.0,
-        border_radius: height / 2.0,
-    });
+    let fill_rect = builder.new_rectangle(
+        format!("fill_{}", id),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(fill_width),
+            height_behavior: SizeBehavior::Fixed(height),
+            fill_color: Fill::Color(fill_color),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            border_radius: height / 2.0,
+        },
+    );
 
-    let mut elements = vec![
-        (bg_rect, (0.0, 0.0)),
-        (fill_rect, (0.0, 0.0)),
-    ];
+    let mut elements = vec![(bg_rect, (0.0, 0.0)), (fill_rect, (0.0, 0.0))];
 
     // Add percentage text if requested
     if show_text {
         let percentage = (progress * 100.0) as i32;
-        let text_node = builder.new_text(&format!("{}%", percentage), TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: height * 0.7,
-            text_color: "black".to_string(),
-            line_width: 100,
-            line_spacing: 0.0,
-        });
+        let text_node = builder.new_text(
+            format!("text_{}", id),
+            &format!("{}%", percentage),
+            TextOptions {
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: height * 0.7,
+                text_color: "black".to_string(),
+                line_width: 100,
+                line_spacing: 0.0,
+            },
+        );
         // Center the text roughly
         let text_x = (width - 30.0) / 2.0; // Rough centering
         let text_y = height * 0.15;
         elements.push((text_node, (text_x, text_y)));
     }
 
-    let progress_bar = builder.new_free_container_with_children(elements);
+    let progress_bar = builder.new_free_container(id.to_string(), elements);
 
-    println!("✅ Progress bar ({}%) created successfully", (progress * 100.0) as i32);
+    println!(
+        "✅ Progress bar ({}%) created successfully",
+        (progress * 100.0) as i32
+    );
     Ok(progress_bar)
 }
 
@@ -356,6 +594,11 @@ fn create_button_component(
     let variant = get_string_attr(attrs, "variant", "primary");
     let size = get_string_attr(attrs, "size", "medium");
     let disabled = get_bool_attr(attrs, "disabled", false);
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("button_{}", uuid::Uuid::new_v4());
+    }
 
     // Define button styles based on variant
     let (bg_color, text_color, border_color) = if disabled {
@@ -379,26 +622,37 @@ fn create_button_component(
     };
 
     // Create button text
-    let button_text = builder.new_text(&text, TextOptions {
-        font_family: "AnonymicePro Nerd Font".to_string(),
-        font_size,
-        text_color: text_color.to_string(),
-        line_width: 200,
-        line_spacing: 0.0,
-    });
+    let button_text = builder.new_text(
+        format!("{}-{}", id, text),
+        &text,
+        TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size,
+            text_color: text_color.to_string(),
+            line_width: 200,
+            line_spacing: 0.0,
+        },
+    );
 
     // Wrap in styled box
-    let button = builder.new_box(button_text, BoxOptions {
-        fill_color: Fill::Color(bg_color.to_string()),
-        stroke_color: border_color.to_string(),
-        stroke_width: 1.0,
-        padding: f32::max(padding_x, padding_y), // Use max for uniform padding
-        border_radius: 4.0,
-        width_behavior: SizeBehavior::Content, // Auto width based on text
-        height_behavior: SizeBehavior::Content, // Auto height based on text
-    });
+    let button = builder.new_box(
+        format!("button_{}", id),
+        button_text,
+        BoxOptions {
+            fill_color: Fill::Color(bg_color.to_string()),
+            stroke_color: border_color.to_string(),
+            stroke_width: 1.0,
+            padding: f32::max(padding_x, padding_y), // Use max for uniform padding
+            border_radius: 4.0,
+            width_behavior: SizeBehavior::Content, // Auto width based on text
+            height_behavior: SizeBehavior::Content, // Auto height based on text
+        },
+    );
 
-    println!("✅ Button '{}' ({}, {}) created successfully", text, variant, size);
+    println!(
+        "✅ Button '{}' ({}, {}) created successfully",
+        text, variant, size
+    );
     Ok(button)
 }
 
@@ -419,7 +673,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 1: Direct usage with Rust API
     println!("=== Demo 1: Direct Rust API Usage ===");
-    
+
     // Create components directly
     let badge_attrs = json!({
         "text": "NEW",
@@ -427,7 +681,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "color": "white",
         "font_size": 14.0,
         "padding": 10.0
-    }).as_object().unwrap().clone();
+    })
+    .as_object()
+    .unwrap()
+    .clone();
 
     let _badge = builder.create_custom_component("badge", &badge_attrs)?;
 
@@ -437,7 +694,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "message": "Your custom component system is working perfectly!",
         "width": 400.0,
         "show_icon": true
-    }).as_object().unwrap().clone();
+    })
+    .as_object()
+    .unwrap()
+    .clone();
 
     let _alert = builder.create_custom_component("alert", &alert_attrs)?;
 
@@ -445,7 +705,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 2: JSON Lines usage
     println!("=== Demo 2: JSON Lines Usage ===");
-    
+
     let jsonl_input = r##"
 {"id":"root","type":"vstack","children":["title","demo_section","buttons_section","progress_section","alerts_section"],"h_align":"center"}
 {"id":"title","type":"text","content":"🎨 Custom Components Showcase","font_size":25,"color":"darkblue"}
@@ -472,21 +732,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
     let root_id = parser.parse_string(jsonl_input)?;
-    
+
     // Create a fresh builder for parsing
     let mut parse_builder = DiagramBuilder::new();
     parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
-    
+
     // Register components with the parse builder
     parse_builder.register_custom_component("badge", create_badge_component);
     parse_builder.register_custom_component("alert", create_alert_component);
     parse_builder.register_custom_component("progress_bar", create_progress_bar_component);
     parse_builder.register_custom_component("button", create_button_component);
-    
+
     // Build the diagram
     let diagram = parser.build(&root_id, &mut parse_builder)?;
     println!("✅ JSON Lines parsing successful!");
-    
+
     // Calculate layout
     println!("📐 Calculating layout...");
     layout::layout_tree_node(&mut parse_builder, &diagram);
@@ -494,30 +754,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 3: Render to SVG
     println!("\n=== Demo 3: SVG Rendering ===");
-    
+
     let temp_dir = std::env::temp_dir();
     let mut svg_path = temp_dir.clone();
     svg_path.push("custom-components-showcase.svg");
-    
+
     let svg_renderer = svg_renderer::SVGRenderer {};
     let mut svg_file = File::create(&svg_path)?;
     svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
-    
+
     println!("✅ SVG rendered successfully!");
     println!("📄 File saved to: {}", svg_path.to_str().unwrap());
-
-    
 
     // Demo 4: Statistics
     println!("\n=== Demo 4: Component Statistics ===");
     let registered_types = parse_builder.get_custom_component_types();
     println!("📊 Registered custom components: {:?}", registered_types);
     println!("🔢 Total custom components: {}", registered_types.len());
-    
+
     // Count components in the diagram
-    fn count_custom_components(node: &diagram_builder::DiagramTreeNode, types: &[&String]) -> usize {
+    fn count_custom_components(
+        node: &diagram_builder::DiagramTreeNode,
+        types: &[&String],
+    ) -> usize {
         let mut count = 0;
-        if types.iter().any(|t| t.as_str() == format!("{:?}", node.entity_type)) {
+        if types
+            .iter()
+            .any(|t| t.as_str() == format!("{:?}", node.entity_type))
+        {
             count += 1;
         }
         for child in &node.children {
@@ -525,13 +789,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         count
     }
-    
+
     let custom_count = count_custom_components(&diagram, &registered_types);
     println!("🎯 Custom components in diagram: {}", custom_count);
 
     println!("\n🎉 Custom Component Demo Complete!");
     println!("💡 Check the generated SVG file to see your custom components in action!");
-    
+
     Ok(())
 }
 
@@ -548,7 +812,10 @@ mod tests {
         let attrs = json!({
             "text": "Test",
             "background": "blue"
-        }).as_object().unwrap().clone();
+        })
+        .as_object()
+        .unwrap()
+        .clone();
 
         let result = builder.create_custom_component("badge", &attrs);
         assert!(result.is_ok());
@@ -578,16 +845,300 @@ mod tests {
 
         let mut parser = parser::JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(measure_text_svg_character_advance);
         builder.register_custom_component("badge", create_badge_component);
-        
+
         let result = parser.build(&root_id, &mut builder);
         assert!(result.is_ok());
     }
 }
 
+===/src/bin/visual_experiments.rs===
+// src/bin/visual_experiments.rs
+// Demo program that generates SVGs for visual experiments using JSONL format
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🎨 Generando Experimentos Visuales...\n");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("visual_experiments");
+    std::fs::create_dir_all(&output_dir)?;
+
+    // 🎯 Experimentos de Animación/Progresión
+    println!("=== 🎯 Experimentos de Animación/Progresión ===");
+    
+    // 1. Construcción de Edificio
+    generate_building_construction(&output_dir)?;
+    
+    // 2. Crecimiento de Árbol
+    generate_tree_growth(&output_dir)?;
+
+    // 📊 Visualización de Datos en Tiempo Real
+    println!("\n=== 📊 Visualización de Datos ===");
+    
+    // 3. Dashboard Financiero
+    generate_financial_dashboard(&output_dir)?;
+    
+    // 4. Monitor de Sistema
+    generate_system_monitor(&output_dir)?;
+
+    // 🎮 Interfaces Interactivas
+    println!("\n=== 🎮 Interfaces Interactivas ===");
+    
+    // 5. Panel de Control Espacial
+    generate_space_control_panel(&output_dir)?;
+    
+    // 6. Simulador de Tráfico
+    generate_traffic_simulator(&output_dir)?;
+
+    // 🧬 Simulaciones Científicas
+    println!("\n=== 🧬 Simulaciones Científicas ===");
+    
+    // 7. Modelo Molecular
+    generate_molecular_model(&output_dir)?;
+    
+    // 8. Sistema Solar
+    generate_solar_system(&output_dir)?;
+
+    // 🎨 Arte Generativo
+    println!("\n=== 🎨 Arte Generativo ===");
+    
+    // 9. Patrón Fractal Simple
+    generate_fractal_pattern(&output_dir)?;
+    
+    // 10. Mandala Geométrico
+    generate_geometric_mandala(&output_dir)?;
+
+    println!("\n✅ Todos los experimentos generados exitosamente!");
+    println!("📁 Archivos guardados en: {}", output_dir.display());
+
+    Ok(())
+}
+
+// 1. Construcción de Edificio
+fn generate_building_construction(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":400,"height":400,"children":["ground","floor1","floor2","floor3","roof","window1","window2"]}
+{"id":"ground","type":"rect","width":400,"height":20,"background":"brown","x":0,"y":380}
+{"id":"floor1","type":"rect","width":200,"height":60,"background":"lightgray","x":100,"y":320}
+{"id":"floor2","type":"rect","width":200,"height":60,"background":"lightgray","x":100,"y":260}
+{"id":"floor3","type":"rect","width":200,"height":60,"background":"lightgray","x":100,"y":200}
+{"id":"roof","type":"polyline","points":[[100,200],[150,150],[250,150],[300,200]],"stroke_color":"red","x":0,"y":0}
+{"id":"window1","type":"rect","width":20,"height":30,"background":"lightblue","x":120,"y":340}
+{"id":"window2","type":"rect","width":20,"height":30,"background":"lightblue","x":160,"y":340}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("01_building_construction.svg"), "Construcción de Edificio")
+}
+
+// 2. Crecimiento de Árbol
+
+fn generate_tree_growth(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+   // 2. Crecimiento de Árbol
+ let jsonl_input = r##"
+{"id":"root","type":"free_container","width":400,"height":300,"children":["trunk","branch1","branch2","leaf1","leaf2","apple1"]}
+{"id":"trunk","type":"rect","width":20,"height":100,"background":"brown","x":190,"y":150}
+{"id":"branch1","type":"line","start_x":200,"start_y":150,"end_x":170,"end_y":120,"stroke_color":"brown","stroke_width":3,"x":0,"y":0}
+{"id":"branch2","type":"line","start_x":200,"start_y":150,"end_x":230,"end_y":120,"stroke_color":"brown","stroke_width":3,"x":0,"y":0}
+{"id":"leaf1","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"green","x":155,"y":105}
+{"id":"leaf2","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"green","x":215,"y":105}
+{"id":"apple1","type":"ellipse","cx":5,"cy":5,"rx":5,"ry":5,"fill":"red","x":160,"y":125}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("02_tree_growth.svg"), "Crecimiento de Árbol")
+}
+
+// 3. Dashboard Financiero
+fn generate_financial_dashboard(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["header","metrics","chart_area"],"h_align":"center"}
+{"id":"header","type":"text","content":"📈 Financial Dashboard","font_size":24,"color":"darkblue"}
+{"id":"metrics","type":"hstack","children":["revenue","profit","users"],"v_align":"center"}
+{"id":"revenue","type":"vstack","children":["rev_icon","rev_value","rev_change"],"h_align":"center"}
+{"id":"rev_icon","type":"text","content":"💰","font_size":20}
+{"id":"rev_value","type":"text","content":"$125,430","font_size":18,"color":"#333"}
+{"id":"rev_change","type":"text","content":"↗ +12.5%","font_size":12,"color":"green"}
+{"id":"profit","type":"vstack","children":["prof_icon","prof_value","prof_change"],"h_align":"center"}
+{"id":"prof_icon","type":"text","content":"📊","font_size":20}
+{"id":"prof_value","type":"text","content":"$45,200","font_size":18,"color":"#333"}
+{"id":"prof_change","type":"text","content":"↗ +8.2%","font_size":12,"color":"green"}
+{"id":"users","type":"vstack","children":["user_icon","user_value","user_change"],"h_align":"center"}
+{"id":"user_icon","type":"text","content":"👥","font_size":20}
+{"id":"user_value","type":"text","content":"8,945","font_size":18,"color":"#333"}
+{"id":"user_change","type":"text","content":"↘ -2.1%","font_size":12,"color":"red"}
+{"id":"chart_area","type":"free_container","width":250,"height":120,"children":["bar1","bar2","bar3"]}
+{"id":"bar1","type":"rect","width":30,"height":50,"background":"blue","x":50,"y":50}
+{"id":"bar2","type":"rect","width":30,"height":75,"background":"green","x":100,"y":25}
+{"id":"bar3","type":"rect","width":30,"height":40,"background":"red","x":150,"y":60}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("03_financial_dashboard.svg"), "Dashboard Financiero")
+}
+
+// 4. Monitor de Sistema
+fn generate_system_monitor(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","cpu_section","memory_section","network_section"],"h_align":"left"}
+{"id":"title","type":"text","content":"🖥️ System Monitor","font_size":20,"color":"#333"}
+{"id":"cpu_section","type":"hstack","children":["cpu_label","cpu_container"],"v_align":"center"}
+{"id":"cpu_label","type":"text","content":"CPU:","font_size":14}
+{"id":"cpu_container","type":"free_container","width":210,"height":25,"children":["cpu_bg","cpu_fill","cpu_text"]}
+{"id":"cpu_bg","type":"rect","width":200,"height":20,"background":"lightgray","x":5,"y":2}
+{"id":"cpu_fill","type":"rect","width":150,"height":20,"background":"orange","x":5,"y":2}
+{"id":"cpu_text","type":"text","content":"75%","font_size":12,"x":105,"y":12}
+{"id":"memory_section","type":"hstack","children":["mem_label","mem_container"],"v_align":"center"}
+{"id":"mem_label","type":"text","content":"Memory:","font_size":14}
+{"id":"mem_container","type":"free_container","width":210,"height":25,"children":["mem_bg","mem_fill","mem_text"]}
+{"id":"mem_bg","type":"rect","width":200,"height":20,"background":"lightgray","x":5,"y":2}
+{"id":"mem_fill","type":"rect","width":90,"height":20,"background":"blue","x":5,"y":2}
+{"id":"mem_text","type":"text","content":"45%","font_size":12,"x":105,"y":12}
+{"id":"network_section","type":"hstack","children":["net_label","net_indicator"],"v_align":"center"}
+{"id":"net_label","type":"text","content":"Network:","font_size":14}
+{"id":"net_indicator","type":"ellipse","cx":8,"cy":8,"rx":8,"ry":8,"fill":"green"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("04_system_monitor.svg"), "Monitor de Sistema")
+}
+
+// 5. Panel de Control Espacial
+fn generate_space_control_panel(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":400,"height":250,"background":"black","border_color":"cyan","border_width":2,"children":["radar","blip1","blip2","status_panel"]}
+{"id":"radar","type":"ellipse","cx":80,"cy":80,"rx":80,"ry":80,"fill":"darkgreen","stroke":"green","x":50,"y":50}
+{"id":"blip1","type":"ellipse","cx":3,"cy":3,"rx":3,"ry":3,"fill":"red","x":120,"y":140}
+{"id":"blip2","type":"ellipse","cx":3,"cy":3,"rx":3,"ry":3,"fill":"yellow","x":170,"y":160}
+{"id":"status_panel","type":"vstack","children":["shields","energy","weapons"],"h_align":"left","x":250,"y":50}
+{"id":"shields","type":"text","content":"🛡️ Shields: 85%","color":"cyan","font_size":12}
+{"id":"energy","type":"text","content":"⚡ Energy: 92%","color":"yellow","font_size":12}
+{"id":"weapons","type":"text","content":"🔫 Weapons: Online","color":"green","font_size":12}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("05_space_control_panel.svg"), "Panel de Control Espacial")
+}
+
+// 6. Simulador de Tráfico
+fn generate_traffic_simulator(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":400,"height":300,"background":"lightgray","children":["road_h","road_v","car1","car2","car3","traffic_light"]}
+{"id":"road_h","type":"rect","width":400,"height":40,"background":"darkgray","x":0,"y":130}
+{"id":"road_v","type":"rect","width":40,"height":300,"background":"darkgray","x":180,"y":0}
+{"id":"car1","type":"rect","width":30,"height":15,"background":"red","x":50,"y":140}
+{"id":"car2","type":"rect","width":30,"height":15,"background":"blue","x":320,"y":140}
+{"id":"car3","type":"rect","width":15,"height":30,"background":"green","x":185,"y":50}
+{"id":"traffic_light","type":"vstack","children":["red_light","yellow_light","green_light"],"h_align":"center","x":175,"y":110}
+{"id":"red_light","type":"ellipse","cx":5,"cy":5,"rx":5,"ry":5,"fill":"red"}
+{"id":"yellow_light","type":"ellipse","cx":5,"cy":5,"rx":5,"ry":5,"fill":"gray"}
+{"id":"green_light","type":"ellipse","cx":5,"cy":5,"rx":5,"ry":5,"fill":"gray"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("06_traffic_simulator.svg"), "Simulador de Tráfico")
+}
+
+// 7. Modelo Molecular
+fn generate_molecular_model(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":300,"height":300,"children":["carbon1","hydrogen1","hydrogen2","oxygen1","bond1","bond2","bond3"]}
+{"id":"carbon1","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"gray","x":100,"y":100}
+{"id":"hydrogen1","type":"ellipse","cx":8,"cy":8,"rx":8,"ry":8,"fill":"white","stroke":"black","x":150,"y":90}
+{"id":"hydrogen2","type":"ellipse","cx":8,"cy":8,"rx":8,"ry":8,"fill":"white","stroke":"black","x":150,"y":110}
+{"id":"oxygen1","type":"ellipse","cx":12,"cy":12,"rx":12,"ry":12,"fill":"red","x":200,"y":100}
+{"id":"bond1","type":"line","start_x":115,"start_y":110,"end_x":150,"end_y":100,"stroke_color":"black","stroke_width":2,"x":0,"y":0}
+{"id":"bond2","type":"line","start_x":115,"start_y":115,"end_x":150,"end_y":118,"stroke_color":"black","stroke_width":2,"x":0,"y":0}
+{"id":"bond3","type":"line","start_x":130,"start_y":115,"end_x":200,"end_y":112,"stroke_color":"black","stroke_width":2,"x":0,"y":0}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("07_molecular_model.svg"), "Modelo Molecular")
+}
+
+// 8. Sistema Solar
+fn generate_solar_system(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":500,"height":500,"background":"black","children":["sun","mercury_orbit","venus_orbit","earth_orbit","mercury","venus","earth","moon"]}
+{"id":"sun","type":"ellipse","cx":25,"cy":25,"rx":25,"ry":25,"fill":"yellow","x":225,"y":225}
+{"id":"mercury_orbit","type":"ellipse","cx":250,"cy":250,"rx":80,"ry":80,"fill":"none","stroke":"gray","x":0,"y":0}
+{"id":"venus_orbit","type":"ellipse","cx":250,"cy":250,"rx":120,"ry":120,"fill":"none","stroke":"gray","x":0,"y":0}
+{"id":"earth_orbit","type":"ellipse","cx":250,"cy":250,"rx":160,"ry":160,"fill":"none","stroke":"gray","x":0,"y":0}
+{"id":"mercury","type":"ellipse","cx":4,"cy":4,"rx":4,"ry":4,"fill":"orange","x":320,"y":246}
+{"id":"venus","type":"ellipse","cx":6,"cy":6,"rx":6,"ry":6,"fill":"yellow","x":360,"y":244}
+{"id":"earth","type":"ellipse","cx":8,"cy":8,"rx":8,"ry":8,"fill":"blue","x":400,"y":242}
+{"id":"moon","type":"ellipse","cx":2,"cy":2,"rx":2,"ry":2,"fill":"gray","x":415,"y":240}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("08_solar_system.svg"), "Sistema Solar")
+}
+
+// 9. Patrón Fractal Simple
+fn generate_fractal_pattern(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":400,"height":400,"children":["center","nw","ne","sw","se","nw_nw","nw_ne","nw_sw","nw_se"]}
+{"id":"center","type":"rect","width":100,"height":100,"background":"blue","x":150,"y":150}
+{"id":"nw","type":"rect","width":50,"height":50,"background":"lightblue","x":100,"y":100}
+{"id":"ne","type":"rect","width":50,"height":50,"background":"lightblue","x":250,"y":100}
+{"id":"sw","type":"rect","width":50,"height":50,"background":"lightblue","x":100,"y":250}
+{"id":"se","type":"rect","width":50,"height":50,"background":"lightblue","x":250,"y":250}
+{"id":"nw_nw","type":"rect","width":25,"height":25,"background":"cyan","x":75,"y":75}
+{"id":"nw_ne","type":"rect","width":25,"height":25,"background":"cyan","x":125,"y":75}
+{"id":"nw_sw","type":"rect","width":25,"height":25,"background":"cyan","x":75,"y":125}
+{"id":"nw_se","type":"rect","width":25,"height":25,"background":"cyan","x":125,"y":125}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("09_fractal_pattern.svg"), "Patrón Fractal Simple")
+}
+
+// 10. Mandala Geométrico
+fn generate_geometric_mandala(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"free_container","width":300,"height":300,"children":["center_circle","ring1_1","ring1_2","ring1_3","ring1_4","ring1_5","ring1_6"]}
+{"id":"center_circle","type":"ellipse","cx":20,"cy":20,"rx":20,"ry":20,"fill":"purple","x":130,"y":130}
+{"id":"ring1_1","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"blue","x":135,"y":80}
+{"id":"ring1_2","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"blue","x":185,"y":105}
+{"id":"ring1_3","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"blue","x":185,"y":155}
+{"id":"ring1_4","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"blue","x":135,"y":180}
+{"id":"ring1_5","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"blue","x":85,"y":155}
+{"id":"ring1_6","type":"ellipse","cx":15,"cy":15,"rx":15,"ry":15,"fill":"blue","x":85,"y":105}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("10_geometric_mandala.svg"), "Mandala Geométrico")
+}
+
+// Helper function to generate SVG from JSONL
+fn generate_svg_from_jsonl(
+    jsonl_input: &str,
+    output_path: std::path::PathBuf,
+    description: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("  📄 Generando: {}", description);
+
+    // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(jsonl_input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+    println!("    ✅ Guardado: {}", output_path.file_name().unwrap().to_str().unwrap());
+
+    Ok(())
+}
 ===/src/bin/sample_components.rs===
 // src/bin/useful_components_demo.rs
 // A library of practical custom components for real-world usage
@@ -645,6 +1196,11 @@ fn create_card_component(
     let shadow = get_bool_attr(attrs, "shadow", true);
     let variant = get_string_attr(attrs, "variant", "default");
 
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        id = uuid::Uuid::new_v4().to_string()
+    }
+
     // Define card styles based on variant
     let (bg_color, border_color) = match variant.as_str() {
         "primary" => ("#ffffff", "#007bff"),
@@ -659,6 +1215,7 @@ fn create_card_component(
     // Add title if provided
     if !title.is_empty() {
         let title_text = builder.new_text(
+            format!("{}_title", id),
             &title,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -674,6 +1231,7 @@ fn create_card_component(
     // Add subtitle if provided
     if !subtitle.is_empty() {
         let subtitle_text = builder.new_text(
+            format!("{}_subtitle", id),
             &subtitle,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -689,6 +1247,7 @@ fn create_card_component(
     // Add content if provided
     if !content.is_empty() {
         let content_text = builder.new_text(
+            format!("{}_content", id),
             &content,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -704,6 +1263,7 @@ fn create_card_component(
     // Add footer if provided
     if !footer.is_empty() {
         let footer_text = builder.new_text(
+            format!("{}_footer", id),
             &footer,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -717,12 +1277,15 @@ fn create_card_component(
     }
 
     // Create layout
-    let content_stack = builder.new_vstack(children, HorizontalAlignment::Left);
+    let content_stack = builder.new_vstack(
+        format!("{}_contentstack", id),
+        children, HorizontalAlignment::Left);
 
     // Apply shadow effect by creating multiple boxes
     if shadow {
         // Shadow box (slightly offset)
         let shadow_box = builder.new_box(
+            format!("{}_shadowbox", id),
             content_stack,
             BoxOptions {
                 fill_color: Fill::Color("#00000010".to_string()),
@@ -736,7 +1299,9 @@ fn create_card_component(
         );
 
         // Main card box
-        let main_content = builder.new_rectangle(RectOptions {
+        let main_content = builder.new_rectangle(
+            format!("{}_maincontent", id),
+            RectOptions {
             width_behavior: SizeBehavior::Content,
             height_behavior: SizeBehavior::Content,
             fill_color: Fill::Color(bg_color.to_string()),
@@ -746,13 +1311,16 @@ fn create_card_component(
         });
 
         // Use free container to overlay them
-        let card = builder.new_free_container_with_children(vec![
+        let card = builder.new_free_container(
+            id, 
+            vec![
             (shadow_box, (2.0, 2.0)),   // Shadow slightly offset
             (main_content, (0.0, 0.0)), // Main card on top
         ]);
         Ok(card)
     } else {
         let card = builder.new_box(
+            id,
             content_stack,
             BoxOptions {
                 fill_color: Fill::Color(bg_color.to_string()),
@@ -778,6 +1346,11 @@ fn create_list_component(
     let spacing = get_float_attr(attrs, "spacing", 4.0);
     let width = get_float_attr(attrs, "width", 300.0);
     let font_size = get_float_attr(attrs, "font_size", 14.0);
+    let mut id = get_string_attr(attrs, "id", "");
+
+    if id.is_empty(){
+        id = uuid::Uuid::new_v4().to_string()
+    }
 
     if items.is_empty() {
         return Err("List component requires 'items' array".to_string());
@@ -795,6 +1368,7 @@ fn create_list_component(
         };
 
         let marker_text = builder.new_text(
+            format!("{}-marker", id),
             &marker,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -806,6 +1380,7 @@ fn create_list_component(
         );
 
         let item_text = builder.new_text(
+            format!("{}_item_text", id),
             item,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -816,11 +1391,15 @@ fn create_list_component(
             },
         );
 
-        let list_item = builder.new_hstack(vec![marker_text, item_text], VerticalAlignment::Top);
+        let list_item = builder.new_hstack(
+            format!("list_items_{}", id),
+            vec![marker_text, item_text], VerticalAlignment::Top);
         list_children.push(list_item);
     }
 
-    let list = builder.new_vstack(list_children, HorizontalAlignment::Left);
+    let list = builder.new_vstack(
+        format!("list_items_{}", id),
+        list_children, HorizontalAlignment::Left);
     Ok(list)
 }
 
@@ -835,6 +1414,11 @@ fn create_form_field_component(
     let required = get_bool_attr(attrs, "required", false);
     let width = get_float_attr(attrs, "width", 250.0);
     let error = get_string_attr(attrs, "error", "");
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+         id = format!("form_field_{}", uuid::Uuid::new_v4());
+    }
 
     let mut children = Vec::new();
 
@@ -846,6 +1430,7 @@ fn create_form_field_component(
     };
 
     let label_node = builder.new_text(
+        format!("label_{}", id),
         &label_text,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -864,6 +1449,7 @@ fn create_form_field_component(
     };
 
     let placeholder_text = builder.new_text(
+        format!("placeholder_{}", id),
         &placeholder,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -875,6 +1461,7 @@ fn create_form_field_component(
     );
 
     let input_field = builder.new_box(
+        format!("input_field_{}", id),
         placeholder_text,
         BoxOptions {
             fill_color: Fill::Color("#ffffff".to_string()),
@@ -896,6 +1483,7 @@ fn create_form_field_component(
     // Add error message if present
     if !error.is_empty() {
         let error_text = builder.new_text(
+            format!("error_{}", id),
             &error,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -908,7 +1496,7 @@ fn create_form_field_component(
         children.push(error_text);
     }
 
-    let form_field = builder.new_vstack(children, HorizontalAlignment::Left);
+    let form_field = builder.new_vstack(id.to_string(), children, HorizontalAlignment::Left);
     Ok(form_field)
 }
 
@@ -923,7 +1511,11 @@ fn create_stats_card_component(
     let icon = get_string_attr(attrs, "icon", "📊");
     let trend = get_string_attr(attrs, "trend", "neutral"); // up, down, neutral
     let color = get_string_attr(attrs, "color", "#007bff");
-
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("stats_card_{}", uuid::Uuid::new_v4());
+    }
     // Determine trend color and symbol
     let (trend_color, trend_symbol) = match trend.as_str() {
         "up" => ("#28a745", "↗"),
@@ -933,6 +1525,7 @@ fn create_stats_card_component(
 
     // Create icon
     let icon_text = builder.new_text(
+        format!("icon_{}", id),
         &icon,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -945,6 +1538,7 @@ fn create_stats_card_component(
 
     // Create value and title section
     let value_text = builder.new_text(
+        format!("value_{}", id),
         &value,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -956,6 +1550,7 @@ fn create_stats_card_component(
     );
 
     let title_text = builder.new_text(
+        format!("title_{}", id),
         &title,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -972,6 +1567,7 @@ fn create_stats_card_component(
     if !change.is_empty() {
         let change_text = format!("{} {}", trend_symbol, change);
         let change_node = builder.new_text(
+            "change_text".to_string(),
             &change_text,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -984,10 +1580,11 @@ fn create_stats_card_component(
         right_children.push(change_node);
     }
 
-    let right_section = builder.new_vstack(right_children, HorizontalAlignment::Left);
-    let content = builder.new_hstack(vec![icon_text, right_section], VerticalAlignment::Center);
+    let right_section = builder.new_vstack("right_section".to_string(), right_children, HorizontalAlignment::Left);
+    let content = builder.new_hstack("stats_card_content".to_string(), vec![icon_text, right_section], VerticalAlignment::Center);
 
     let stats_card = builder.new_box(
+        id,
         content,
         BoxOptions {
             fill_color: Fill::Color("#ffffff".to_string()),
@@ -1012,6 +1609,11 @@ fn create_nav_menu_component(
     let orientation = get_string_attr(attrs, "orientation", "horizontal"); // horizontal, vertical
     let active_item = get_string_attr(attrs, "active_item", "");
     let style = get_string_attr(attrs, "style", "default"); // default, pills, tabs
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("nav_menu_{}", uuid::Uuid::new_v4());
+    }
 
     if items.is_empty() {
         return Err("Navigation menu requires 'items' array".to_string());
@@ -1033,6 +1635,7 @@ fn create_nav_menu_component(
         };
 
         let nav_text = builder.new_text(
+            format!("nav_text_{}_{}", item, id),
             item,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1044,6 +1647,7 @@ fn create_nav_menu_component(
         );
 
         let nav_item = builder.new_box(
+            format!("nav_item_{}_{}", item, id),
             nav_text,
             BoxOptions {
                 fill_color: Fill::Color(bg_color.to_string()),
@@ -1060,8 +1664,8 @@ fn create_nav_menu_component(
     }
 
     let nav_menu = match orientation.as_str() {
-        "vertical" => builder.new_vstack(nav_children, HorizontalAlignment::Left),
-        _ => builder.new_hstack(nav_children, VerticalAlignment::Center),
+        "vertical" => builder.new_vstack(format!("nav_menu_{}_{}", id, orientation), nav_children, HorizontalAlignment::Left),
+        _ => builder.new_hstack(format!("nav_menu_{}_{}", id, orientation), nav_children, VerticalAlignment::Center),
     };
 
     Ok(nav_menu)
@@ -1076,6 +1680,12 @@ fn create_header_component(
     let subtitle = get_string_attr(attrs, "subtitle", "");
     let breadcrumbs = get_array_attr(attrs, "breadcrumbs");
     let show_back = get_bool_attr(attrs, "show_back", false);
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        //use uuid
+        id = format!("header_{}", uuid::Uuid::new_v4());
+    }
+
 
     let mut children = Vec::new();
 
@@ -1083,6 +1693,7 @@ fn create_header_component(
     if !breadcrumbs.is_empty() {
         let breadcrumb_text = breadcrumbs.join(" > ");
         let breadcrumb_node = builder.new_text(
+            format!("breadcrumb_{}",id),
             &breadcrumb_text,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1098,6 +1709,7 @@ fn create_header_component(
     // Add back button if requested
     if show_back {
         let back_text = builder.new_text(
+            "back_button".to_string(),
             "← Back",
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1112,6 +1724,7 @@ fn create_header_component(
 
     // Add main title
     let title_node = builder.new_text(
+        format!("title_{}", id),
         &title,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1126,6 +1739,7 @@ fn create_header_component(
     // Add subtitle if provided
     if !subtitle.is_empty() {
         let subtitle_node = builder.new_text(
+            format!("subtitle_{}", id),
             &subtitle,
             TextOptions {
                 font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1138,7 +1752,7 @@ fn create_header_component(
         children.push(subtitle_node);
     }
 
-    let header = builder.new_vstack(children, HorizontalAlignment::Left);
+    let header = builder.new_vstack("header".to_string(),children, HorizontalAlignment::Left);
     Ok(header)
 }
 
@@ -1436,6 +2050,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     points.push((10.0, 0.0));
 
     let polyline = session.new_polyline(
+        "star".to_string(),
         points,
         LineOptions {
             stroke_color: "black".to_string(),
@@ -1449,11 +2064,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rectOpts.height_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.stroke_color = "black".to_string();
     rectOpts.stroke_width = 1.0;
-    let rect = session.new_rectangle(rectOpts.clone());
-    let rect2 = session.new_rectangle(rectOpts.clone());
+    let rect = session.new_rectangle("r1".to_string(), rectOpts.clone());
+    let rect2 = session.new_rectangle("r2".to_string(), rectOpts.clone());
 
 
     let label = session.new_text(
+        "label".to_string(),
         "Center",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1465,6 +2081,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let hstack_centered = session.new_hstack(
+        "hstack_centered".to_string(),
         vec![rect, label, rect2],
         volare_engine_layout::VerticalAlignment::Center
     );
@@ -1485,6 +2102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     hex_points.push(hex_points[0]);
 
     let hexagon = session.new_polyline(
+        "hexagon".to_string(),
         hex_points,
         LineOptions {
             stroke_color: "blue".to_string(),
@@ -1496,6 +2114,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
     for i in 0..10 {
         let ellipse = session.new_elipse(
+            format!("table_ellipse_{}", i).to_string(),
             (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
@@ -1506,7 +2125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         table_items_ellipses.push(ellipse);
     }
-    let tableEllipses = session.new_table(table_items_ellipses, 5, TableOptions::default());
+    let tableEllipses = session.new_table("table_ellipses".to_string(), table_items_ellipses, 5, TableOptions::default());
 
     //Create a list of 10 texts
     let mut table_items = Vec::new();
@@ -1516,6 +2135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     table_items.push(hexagon);
     for i in 0..10 {
         let text = session.new_text(
+            format!("table_text_{}", i),
             &format!("Text hey ☣ {} \nthis is a multiline text", i),
             text_options.clone(),
         );
@@ -1526,6 +2146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create an ellipse and wrap it with a box
     let ellipse = session.new_elipse(
+        "ellipse1".to_string(),
         (0.0, 0.0),
         (10.0, 10.0),
         EllipseOptions {
@@ -1540,6 +2161,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Now add 10 ellipses
     for i in 0..10 {
         let ellipse = session.new_elipse(
+            format!("ellipse{}", i).to_string(),
             (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
@@ -1564,24 +2186,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //create text shape
     let text = session.new_text(
+        "lorem_ipsum".to_string(),
         std::str::from_utf8(lorem_ipsum).unwrap(),
         text_options.clone(),
     );
     table_items.push(text);
 
     //Add sample image from file (first instance)
-    let sampleImage = session.new_image_from_file("demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
+    let sampleImage = session.new_image_from_file("imagefile0".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
     //table_items.push(sampleImage);
 
     //Add sample image from file
     // The path is relative to where the binary is run
-    let file_image = session.new_image_from_file("demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
+    let file_image = session.new_image_from_file("imagefile".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
    // table_items.push(file_image);
 
     // Create a FreeContainer with multiple visual elements at specific positions using the new method
 
     // Create all elements first
     let title_text = session.new_text(
+        "titletext".to_string(),
         "FreeContainer Demo",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1593,6 +2217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let red_circle = session.new_elipse(
+        "redcircle".to_string(),
         (0.0, 0.0),   // center position (will be positioned by container)
         (15.0, 15.0), // radius
         EllipseOptions {
@@ -1611,6 +2236,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let blue_text = session.new_text(
+        "bluetext".to_string(),
         &thetext,
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1632,9 +2258,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), 
         ..BoxOptions::default()
     };
-    let blue_box = session.new_box(blue_text, box_options);
+    let blue_box = session.new_box("bluebox".to_string(),blue_text, box_options);
 
     let green_ellipse = session.new_elipse(
+        "greeneclipse".to_string(),
         (0.0, 0.0),
         (30.0, 20.0),
         EllipseOptions {
@@ -1645,6 +2272,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let subtitle = session.new_text(
+        "test_absolute".to_string(),
         "Absolute positioning of elements",
         TextOptions {
             font_family: "AnonymicePro Nerd Font".to_string(),
@@ -1656,7 +2284,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Create a container with all children at once
-    let container_with_elements = session.new_free_container_with_children(vec![
+    let container_with_elements = session.new_free_container("containerwithelems".to_string(),vec![
         (title_text, (30.0, 10.0)),
         (red_circle, (40.0, 50.0)),
         (blue_box, (80.0, 40.0)),
@@ -1665,7 +2293,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]);
 
     // Add styling to the container with more vibrant colors
-    let free_container = session.get_free_container_mut(container_with_elements.entity_id);
+    let free_container = session.get_free_container_mut(container_with_elements.entity_id.clone());
     free_container.background_color = Some("#FFDDDD".to_string()); // Light red background (more visible)
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
@@ -1676,7 +2304,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
     toptions.cell_padding = 2;
-    let table = session.new_table(table_items, 5, toptions);
+    let table = session.new_table("table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
     layout_tree_node(&mut session, &table);
@@ -1729,7 +2357,9 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     //Create a list of 10 texts
     let mut texts = Vec::new();
     for i in 0..10 {
+        let textid = format!("text_{}", i);
         let text = session.new_text(
+            textid,
             &format!("Text hey {} \nthis is a multiline text", i),
             text_options.clone(),
         );
@@ -1741,7 +2371,7 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
         ..Default::default()
     };
     //Create a table for the texts with 2 columns
-    let table = session.new_table(texts, 3, table_options);
+    let table = session.new_table("tabletexts".to_string(), texts, 3, table_options);
     table
 }
 

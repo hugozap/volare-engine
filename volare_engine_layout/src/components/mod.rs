@@ -81,7 +81,8 @@ pub enum EntityType {
     TableShape,
     TextLine,
     PolyLine,
-    FreeContainer
+    FreeContainer,
+    ArcShape,
 }
 
 #[derive(Debug, Copy, PartialEq)]
@@ -1070,6 +1071,125 @@ impl FreeContainer {
     pub fn with_border(mut self, color: &str, width: Float) -> Self {
         self.border_color = Some(color.to_string());
         self.border_width = width;
+        self
+    }
+}
+
+
+// Arc options structure
+#[derive(Default, Debug)]
+pub struct ArcOptions {
+    pub fill_color: String,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub filled: bool, // Whether to fill the arc sector or just draw the outline
+}
+
+impl Clone for ArcOptions {
+    fn clone(&self) -> Self {
+        ArcOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            filled: self.filled,
+        }
+    }
+}
+
+impl ArcOptions {
+    pub fn new() -> ArcOptions {
+        ArcOptions {
+            fill_color: String::from("none"),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            filled: false,
+        }
+    }
+}
+
+// Arc shape structure
+pub struct ShapeArc {
+    pub entity: EntityID,
+    pub center: (Float, Float),     // Center point of the arc
+    pub radius: Float,              // Radius of the arc
+    pub start_angle: Float,         // Start angle in degrees
+    pub end_angle: Float,           // End angle in degrees
+    pub arc_options: ArcOptions,
+}
+
+impl Clone for ShapeArc {
+    fn clone(&self) -> Self {
+        ShapeArc {
+            entity: self.entity.clone(),
+            center: self.center,
+            radius: self.radius,
+            start_angle: self.start_angle,
+            end_angle: self.end_angle,
+            arc_options: self.arc_options.clone(),
+        }
+    }
+}
+
+impl ShapeArc {
+    pub fn new(
+        entity: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        start_angle: Float,
+        end_angle: Float,
+        arc_options: ArcOptions,
+    ) -> ShapeArc {
+        ShapeArc {
+            entity,
+            center,
+            radius,
+            start_angle,
+            end_angle,
+            arc_options,
+        }
+    }
+    
+    /// Normalize angles to 0-360 degree range
+    pub fn normalize_angles(&self) -> (Float, Float) {
+        let mut start = self.start_angle % 360.0;
+        let mut end = self.end_angle % 360.0;
+        
+        if start < 0.0 {
+            start += 360.0;
+        }
+        if end < 0.0 {
+            end += 360.0;
+        }
+        
+        (start, end)
+    }
+    
+    /// Calculate the angle sweep of the arc
+    pub fn angle_sweep(&self) -> Float {
+        let (start, end) = self.normalize_angles();
+        if end > start {
+            end - start
+        } else {
+            360.0 - start + end
+        }
+    }
+    
+    /// Check if this is a major arc (> 180 degrees)
+    pub fn is_major_arc(&self) -> bool {
+        self.angle_sweep() > 180.0
+    }
+}
+
+impl Entity for ShapeArc {
+    fn get_id(&self) -> EntityID {
+        self.entity.clone()
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ArcShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

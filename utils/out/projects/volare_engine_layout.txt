@@ -137,7 +137,7 @@ jobs:
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
-use crate::{HorizontalAlignment, ShapeRect, SizeBehavior, VerticalAlignment};
+use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
@@ -154,7 +154,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
     
     // Get the wrapped element dimensions
-    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity);
+    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
 
     // Calculate the box dimensions based on size behavior
@@ -197,7 +197,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     );
 
     // Set the box dimensions
-    session.set_size(shape_box.entity, box_width, box_height);
+    session.set_size(shape_box.entity.clone(), box_width, box_height);
 
     // Position the wrapped element within the box
     // For fixed sizing, we might want to center or align the content
@@ -238,7 +238,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     };
 
     // Update the wrapped element position
-    session.set_position(shape_box.wrapped_entity, content_x, content_y);
+    session.set_position(shape_box.wrapped_entity.clone(), content_x, content_y);
 }
 
 /**
@@ -251,7 +251,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
     let mut width = 0.0;
     let mut height = 0.0;
     for elem in shape_group.elements.iter() {
-        let elem_size = session.get_size(*elem);
+        let elem_size = session.get_size(elem.clone());
         if elem_size.0 > width {
             width = elem_size.0;
         }
@@ -259,7 +259,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
             height = elem_size.1;
         }
     }
-    session.set_size(shape_group.entity, width, height);
+    session.set_size(shape_group.entity.clone(), width, height);
 }
 
 pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
@@ -272,13 +272,13 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         let mut max_line_width = 0.0;
         for line in shape_text.lines.iter() {
             println!("Line: {:?}", line);
-            let textLine = session.get_text_line(*line);
+            let textLine = session.get_text_line(line.clone());
             let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
             if line_size.0 > max_line_width {
                 max_line_width = line_size.0;
             }
-            session.set_position(*line, 0.0, y);
-            session.set_size(*line, line_size.0, line_size.1);
+            session.set_position(line.clone(), 0.0, y);
+            session.set_size(line.clone(), line_size.0, line_size.1);
             y += line_size.1 + shape_text.text_options.line_spacing as Float;
         }
         y -= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
@@ -289,7 +289,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
             "Setting size to text entity: {} - {} {}",
             shape_text.entity, max_line_width, y
         );
-        session.set_size(shape_text.entity, max_line_width, y);
+        session.set_size(shape_text.entity.clone(), max_line_width, y);
     }
 }
 
@@ -304,12 +304,12 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
     let y = start.1.min(end.1);
 
     session.set_size(
-        shape_line.entity,
+        shape_line.entity.clone(),
         (end.0 - start.0).abs(),
         (end.1 - start.1).abs(),
     );
 
-    session.set_position(shape_line.entity, x, y);
+    session.set_position(shape_line.entity.clone(), x, y);
 }
 
 /**
@@ -323,12 +323,12 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
     let y = start.1.min(end.1);
 
     session.set_size(
-        shape_arrow.entity,
+        shape_arrow.entity.clone(),
         (end.0 - start.0).abs(),
         (end.1 - start.1).abs(),
     );
 
-    session.set_position(shape_arrow.entity, x, y);
+    session.set_position(shape_arrow.entity.clone(), x, y);
 }
 
 /**
@@ -339,7 +339,7 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
 pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
     let w = shape_ellipse.radius.0 * 2.0;
     let h = shape_ellipse.radius.1 * 2.0;
-    session.set_size(shape_ellipse.entity, w, h);
+    session.set_size(shape_ellipse.entity.clone(), w, h);
 }
 
 pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
@@ -353,7 +353,7 @@ pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
         _ => 0.0
     };
 
-    session.set_size(rect.entity, width, height);
+    session.set_size(rect.entity.clone(), width, height);
 }
 
 /**
@@ -374,7 +374,7 @@ pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
     };
 
     session.set_size(
-        shape_image.entity,
+        shape_image.entity.clone(),
         width,
         height,
     );
@@ -389,25 +389,25 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     let mut width = 0.0;
     for elem in vertical_stack.elements.iter() {
         println!("DEBUG:::y: {}", y);
-        let elem_size = session.get_size(*elem);
-        session.set_position(*elem, 0.0, y);
+        let elem_size = session.get_size(elem.clone());
+        session.set_position(elem.clone(), 0.0, y);
         y += elem_size.1;
         if elem_size.0 > width {
             width = elem_size.0;
         }
     }
-    session.set_size(vertical_stack.entity, width, y);
+    session.set_size(vertical_stack.entity.clone(), width, y);
 
       // Second pass: only adjust x positions if alignment is specified
         for elem in vertical_stack.elements.iter() {
-            let elem_size = session.get_size(*elem);
-            let current_pos = session.get_position(*elem);
+            let elem_size = session.get_size(elem.clone());
+            let current_pos = session.get_position(elem.clone());
             let x = match vertical_stack.horizontal_alignment {
                 HorizontalAlignment::Left => 0.0,
                 HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
                 HorizontalAlignment::Right => width - elem_size.0,
             };
-            session.set_position(*elem, x, current_pos.1); // Update x, keep y
+            session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y   
         }
 }
 
@@ -415,25 +415,25 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
     let mut x = 0.0;
     let mut height = 0.0;
     for elem in horizontal_stack.elements.iter() {
-        let elem_size = session.get_size(*elem);
-        session.set_position(*elem, x, 0.0);
+        let elem_size = session.get_size(elem.clone());
+        session.set_position(elem.clone(), x, 0.0);
         x += elem_size.0;
         if elem_size.1 > height {
             height = elem_size.1;
         }
     }
-    session.set_size(horizontal_stack.entity, x, height);
+    session.set_size(horizontal_stack.entity.clone(), x, height);
 
     // Second pass: only adjust y positions, keep existing x positions
         for elem in horizontal_stack.elements.iter() {
-            let elem_size = session.get_size(*elem);
-            let current_pos = session.get_position(*elem); // Get the x we already set
+            let elem_size = session.get_size(elem.clone());
+            let current_pos = session.get_position(elem.clone()); // Get the x we already set
             let y = match horizontal_stack.vertical_alignment {
                 VerticalAlignment::Top => 0.0,
                 VerticalAlignment::Center => (height - elem_size.1) / 2.0,
                 VerticalAlignment::Bottom => height - elem_size.1,
             };
-            session.set_position(*elem, current_pos.0, y); // Keep x, update y
+            session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
         }
 }
 
@@ -470,11 +470,11 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
             cols.push(Vec::new());
             col_widths.push(0.0);
         }
-        rows[row].push(*elem);
-        cols[col].push(*elem);
+        rows[row].push(elem.clone());
+        cols[col].push(elem.clone());
 
         //update the row and col sizes
-        let elem_size = session.get_size(*elem);
+        let elem_size = session.get_size(elem.clone());
         if elem_size.0 > col_widths[col] {
             col_widths[col] = elem_size.0 + table.table_options.cell_padding as Float * 2.0;
         }
@@ -497,7 +497,7 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         let mut y = 0.0;
         for (j, elem) in col.iter().enumerate() {
             session.set_position(
-                *elem,
+                elem.clone(),
                 x + table.table_options.cell_padding as Float,
                 y + table.table_options.cell_padding as Float,
             );
@@ -534,33 +534,33 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     }
 
     //Update the size of the table header rect
-    session.set_size(table.header_rect, width, row_heights[0]);
+    session.set_size(table.header_rect.clone(), width, row_heights[0]);
 
     //print the size of the table
     println!("Table size: {:?}", (width, height));
 
-    session.set_size(table.entity, width, height);
+    session.set_size(table.entity.clone(), width, height);
 
     //We need to update the position of the horizontal lines and their size
     for (i, line) in table.row_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(*line);
+        let line_size = session.get_size(line.clone());
         if i < horizontal_line_positions.len() {
             //set the y position of the horizontal line, x will be 0
-            session.set_position(*line, 0.0, horizontal_line_positions[i]);
+            session.set_position(line.clone(), 0.0, horizontal_line_positions[i]);
             //update the size, we only need to update the height and leave the width as it is (0 by default)
-            session.set_size(*line, width, line_size.1);
+            session.set_size(line.clone(), width, line_size.1);
         }
     }
 
     for (i, line) in table.col_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(*line);
+        let line_size = session.get_size(line.clone());
         if i < vertical_line_positions.len() {
             //set the x position of the vertical line, y will be 0
-            session.set_position(*line, vertical_line_positions[i], 0.0);
+            session.set_position(line.clone(), vertical_line_positions[i], 0.0);
             //update the size, we only need to update the width and leave the height as it is (0 by default)
-            session.set_size(*line, line_size.0, height);
+            session.set_size(line.clone(), line_size.0, height);
         }
     }
 }
@@ -585,7 +585,7 @@ pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
             }
         }
     }
-    session.set_size(polyline.entity, width, height);
+    session.set_size(polyline.entity.clone(), width, height);
 }
 
 /**
@@ -601,10 +601,10 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     // Iterate through all children and find the maximum extent
     for (child_id, position) in &container.children {
         // Get the child's size
-        let child_size = session.get_size(*child_id);
+        let child_size = session.get_size(child_id.clone());
 
         // Set the child's position relative to the container
-        session.set_position(*child_id, position.0, position.1);
+        session.set_position(child_id.clone(), position.0, position.1);
 
         // Calculate the right and bottom edges of this child
         let right = position.0 + child_size.0;
@@ -625,8 +625,77 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     max_height += margin;
 
     // Set the container's size
-    session.set_size(container.entity, max_width, max_height);
+    session.set_size(container.entity.clone(), max_width, max_height);
 }
+
+
+/**
+ * Updates the size of the arc entity based on the radius and angle sweep
+ * The arc's bounding box is calculated from its center, radius, and angle range
+ */
+pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
+    use std::f32::consts::PI;
+    
+    let radius = shape_arc.radius;
+    let (start_angle, end_angle) = shape_arc.normalize_angles();
+    
+    // Convert degrees to radians
+    let start_rad = start_angle * PI / 180.0;
+    let end_rad = end_angle * PI / 180.0;
+    
+    // Calculate the points at start and end angles
+    let start_x = shape_arc.center.0 + radius * start_rad.cos();
+    let start_y = shape_arc.center.1 + radius * start_rad.sin();
+    let end_x = shape_arc.center.0 + radius * end_rad.cos();
+    let end_y = shape_arc.center.1 + radius * end_rad.sin();
+    
+    // For a more accurate bounding box, we need to consider if the arc crosses
+    // the cardinal directions (0°, 90°, 180°, 270°)
+    let mut min_x = start_x.min(end_x);
+    let mut max_x = start_x.max(end_x);
+    let mut min_y = start_y.min(end_y);
+    let mut max_y = start_y.max(end_y);
+    
+    // Check if arc crosses cardinal directions and expand bounding box accordingly
+    let sweep = shape_arc.angle_sweep();
+    let angles_to_check = if end_angle > start_angle {
+        vec![0.0, 90.0, 180.0, 270.0]
+    } else {
+        // Arc crosses 0° (wraps around)
+        vec![0.0, 90.0, 180.0, 270.0, 360.0]
+    };
+    
+    for angle in angles_to_check {
+        let normalized_angle = angle % 360.0;
+        
+        // Check if this cardinal angle is within our arc
+        let angle_in_arc = if end_angle > start_angle {
+            normalized_angle >= start_angle && normalized_angle <= end_angle
+        } else {
+            normalized_angle >= start_angle || normalized_angle <= end_angle
+        };
+        
+        if angle_in_arc {
+            let rad = normalized_angle * PI / 180.0;
+            let x = shape_arc.center.0 + radius * rad.cos();
+            let y = shape_arc.center.1 + radius * rad.sin();
+            
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
+        }
+    }
+    
+    // Calculate width and height from bounding box
+    let width = max_x - min_x;
+    let height = max_y - min_y;
+    
+    // Set the position to the top-left corner of the bounding box
+    session.set_position(shape_arc.entity.clone(), min_x, min_y);
+    session.set_size(shape_arc.entity.clone(), width, height);
+}
+
 
 pub struct BoundingBox {
     x: Float,
@@ -645,8 +714,8 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         layout_tree_node(session, child);
         //print size and position of the child
 
-        let child_size = session.get_size(child.entity_id);
-        let child_pos = session.get_position(child.entity_id);
+        let child_size = session.get_size(child.entity_id.clone());
+        let child_pos = session.get_position(child.entity_id.clone());
         println!("Child size: {:?}", child_size);
         println!("Child pos: {:?}", child_pos);
     }
@@ -657,19 +726,19 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::TextShape => {
             {
                 //get the Shape text entity
-                let text = session.get_text(root.entity_id).clone();
+                let text = session.get_text(root.entity_id.clone()).clone();
                 layout_text(session, &text);
             }
         }
         EntityType::BoxShape => {
             //get the Shape box entity
-            let box_shape = session.get_box(root.entity_id).clone();
+            let box_shape = session.get_box(root.entity_id.clone()).clone();
             layout_box(session, &box_shape);
         }
 
         EntityType::RectShape => {
             //get the Rect entity
-            let rect = session.get_rectangle(root.entity_id).clone();
+            let rect = session.get_rectangle(root.entity_id.clone()).clone();
             layout_rect(
                 session,
                 &rect
@@ -678,64 +747,69 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
 
         EntityType::LineShape => {
             //get the Shape line entity
-            let line = session.get_line(root.entity_id).clone();
+            let line = session.get_line(root.entity_id.clone()).clone();
             layout_line(session, &line);
         }
         EntityType::ArrowShape => {
             //get the Shape arrow entity
-            let arrow = session.get_arrow(root.entity_id).clone();
+            let arrow = session.get_arrow(root.entity_id.clone()).clone();
             layout_arrow(session, &arrow);
         }
         EntityType::EllipseShape => {
             //get the Shape ellipse entity
-            let ellipse = session.get_ellipse(root.entity_id).clone();
+            let ellipse = session.get_ellipse(root.entity_id.clone()).clone();
             layout_ellipse(session, &ellipse);
         }
         EntityType::ImageShape => {
             //get the Shape image entity
-            let image = session.get_image(root.entity_id).clone();
+            let image = session.get_image(root.entity_id.clone()).clone();
             layout_image(session, &image);
         }
         EntityType::VerticalStackShape => {
             //get the VerticalStack entity
-            let vertical_stack = session.get_vertical_stack(root.entity_id).clone();
+            let vertical_stack = session.get_vertical_stack(root.entity_id.clone()).clone();
             layout_vertical_stack(session, &vertical_stack);
         }
 
         EntityType::HorizontalStackShape => {
             //get the HorizontalStack entity
-            let horizontal_stack = session.get_horizontal_stack(root.entity_id).clone();
+            let horizontal_stack = session.get_horizontal_stack(root.entity_id.clone()).clone();
             layout_horizontal_stack(session, &horizontal_stack);
         }
 
         EntityType::TableShape => {
             //get the Table entity
-            let table = session.get_table(root.entity_id).clone();
+            let table = session.get_table(root.entity_id.clone()).clone();
             layout_table(session, &table);
         }
 
         EntityType::GroupShape => {
             //get the Group entity
-            let group = session.get_group(root.entity_id).clone();
+            let group = session.get_group(root.entity_id.clone()).clone();
             layout_group(session, &group);
         }
 
         EntityType::PolyLine => {
-            let polyline = session.get_polyline(root.entity_id).clone();
+            let polyline = session.get_polyline(root.entity_id.clone()).clone();
             layout_polyline(session, &polyline);
         }
         EntityType::FreeContainer => {
-            let container = session.get_free_container(root.entity_id).clone();
+            let container = session.get_free_container(root.entity_id.clone()).clone();
             layout_free_container(session, &container);
         }
+
+        EntityType::ArcShape => {
+        let arc = session.get_arc(root.entity_id.clone()).clone();
+        layout_arc(session, &arc);
+    }
 
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
     }
 
     //Return the bounding box for the root element
-    let size = session.get_size(root.entity_id);
-    let position = session.get_position(root.entity_id);
+    let size = session.get_size(root.entity_id.clone());
+    let position = session.get_position(root.entity_id.clone());
     BoundingBox {
         x: position.0,
         y: position.1,
@@ -753,6 +827,7 @@ fn test_layout_box_with_text() {
     let mut session = DiagramBuilder::new();
     session.set_measure_text_fn(|_, _| (10.0, 10.0));
     let text = session.new_text(
+        "testid".to_string(),
         "hello",
         TextOptions {
             font_size: 20.0,
@@ -764,7 +839,7 @@ fn test_layout_box_with_text() {
         padding: 10.0,
         ..Default::default()
     };
-    let box_shape = session.new_box(text.clone(), box_options.clone());
+    let box_shape = session.new_box("testbox".to_string(), text.clone(), box_options.clone());
 
     //print box options
     println!("--box options: {:?}", box_options);
@@ -772,11 +847,11 @@ fn test_layout_box_with_text() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id);
-    let text_size = session.get_size(text.entity_id);
+    let text_position = session.get_position(text.entity_id.clone());
+    let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id);
-    let box_size = session.get_size(box_shape.entity_id);
+    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_size = session.get_size(box_shape.entity_id.clone());
     //assert equal positions
 
     // assert the box size is greater than the text size
@@ -793,6 +868,7 @@ fn test_box_fixed_size() {
     let mut session = DiagramBuilder::new();
     session.set_measure_text_fn(|_, _| (10.0, 10.0));
     let text = session.new_text(
+        "testid".to_string(),
         "hello",
         TextOptions {
             font_size: 20.0,
@@ -806,16 +882,16 @@ fn test_box_fixed_size() {
         height_behavior: SizeBehavior::Fixed(50.0),
         ..Default::default()
     };
-    let box_shape = session.new_box(text.clone(), box_options.clone());
+    let box_shape = session.new_box("testbox".to_string(), text.clone(), box_options.clone());
 
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id);
-    let text_size = session.get_size(text.entity_id);
+    let text_position = session.get_position(text.entity_id.clone());
+    let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id);
-    let box_size = session.get_size(box_shape.entity_id);
+    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_size = session.get_size(box_shape.entity_id.clone());
 
     //assert equal positions
     // Assert that the text is centered within the box
@@ -860,7 +936,7 @@ use serde_json::{Value, Map};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
-pub type EntityID = usize;
+pub type EntityID = String;
 pub type Float = f32;
 
 //Export table and table options
@@ -933,26 +1009,8 @@ pub enum EntityType {
     TableShape,
     TextLine,
     PolyLine,
-    FreeContainer
-}
-
-pub fn get_entity_type(entity_id: EntityID) -> EntityType {
-    match (entity_id >> 32) as u32 {
-        0 => EntityType::BoxShape,
-        1 => EntityType::TextShape,
-        2 => EntityType::LineShape,
-        3 => EntityType::ArrowShape,
-        4 => EntityType::EllipseShape,
-        5 => EntityType::ImageShape,
-        6 => EntityType::GroupShape,
-        7 => EntityType::VerticalStackShape,
-        8 => EntityType::HorizontalStackShape,
-        9 => EntityType::TableShape,
-        10 => EntityType::TextLine,
-        11 => EntityType::PolyLine,
-        12 => EntityType::FreeContainer,
-        _ => panic!("Invalid entity type"),
-    }
+    FreeContainer,
+    ArcShape,
 }
 
 #[derive(Debug, Copy, PartialEq)]
@@ -1008,8 +1066,8 @@ pub struct ShapeBox {
 impl Clone for ShapeBox {
     fn clone(&self) -> Self {
         ShapeBox {
-            entity: self.entity,
-            wrapped_entity: self.wrapped_entity,
+            entity: self.entity.clone(),
+            wrapped_entity: self.wrapped_entity.clone(),
             box_options: self.box_options.clone(),
         }
     }
@@ -1017,7 +1075,7 @@ impl Clone for ShapeBox {
 
 impl Entity for ShapeBox {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1308,7 +1366,7 @@ impl ShapeRect {
 impl Clone for ShapeRect {
     fn clone(&self) -> Self {
         ShapeRect {
-            entity: self.entity,
+            entity: self.entity.clone(),
             rect_options: self.rect_options.clone(),
         }
     }
@@ -1316,7 +1374,7 @@ impl Clone for ShapeRect {
 
 impl Entity for ShapeRect {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1338,7 +1396,7 @@ pub struct ShapeGroup {
 impl Clone for ShapeGroup {
     fn clone(&self) -> Self {
         ShapeGroup {
-            entity: self.entity,
+            entity: self.entity.clone(),
             elements: self.elements.clone(),
         }
     }
@@ -1346,7 +1404,7 @@ impl Clone for ShapeGroup {
 
 impl Entity for ShapeGroup {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1368,7 +1426,7 @@ pub struct TextLine {
 impl Clone for TextLine {
     fn clone(&self) -> Self {
         TextLine {
-            entity: self.entity,
+            entity: self.entity.clone(),
             text: self.text.clone(),
         }
     }
@@ -1376,7 +1434,7 @@ impl Clone for TextLine {
 
 impl Entity for TextLine {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1399,7 +1457,7 @@ pub struct ShapeText {
 impl Clone for ShapeText {
     fn clone(&self) -> Self {
         ShapeText {
-            entity: self.entity,
+            entity: self.entity.clone(),
             text: self.text.clone(),
             text_options: self.text_options.clone(),
             lines: self.lines.clone(),
@@ -1423,7 +1481,7 @@ impl ShapeText {
 
 impl Entity for ShapeText {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1496,7 +1554,7 @@ pub struct VerticalStack {
 impl Clone for VerticalStack {
     fn clone(&self) -> Self {
         VerticalStack {
-            entity: self.entity,
+            entity: self.entity.clone(),
             elements: self.elements.clone(),
             horizontal_alignment: self.horizontal_alignment.clone()
         }
@@ -1505,7 +1563,7 @@ impl Clone for VerticalStack {
 
 impl Entity for VerticalStack {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1553,7 +1611,7 @@ pub struct HorizontalStack {
 impl Clone for HorizontalStack {
     fn clone(&self) -> Self {
         HorizontalStack {
-            entity: self.entity,
+            entity: self.entity.clone(),
             elements: self.elements.clone(),
             vertical_alignment: self.vertical_alignment.clone(),
         }
@@ -1562,7 +1620,7 @@ impl Clone for HorizontalStack {
 
 impl Entity for HorizontalStack {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1584,7 +1642,7 @@ pub struct ShapeLine {
 impl Clone for ShapeLine {
     fn clone(&self) -> Self {
         ShapeLine {
-            entity: self.entity,
+            entity: self.entity.clone(),
             start: self.start,
             end: self.end,
             line_options: self.line_options.clone(),
@@ -1606,7 +1664,7 @@ impl ShapeLine {
 
 impl Entity for ShapeLine {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1660,7 +1718,7 @@ impl PolyLine {
 
 impl Entity for PolyLine {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1675,7 +1733,7 @@ impl Entity for PolyLine {
 impl Clone for PolyLine {
     fn clone(&self) -> Self {
         PolyLine {
-            entity: self.entity,
+            entity: self.entity.clone(),
             points: self.points.clone(),
             line_options: self.line_options.clone(),
         }
@@ -1692,7 +1750,7 @@ pub struct ShapeArrow {
 impl Clone for ShapeArrow {
     fn clone(&self) -> Self {
         ShapeArrow {
-            entity: self.entity,
+            entity: self.entity.clone(),
             start: self.start,
             end: self.end,
             arrow_options: self.arrow_options.clone(),
@@ -1702,7 +1760,7 @@ impl Clone for ShapeArrow {
 
 impl Entity for ShapeArrow {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1751,7 +1809,7 @@ pub struct ShapeEllipse {
 impl Clone for ShapeEllipse {
     fn clone(&self) -> Self {
         ShapeEllipse {
-            entity: self.entity,
+            entity: self.entity.clone(),
             center: self.center,
             radius: self.radius,
             ellipse_options: self.ellipse_options.clone(),
@@ -1772,7 +1830,7 @@ impl ShapeEllipse {
 
 impl Entity for ShapeEllipse {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1827,7 +1885,7 @@ pub struct ShapeImage {
 impl Clone for ShapeImage {
     fn clone(&self) -> Self {
         ShapeImage {
-            entity: self.entity,
+            entity: self.entity.clone(),
             image: self.image.clone(),
             file_path: self.file_path.clone(),
             width_behavior: self.width_behavior.clone(),
@@ -1838,7 +1896,7 @@ impl Clone for ShapeImage {
 
 impl Entity for ShapeImage {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1885,7 +1943,7 @@ pub struct FreeContainer {
 impl Clone for FreeContainer {
     fn clone(&self) -> Self {
         FreeContainer {
-            entity: self.entity,
+            entity: self.entity.clone(),
             children: self.children.clone(),
             background_color: self.background_color.clone(),
             border_color: self.border_color.clone(),
@@ -1896,7 +1954,7 @@ impl Clone for FreeContainer {
 
 impl Entity for FreeContainer {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -1941,6 +1999,125 @@ impl FreeContainer {
     pub fn with_border(mut self, color: &str, width: Float) -> Self {
         self.border_color = Some(color.to_string());
         self.border_width = width;
+        self
+    }
+}
+
+
+// Arc options structure
+#[derive(Default, Debug)]
+pub struct ArcOptions {
+    pub fill_color: String,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub filled: bool, // Whether to fill the arc sector or just draw the outline
+}
+
+impl Clone for ArcOptions {
+    fn clone(&self) -> Self {
+        ArcOptions {
+            fill_color: self.fill_color.clone(),
+            stroke_color: self.stroke_color.clone(),
+            stroke_width: self.stroke_width,
+            filled: self.filled,
+        }
+    }
+}
+
+impl ArcOptions {
+    pub fn new() -> ArcOptions {
+        ArcOptions {
+            fill_color: String::from("none"),
+            stroke_color: String::from("black"),
+            stroke_width: 1.0,
+            filled: false,
+        }
+    }
+}
+
+// Arc shape structure
+pub struct ShapeArc {
+    pub entity: EntityID,
+    pub center: (Float, Float),     // Center point of the arc
+    pub radius: Float,              // Radius of the arc
+    pub start_angle: Float,         // Start angle in degrees
+    pub end_angle: Float,           // End angle in degrees
+    pub arc_options: ArcOptions,
+}
+
+impl Clone for ShapeArc {
+    fn clone(&self) -> Self {
+        ShapeArc {
+            entity: self.entity.clone(),
+            center: self.center,
+            radius: self.radius,
+            start_angle: self.start_angle,
+            end_angle: self.end_angle,
+            arc_options: self.arc_options.clone(),
+        }
+    }
+}
+
+impl ShapeArc {
+    pub fn new(
+        entity: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        start_angle: Float,
+        end_angle: Float,
+        arc_options: ArcOptions,
+    ) -> ShapeArc {
+        ShapeArc {
+            entity,
+            center,
+            radius,
+            start_angle,
+            end_angle,
+            arc_options,
+        }
+    }
+    
+    /// Normalize angles to 0-360 degree range
+    pub fn normalize_angles(&self) -> (Float, Float) {
+        let mut start = self.start_angle % 360.0;
+        let mut end = self.end_angle % 360.0;
+        
+        if start < 0.0 {
+            start += 360.0;
+        }
+        if end < 0.0 {
+            end += 360.0;
+        }
+        
+        (start, end)
+    }
+    
+    /// Calculate the angle sweep of the arc
+    pub fn angle_sweep(&self) -> Float {
+        let (start, end) = self.normalize_angles();
+        if end > start {
+            end - start
+        } else {
+            360.0 - start + end
+        }
+    }
+    
+    /// Check if this is a major arc (> 180 degrees)
+    pub fn is_major_arc(&self) -> bool {
+        self.angle_sweep() > 180.0
+    }
+}
+
+impl Entity for ShapeArc {
+    fn get_id(&self) -> EntityID {
+        self.entity.clone()
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ArcShape
+    }
+
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }
@@ -2008,253 +2185,6 @@ impl Default for CustomComponentRegistry {
     }
 }
 
-#[cfg(test)]
-mod custom_component_tests {
-    use super::*;
-    use crate::*;
-    use serde_json::json;
-
-    /// Test custom component: Badge
-    /// Creates a rounded box with text and a colored background
-    fn create_badge_component(
-        attrs: &Map<String, Value>,
-        builder: &mut DiagramBuilder,
-    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
-        // Extract attributes with defaults
-        let text = attrs
-            .get("text")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Badge")
-            .to_string();
-
-        let background_color = attrs
-            .get("background_color")
-            .and_then(|v| v.as_str())
-            .unwrap_or("blue")
-            .to_string();
-
-        let text_color = attrs
-            .get("text_color")
-            .and_then(|v| v.as_str())
-            .unwrap_or("white")
-            .to_string();
-
-        let font_size = attrs
-            .get("font_size")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(12.0) as Float;
-
-        let padding = attrs
-            .get("padding")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(8.0) as Float;
-
-        let border_radius = attrs
-            .get("border_radius")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(15.0) as Float;
-
-        // Create the badge components
-        let text_options = TextOptions {
-            font_family: "Arial".to_string(),
-            font_size,
-            text_color,
-            line_width: 200, // Reasonable default
-            line_spacing: 0.0,
-        };
-
-        let text_node = builder.new_text(&text, text_options);
-
-        let box_options = BoxOptions {
-            fill_color: Fill::Color(background_color),
-            stroke_color: "transparent".to_string(),
-            stroke_width: 0.0,
-            padding,
-            border_radius,
-            width_behavior: SizeBehavior::Content,
-            height_behavior: SizeBehavior::Content,
-        };
-
-        let badge_node = builder.new_box(text_node, box_options);
-        Ok(badge_node)
-    }
-
-    /// Test custom component: Card
-    /// Creates a card with title, content, and optional footer
-    fn create_card_component(
-        attrs: &Map<String, Value>,
-        builder: &mut DiagramBuilder,
-    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
-        let title = attrs
-            .get("title")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Card Title")
-            .to_string();
-
-        let content = attrs
-            .get("content")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Card content goes here")
-            .to_string();
-
-        let footer = attrs.get("footer").and_then(|v| v.as_str());
-
-        let padding = attrs
-            .get("padding")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(16.0) as Float;
-
-        let background_color = attrs
-            .get("background_color")
-            .and_then(|v| v.as_str())
-            .unwrap_or("white")
-            .to_string();
-
-        let border_color = attrs
-            .get("border_color")
-            .and_then(|v| v.as_str())
-            .unwrap_or("gray")
-            .to_string();
-
-        // Create title
-        let title_options = TextOptions {
-            font_family: "Arial".to_string(),
-            font_size: 18.0,
-            text_color: "black".to_string(),
-            line_width: 300,
-            line_spacing: 0.0,
-        };
-        let title_node = builder.new_text(&title, title_options);
-
-        // Create content
-        let content_options = TextOptions {
-            font_family: "Arial".to_string(),
-            font_size: 14.0,
-            text_color: "gray".to_string(),
-            line_width: 300,
-            line_spacing: 2.0,
-        };
-        let content_node = builder.new_text(&content, content_options);
-
-        // Create children vector
-        let mut children = vec![title_node, content_node];
-
-        // Add footer if provided
-        if let Some(footer_text) = footer {
-            let footer_options = TextOptions {
-                font_family: "Arial".to_string(),
-                font_size: 12.0,
-                text_color: "lightgray".to_string(),
-                line_width: 300,
-                line_spacing: 0.0,
-            };
-            let footer_node = builder.new_text(footer_text, footer_options);
-            children.push(footer_node);
-        }
-
-        // Create vertical stack
-        let stack = builder.new_vstack(children, HorizontalAlignment::Left);
-
-        // Wrap in box
-        let box_options = BoxOptions {
-            fill_color: Fill::Color(background_color),
-            stroke_color: border_color,
-            stroke_width: 1.0,
-            padding,
-            border_radius: 8.0,
-            width_behavior: SizeBehavior::Content,
-            height_behavior: SizeBehavior::Content,
-        };
-
-        let card_node = builder.new_box(stack, box_options);
-        Ok(card_node)
-    }
-
-    #[test]
-    fn test_custom_component_registry() {
-        let mut registry = CustomComponentRegistry::new();
-
-        // Register badge component
-        registry.register("badge", create_badge_component);
-
-        // Register card component  
-        registry.register("card", create_card_component);
-
-        // Test that components are registered
-        assert!(registry.has_component("badge"));
-        assert!(registry.has_component("card"));
-        assert!(!registry.has_component("unknown"));
-
-        // Test getting registered types
-        let types = registry.get_registered_types();
-        assert_eq!(types.len(), 2);
-        assert!(types.contains(&&"badge".to_string()));
-        assert!(types.contains(&&"card".to_string()));
-    }
-
-    #[test]
-    fn test_create_badge_component() {
-        let mut registry = CustomComponentRegistry::new();
-        registry.register("badge", create_badge_component);
-
-        let mut builder = DiagramBuilder::new();
-        builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
-
-        // Create badge with custom attributes
-        let attrs = json!({
-            "text": "NEW",
-            "background_color": "red",
-            "text_color": "white",
-            "font_size": 14.0,
-            "padding": 6.0,
-            "border_radius": 20.0
-        });
-
-        let attrs_map = attrs.as_object().unwrap();
-        let badge = registry.create_component("badge", attrs_map, &mut builder);
-
-        assert!(badge.is_ok());
-        let badge_node = badge.unwrap();
-        assert_eq!(badge_node.entity_type, EntityType::BoxShape);
-    }
-
-    #[test]
-    fn test_create_card_component() {
-        let mut registry = CustomComponentRegistry::new();
-        registry.register("card", create_card_component);
-
-        let mut builder = DiagramBuilder::new();
-        builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
-
-        // Create card with custom attributes
-        let attrs = json!({
-            "title": "Welcome Card",
-            "content": "This is a sample card component with custom content.",
-            "footer": "Created with custom components",
-            "padding": 20.0,
-            "background_color": "lightblue",
-            "border_color": "darkblue"
-        });
-
-        let attrs_map = attrs.as_object().unwrap();
-        let card = registry.create_component("card", attrs_map, &mut builder);
-
-        assert!(card.is_ok());
-        let card_node = card.unwrap();
-        assert_eq!(card_node.entity_type, EntityType::BoxShape);
-    }
-
-    #[test]
-    fn test_unknown_component_error() {
-        let registry = CustomComponentRegistry::new();
-        let mut builder = DiagramBuilder::new();
-        let attrs = json!({}).as_object().unwrap().clone();
-
-        let result = registry.create_component("unknown", &attrs, &mut builder);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Unknown custom component type"));
-    }
-}
 
 // Helper functions for extracting common attribute types
 impl CustomComponentRegistry {
@@ -2291,6 +2221,81 @@ impl CustomComponentRegistry {
             .unwrap_or(default)
     }
 }
+
+
+#[cfg(test)]
+mod custom_component_tests {
+    use super::*;
+    use crate::*;
+    use serde_json::json;
+
+    /// Test custom component: Badge
+    /// Creates a rounded box with text and a colored background
+    fn create_badge_component(
+        attrs: &Map<String, Value>,
+        builder: &mut DiagramBuilder,
+    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
+        // Extract attributes with defaults
+        let text = attrs
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Badge")
+            .to_string();
+
+        let id = attrs
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        
+        let textNode = builder.new_text(id, &text, TextOptions::default());
+        Ok(textNode)
+    }
+
+    #[test]
+    fn test_custom_component_registry() {
+        let mut registry = CustomComponentRegistry::new();
+
+        // Register badge component
+        registry.register("badge", create_badge_component);
+
+        // Test that components are registered
+        assert!(registry.has_component("badge"));
+        assert!(!registry.has_component("unknown"));
+
+        // Test getting registered types
+        let types = registry.get_registered_types();
+        assert_eq!(types.len(), 1);
+        assert!(types.contains(&&"badge".to_string()));
+    }
+
+    #[test]
+    fn test_create_badge_component() {
+        let mut registry = CustomComponentRegistry::new();
+        registry.register("badge", create_badge_component);
+
+        let mut builder = DiagramBuilder::new();
+        builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
+
+        // Create badge with custom attributes
+        let attrs = json!({
+            "text": "NEW",
+            "background_color": "red",
+            "text_color": "white",
+            "font_size": 14.0,
+            "padding": 6.0,
+            "border_radius": 20.0
+        });
+
+        let attrs_map = attrs.as_object().unwrap();
+        let badge = registry.create_component("badge", attrs_map, &mut builder);
+
+        assert!(badge.is_ok());
+        let badge_node = badge.unwrap();
+        assert_eq!(badge_node.entity_type, EntityType::TextShape);
+    }
+}
+
 ===/src/components/table.rs===
 
 //use EntityID
@@ -2326,13 +2331,13 @@ pub struct Table {
 impl Clone for Table {
     fn clone(&self) -> Self {
         Table {
-            entity: self.entity,
+            entity: self.entity.clone(),
             cols: self.cols,
             cells: self.cells.clone(),
             col_lines: self.col_lines.clone(),
             row_lines: self.row_lines.clone(),
             table_options: self.table_options.clone(),
-            header_rect: self.header_rect,
+            header_rect: self.header_rect.clone(),
         }
     }
 }
@@ -2354,7 +2359,7 @@ impl Table {
 
 impl Entity for Table {
     fn get_id(&self) -> EntityID {
-        self.entity
+        self.entity.clone()
     }
 
     fn get_type(&self) -> EntityType {
@@ -2436,7 +2441,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 
-use crate::{components::*, DiagramBuilder, diagram_builder::*};
+use crate::{components::*, diagram_builder::*, DiagramBuilder};
 
 /// Simplified JSON Lines entity with only essential fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2519,7 +2524,12 @@ fn get_array_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<String>> 
     })
 }
 
-fn get_point_attr(attrs: &Map<String, Value>, x_keys: &[&str], y_keys: &[&str], default: (Float, Float)) -> (Float, Float) {
+fn get_point_attr(
+    attrs: &Map<String, Value>,
+    x_keys: &[&str],
+    y_keys: &[&str],
+    default: (Float, Float),
+) -> (Float, Float) {
     let x = get_float_attr(attrs, x_keys, default.0 as f64);
     let y = get_float_attr(attrs, y_keys, default.1 as f64);
     (x, y)
@@ -2701,16 +2711,15 @@ impl JsonLinesParser {
             .get(entity_id)
             .ok_or_else(|| JsonLinesError::EntityNotFound(entity_id.to_string()))?;
 
-            // Clone the entity type to avoid borrow conflicts
-            let component_type = entity.entity_type.clone();
-            let attributes = entity.attributes.clone();
+        // Clone the entity type to avoid borrow conflicts
+        let component_type = entity.entity_type.clone();
+        let attributes = entity.attributes.clone();
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
-            return builder.create_custom_component(
-                &component_type,
-                &attributes,
-            ).map_err(|e| JsonLinesError::InvalidStructure(e));
+            return builder
+                .create_custom_component(&component_type, &attributes)
+                .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 
         // Handle built-in components using attribute helpers
@@ -2718,18 +2727,24 @@ impl JsonLinesParser {
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
-                    return Err(JsonLinesError::MissingAttribute("content or text".to_string()));
+                    return Err(JsonLinesError::MissingAttribute(
+                        "content or text".to_string(),
+                    ));
                 }
 
                 let options = TextOptions {
                     font_size: get_float_attr(&entity.attributes, &["font_size"], 12.0),
-                    text_color: get_string_attr(&entity.attributes, &["color", "text_color"], "black"),
+                    text_color: get_string_attr(
+                        &entity.attributes,
+                        &["color", "text_color"],
+                        "black",
+                    ),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
                 };
 
-                Ok(builder.new_text(&content, options))
+                Ok(builder.new_text(entity_id.to_string(), &content, options))
             }
 
             "box" => {
@@ -2750,21 +2765,39 @@ impl JsonLinesParser {
                 let options = BoxOptions {
                     padding: get_float_attr(&entity.attributes, &["padding"], 0.0),
                     fill_color: {
-                        let color = get_string_attr(&entity.attributes, &["background", "background_color", "fill"], "white");
+                        let color = get_string_attr(
+                            &entity.attributes,
+                            &["background", "background_color", "fill"],
+                            "white",
+                        );
                         Fill::Color(color)
                     },
-                    stroke_color: get_string_attr(&entity.attributes, &["border_color", "stroke_color"], "black"),
-                    stroke_width: get_float_attr(&entity.attributes, &["border_width", "stroke_width"], 1.0),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["border_color", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(
+                        &entity.attributes,
+                        &["border_width", "stroke_width"],
+                        1.0,
+                    ),
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                     width_behavior,
                     height_behavior,
                 };
 
-                Ok(builder.new_box(child, options))
+                Ok(builder.new_box(entity_id.to_string(), child, options))
             }
 
             "vstack" => {
-                let halign = match get_string_attr(&entity.attributes, &["h_align", "horizontal_alignment"], "center").as_str() {
+                let halign = match get_string_attr(
+                    &entity.attributes,
+                    &["h_align", "horizontal_alignment"],
+                    "center",
+                )
+                .as_str()
+                {
                     "left" => HorizontalAlignment::Left,
                     "center" => HorizontalAlignment::Center,
                     "right" => HorizontalAlignment::Right,
@@ -2779,11 +2812,17 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_vstack(child_nodes?, halign))
+                Ok(builder.new_vstack(entity_id.to_string(), child_nodes?, halign))
             }
 
             "hstack" => {
-                let valign = match get_string_attr(&entity.attributes, &["v_align", "vertical_alignment"], "center").as_str() {
+                let valign = match get_string_attr(
+                    &entity.attributes,
+                    &["v_align", "vertical_alignment"],
+                    "center",
+                )
+                .as_str()
+                {
                     "top" => VerticalAlignment::Top,
                     "center" => VerticalAlignment::Center,
                     "bottom" => VerticalAlignment::Bottom,
@@ -2798,7 +2837,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_hstack(child_nodes?, valign))
+                Ok(builder.new_hstack(entity_id.to_string(), child_nodes?, valign))
             }
 
             "group" => {
@@ -2810,7 +2849,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                Ok(builder.new_group(child_nodes?))
+                Ok(builder.new_group(entity_id.to_string(), child_nodes?))
             }
 
             "rect" => {
@@ -2821,40 +2860,193 @@ impl JsonLinesParser {
                     width_behavior,
                     height_behavior,
                     fill_color: {
-                        let color = get_string_attr(&entity.attributes, &["background", "background_color", "fill"], "white");
+                        let color = get_string_attr(
+                            &entity.attributes,
+                            &["background", "background_color", "fill"],
+                            "white",
+                        );
                         Fill::Color(color)
                     },
-                    stroke_color: get_string_attr(&entity.attributes, &["border_color", "stroke_color"], "black"),
-                    stroke_width: get_float_attr(&entity.attributes, &["border_width", "stroke_width"], 1.0),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["border_color", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(
+                        &entity.attributes,
+                        &["border_width", "stroke_width"],
+                        1.0,
+                    ),
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                 };
 
-                Ok(builder.new_rectangle(options))
+                Ok(builder.new_rectangle(entity_id.to_string(), options))
             }
 
             "line" => {
-                let start_point = get_point_attr(&entity.attributes, &["start_x", "x1"], &["start_y", "y1"], (0.0, 0.0));
-                let end_point = get_point_attr(&entity.attributes, &["end_x", "x2"], &["end_y", "y2"], (0.0, 0.0));
+                let start_point = get_point_attr(
+                    &entity.attributes,
+                    &["start_x", "x1"],
+                    &["start_y", "y1"],
+                    (0.0, 0.0),
+                );
+                let end_point = get_point_attr(
+                    &entity.attributes,
+                    &["end_x", "x2"],
+                    &["end_y", "y2"],
+                    (0.0, 0.0),
+                );
 
                 let options = LineOptions {
-                    stroke_color: get_string_attr(&entity.attributes, &["stroke_color", "color"], "black"),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke_color", "color"],
+                        "black",
+                    ),
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                Ok(builder.new_line(start_point, end_point, options))
+                Ok(builder.new_line(entity_id.to_string(), start_point, end_point, options))
             }
 
             "ellipse" => {
-                let center = get_point_attr(&entity.attributes, &["cx", "center_x"], &["cy", "center_y"], (50.0, 50.0));
-                let radius = get_point_attr(&entity.attributes, &["rx", "radius_x"], &["ry", "radius_y"], (25.0, 25.0));
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (50.0, 50.0),
+                );
+                let radius = get_point_attr(
+                    &entity.attributes,
+                    &["rx", "radius_x"],
+                    &["ry", "radius_y"],
+                    (25.0, 25.0),
+                );
 
                 let options = EllipseOptions {
-                    fill_color: get_string_attr(&entity.attributes, &["fill", "fill_color", "background"], "white"),
-                    stroke_color: get_string_attr(&entity.attributes, &["stroke", "stroke_color", "border_color"], "black"),
-                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width", "border_width"], 1.0),
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color", "background"],
+                        "white",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color", "border_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(
+                        &entity.attributes,
+                        &["stroke_width", "border_width"],
+                        1.0,
+                    ),
                 };
 
-                Ok(builder.new_elipse(center, radius, options))
+                Ok(builder.new_elipse(entity_id.to_string(), center, radius, options))
+            }
+
+            "arc" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let start_angle =
+                    get_float_attr(&entity.attributes, &["start_angle", "start"], 0.0);
+                let end_angle = get_float_attr(&entity.attributes, &["end_angle", "end"], 90.0);
+
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
+
+                Ok(builder.new_arc(
+                    entity_id.to_string(),
+                    center,
+                    radius,
+                    start_angle,
+                    end_angle,
+                    options,
+                ))
+            }
+
+            "semicircle" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
+
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
+
+                Ok(builder.new_semicircle(
+                    entity_id.to_string(),
+                    center,
+                    radius,
+                    facing_up,
+                    options,
+                ))
+            }
+
+            "quarter_circle" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let quadrant = get_int_attr(&entity.attributes, &["quadrant"], 1) as u8;
+
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
+
+                Ok(builder.new_quarter_circle(
+                    entity_id.to_string(),
+                    center,
+                    radius,
+                    quadrant,
+                    options,
+                ))
             }
 
             "image" => {
@@ -2865,11 +3057,21 @@ impl JsonLinesParser {
                 let file_path = get_string_attr(&entity.attributes, &["file_path"], "");
 
                 if !src.is_empty() {
-                    Ok(builder.new_image(&src, (width_behavior, height_behavior)))
+                    Ok(builder.new_image(
+                        entity_id.to_string(),
+                        &src,
+                        (width_behavior, height_behavior),
+                    ))
                 } else if !file_path.is_empty() {
-                    Ok(builder.new_image_from_file(&file_path, (width_behavior, height_behavior)))
+                    Ok(builder.new_image_from_file(
+                        entity_id.to_string(),
+                        &file_path,
+                        (width_behavior, height_behavior),
+                    ))
                 } else {
-                    Err(JsonLinesError::MissingAttribute("src or file_path".to_string()))
+                    Err(JsonLinesError::MissingAttribute(
+                        "src or file_path".to_string(),
+                    ))
                 }
             }
 
@@ -2884,14 +3086,23 @@ impl JsonLinesParser {
                     .collect();
 
                 let options = TableOptions {
-                    header_fill_color: get_string_attr(&entity.attributes, &["header_fill_color", "header_background"], "lightgray"),
-                    fill_color: get_string_attr(&entity.attributes, &["fill_color", "background"], "white"),
+                    header_fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["header_fill_color", "header_background"],
+                        "lightgray",
+                    ),
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill_color", "background"],
+                        "white",
+                    ),
                     border_color: get_string_attr(&entity.attributes, &["border_color"], "black"),
                     border_width: get_int_attr(&entity.attributes, &["border_width"], 1) as usize,
-                    cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20) as usize,
+                    cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20)
+                        as usize,
                 };
 
-                Ok(builder.new_table(child_nodes?, cols, options))
+                Ok(builder.new_table(entity_id.to_string(), child_nodes?, cols, options))
             }
 
             "polyline" => {
@@ -2899,11 +3110,15 @@ impl JsonLinesParser {
                     .ok_or_else(|| JsonLinesError::MissingAttribute("points".to_string()))?;
 
                 let options = LineOptions {
-                    stroke_color: get_string_attr(&entity.attributes, &["stroke_color", "color"], "black"),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke_color", "color"],
+                        "black",
+                    ),
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                Ok(builder.new_polyline(points, options))
+                Ok(builder.new_polyline(entity_id.to_string(), points, options))
             }
 
             "free_container" => {
@@ -2918,11 +3133,12 @@ impl JsonLinesParser {
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
 
                     let child_node = self.build_entity(&child_id, builder)?;
-                    let position = get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
+                    let position =
+                        get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
                     positioned_children.push((child_node, position));
                 }
 
-                Ok(builder.new_free_container_with_children(positioned_children))
+                Ok(builder.new_free_container(entity_id.to_string(), positioned_children))
             }
 
             _ => Err(JsonLinesError::UnknownEntityType(
@@ -2957,28 +3173,20 @@ impl JsonLinesParser {
 /// Builder for creating JSON Lines diagrams
 pub struct JsonLinesBuilder {
     entities: Vec<JsonEntity>,
-    id_counter: usize,
 }
 
 impl JsonLinesBuilder {
     pub fn new() -> Self {
         Self {
             entities: Vec::new(),
-            id_counter: 0,
         }
     }
 
-    pub fn next_id(&mut self) -> String {
-        self.id_counter += 1;
-        format!("e{}", self.id_counter)
-    }
-
     /// Create a text entity
-    pub fn text(&mut self, content: &str) -> String {
-        let id = self.next_id();
+    pub fn text(&mut self, id: String, content: &str) -> String {
         let mut attrs = Map::new();
         attrs.insert("content".to_string(), Value::String(content.to_string()));
-        
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "text".to_string(),
@@ -2988,13 +3196,21 @@ impl JsonLinesBuilder {
     }
 
     /// Create a styled text entity
-    pub fn text_styled(&mut self, content: &str, font_size: f64, color: &str) -> String {
-        let id = self.next_id();
+    pub fn text_styled(
+        &mut self,
+        id: String,
+        content: &str,
+        font_size: f64,
+        color: &str,
+    ) -> String {
         let mut attrs = Map::new();
         attrs.insert("content".to_string(), Value::String(content.to_string()));
-        attrs.insert("font_size".to_string(), Value::Number(serde_json::Number::from_f64(font_size).unwrap()));
+        attrs.insert(
+            "font_size".to_string(),
+            Value::Number(serde_json::Number::from_f64(font_size).unwrap()),
+        );
         attrs.insert("color".to_string(), Value::String(color.to_string()));
-        
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "text".to_string(),
@@ -3004,13 +3220,27 @@ impl JsonLinesBuilder {
     }
 
     /// Create a box entity
-    pub fn box_with(&mut self, child: String, padding: f64, background: &str) -> String {
-        let id = self.next_id();
+    pub fn box_with(
+        &mut self,
+        id: String,
+        child: String,
+        padding: f64,
+        background: &str,
+    ) -> String {
         let mut attrs = Map::new();
-        attrs.insert("children".to_string(), Value::Array(vec![Value::String(child)]));
-        attrs.insert("padding".to_string(), Value::Number(serde_json::Number::from_f64(padding).unwrap()));
-        attrs.insert("background".to_string(), Value::String(background.to_string()));
-        
+        attrs.insert(
+            "children".to_string(),
+            Value::Array(vec![Value::String(child)]),
+        );
+        attrs.insert(
+            "padding".to_string(),
+            Value::Number(serde_json::Number::from_f64(padding).unwrap()),
+        );
+        attrs.insert(
+            "background".to_string(),
+            Value::String(background.to_string()),
+        );
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "box".to_string(),
@@ -3020,11 +3250,13 @@ impl JsonLinesBuilder {
     }
 
     /// Create a vertical stack
-    pub fn vstack(&mut self, children: Vec<String>) -> String {
-        let id = self.next_id();
+    pub fn vstack(&mut self, id: String, children: Vec<String>) -> String {
         let mut attrs = Map::new();
-        attrs.insert("children".to_string(), Value::Array(children.into_iter().map(Value::String).collect()));
-        
+        attrs.insert(
+            "children".to_string(),
+            Value::Array(children.into_iter().map(Value::String).collect()),
+        );
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "vstack".to_string(),
@@ -3034,11 +3266,13 @@ impl JsonLinesBuilder {
     }
 
     /// Create a horizontal stack
-    pub fn hstack(&mut self, children: Vec<String>) -> String {
-        let id = self.next_id();
+    pub fn hstack(&mut self, id: String, children: Vec<String>) -> String {
         let mut attrs = Map::new();
-        attrs.insert("children".to_string(), Value::Array(children.into_iter().map(Value::String).collect()));
-        
+        attrs.insert(
+            "children".to_string(),
+            Value::Array(children.into_iter().map(Value::String).collect()),
+        );
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "hstack".to_string(),
@@ -3048,13 +3282,18 @@ impl JsonLinesBuilder {
     }
 
     /// Create a rectangle
-    pub fn rect(&mut self, width: f64, height: f64, color: &str) -> String {
-        let id = self.next_id();
+    pub fn rect(&mut self, id: String, width: f64, height: f64, color: &str) -> String {
         let mut attrs = Map::new();
-        attrs.insert("width".to_string(), Value::Number(serde_json::Number::from_f64(width).unwrap()));
-        attrs.insert("height".to_string(), Value::Number(serde_json::Number::from_f64(height).unwrap()));
+        attrs.insert(
+            "width".to_string(),
+            Value::Number(serde_json::Number::from_f64(width).unwrap()),
+        );
+        attrs.insert(
+            "height".to_string(),
+            Value::Number(serde_json::Number::from_f64(height).unwrap()),
+        );
         attrs.insert("background".to_string(), Value::String(color.to_string()));
-        
+
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: "rect".to_string(),
@@ -3064,9 +3303,12 @@ impl JsonLinesBuilder {
     }
 
     /// Create a custom component entity
-    pub fn custom_component(&mut self, component_type: &str, attributes: Map<String, Value>) -> String {
-        let id = self.next_id();
-        
+    pub fn custom_component(
+        &mut self,
+        id: String,
+        component_type: &str,
+        attributes: Map<String, Value>,
+    ) -> String {
         self.entities.push(JsonEntity {
             id: id.clone(),
             entity_type: component_type.to_string(),
@@ -3136,8 +3378,8 @@ impl std::error::Error for JsonLinesError {}
 
 #[cfg(test)]
 mod tests {
-    use crate::DiagramBuilder;
     use super::*;
+    use crate::DiagramBuilder;
     use serde_json::json;
 
     #[test]
@@ -3168,11 +3410,11 @@ mod tests {
 
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 
@@ -3187,9 +3429,12 @@ mod tests {
             assert!(attrs.contains_key("custom_prop"));
             assert!(attrs.contains_key("width"));
             assert!(attrs.contains_key("background"));
-            
+
             // Return a dummy node for testing
-            Ok(DiagramTreeNode::new(EntityType::TextShape, 1))
+            Ok(DiagramTreeNode::new(
+                EntityType::TextShape,
+                "test_component".to_string(),
+            ))
         }
 
         let mut builder = DiagramBuilder::new();
@@ -3197,11 +3442,11 @@ mod tests {
         builder.register_custom_component("test_comp", test_component);
 
         let input = r#"{"id":"test1","type":"test_comp","width":200,"background":"blue","custom_prop":"value"}"#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 
@@ -3223,24 +3468,24 @@ mod tests {
     fn test_builder_api() {
         let mut builder = JsonLinesBuilder::new();
 
-        let title = builder.text_styled("Document Title", 18.0, "blue");
-        let left_text = builder.text("Left Panel");
-        let right_text = builder.text("Right Panel");
+        let title = builder.text_styled("title".to_string(), "Document Title", 18.0, "blue");
+        let left_text = builder.text("left_text".to_string(), "Left Panel");
+        let right_text = builder.text("right_text".to_string(), "Right Panel");
 
-        let left_box = builder.box_with(left_text, 10.0, "lightblue");
-        let right_box = builder.box_with(right_text, 10.0, "lightgreen");
+        let left_box = builder.box_with("left_box".to_string(), left_text, 10.0, "lightblue");
+        let right_box = builder.box_with("right_box".to_string(), right_text, 10.0, "lightgreen");
 
-        let content = builder.hstack(vec![left_box, right_box]);
-        let footer = builder.text_styled("Footer", 12.0, "gray");
+        let content = builder.hstack("content".to_string(), vec![left_box, right_box]);
+        let footer = builder.text_styled("footer".to_string(), "Footer", 12.0, "gray");
 
-        let _root = builder.vstack(vec![title, content, footer]);
+        let _root = builder.vstack("root".to_string(), vec![title, content, footer]);
 
         let jsonl = builder.build().unwrap();
         println!("Generated JSON Lines:\n{}", jsonl);
 
         // Parse it back to verify
         let mut parser = JsonLinesParser::new();
-        let root_id = parser.parse_string(&jsonl).unwrap();
+        parser.parse_string(&jsonl).unwrap();
         parser.validate().unwrap();
     }
 
@@ -3248,14 +3493,14 @@ mod tests {
     fn test_complex_attributes() {
         // Test points for polyline
         let input = r#"{"id":"poly1","type":"polyline","points":[[0,0],[10,10],[20,0]],"stroke_color":"red"}"#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 
@@ -3266,14 +3511,14 @@ mod tests {
 {"id":"box1","type":"box","width":"content","height":100,"children":["text1"]}
 {"id":"text1","type":"text","content":"Auto-sized"}
 "#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as Float * 8.0, 16.0));
         let diagram = parser.build(&root_id, &mut builder);
-        
+
         assert!(diagram.is_ok());
     }
 }
@@ -3295,20 +3540,10 @@ pub fn example_llm_generated_jsonl() -> &'static str {
 {"id":"article_body","type":"text","content":"This is the main content of the article..."}
 {"id":"footer","type":"text","content":"Copyright 2024","font_size":10,"color":"gray"}"#
 }
+
 ===/src/utils.rs===
 use crate::components::*;
-// Returns the entity type given its id.
-pub fn get_entity_type_from_id(entity_id: EntityID) -> EntityType {
-    match (entity_id >> 32) as u8 {
-        0 => EntityType::GroupShape,
-        1 => EntityType::HorizontalStackShape,
-        2 => EntityType::VerticalStackShape,
-        3 => EntityType::TextShape,
-        4 => EntityType::LineShape,
-        5 => EntityType::ArrowShape,
-        _ => EntityType::GroupShape,
-    }
-}
+
 ===/src/diagram_builder.rs===
 use std::{collections::HashMap, sync::Arc};
 
@@ -3332,7 +3567,6 @@ pub struct DiagramBuilder {
     pub entities: Vec<EntityID>,
     pub positions: HashMap<EntityID, Point>,
     pub sizes: HashMap<EntityID, Size>,
-    entity_id_counter: usize,
     pub entityTypes: HashMap<EntityID, EntityType>,
 
     // Components
@@ -3350,6 +3584,7 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
+    arcs : HashMap<EntityID, ShapeArc>,
     pub custom_components: CustomComponentRegistry,
 }
 
@@ -3388,7 +3623,6 @@ impl DiagramTreeNode {
 impl DiagramBuilder {
     pub fn new() -> DiagramBuilder {
         DiagramBuilder {
-            entity_id_counter: 0,
             entityTypes: HashMap::<EntityID, EntityType>::new(),
             measure_text: Some(|_text, _text_options| (0.0, 0.0)),
             entities: Vec::new(),
@@ -3408,6 +3642,7 @@ impl DiagramBuilder {
             images: HashMap::new(),
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
+            arcs: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
         }
     }
@@ -3457,14 +3692,12 @@ impl DiagramBuilder {
      * We have another array with the positions of the entities
      * in the same index. So they are fast to access
      */
-    pub fn new_entity(&mut self, entity_type: EntityType) -> EntityID {
-        self.entity_id_counter += 1;
-        let id = self.entity_id_counter;
+    pub fn new_entity(&mut self,id : EntityID, entity_type: EntityType) -> EntityID {
         println!("Creating new entity with id {}", id);
-        self.entities.push(id);
-        self.positions.insert(id, Point::new(0.0, 0.0));
-        self.sizes.insert(id, Size::new(0.0, 0.0));
-        self.entityTypes.insert(id, entity_type.clone());
+        self.entities.push(id.clone());
+        self.positions.insert(id.clone(), Point::new(0.0, 0.0));
+        self.sizes.insert(id.clone(), Size::new(0.0, 0.0));
+        self.entityTypes.insert(id.clone(), entity_type.clone());
         id
     }
 
@@ -3514,45 +3747,110 @@ impl DiagramBuilder {
      */
 
     // Wraps an element in a box
-    pub fn new_box(&mut self, child: DiagramTreeNode, options: BoxOptions) -> DiagramTreeNode {
-        let box_id = self.new_entity(EntityType::BoxShape);
+    pub fn new_box(&mut self,id: EntityID, child: DiagramTreeNode, options: BoxOptions) -> DiagramTreeNode {
+        let box_id = self.new_entity(id.clone(), EntityType::BoxShape);
 
-        let sbox = ShapeBox::new(box_id, child.entity_id, options);
-        self.boxes.insert(box_id, sbox);
+        let sbox = ShapeBox::new(box_id.clone(), child.entity_id.clone(), options);
+        self.boxes.insert(box_id.clone(), sbox);
         let mut node = DiagramTreeNode {
             entity_type: EntityType::BoxShape,
-            entity_id: box_id,
+            entity_id: box_id.clone(),
             children: Vec::new(),
         };
         node.children.push(Box::new(child.clone()));
         node
     }
 
+
+    // Add the new_arc method
+    pub fn new_arc(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        start_angle: Float,
+        end_angle: Float,
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        let arc_id = self.new_entity(id, EntityType::ArcShape);
+        let arc = ShapeArc::new(arc_id.clone(), center, radius, start_angle, end_angle, options);
+        self.arcs.insert(arc_id.clone(), arc);
+        DiagramTreeNode::new(EntityType::ArcShape, arc_id)
+    }
+
+    // Add convenience methods for common arc types
+    pub fn new_arc_degrees(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        start_degrees: Float,
+        end_degrees: Float,
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        self.new_arc(id, center, radius, start_degrees, end_degrees, options)
+    }
+
+    pub fn new_semicircle(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        facing_up: bool,
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        let (start, end) = if facing_up {
+            (0.0, 180.0) // Top semicircle
+        } else {
+            (180.0, 360.0) // Bottom semicircle
+        };
+        self.new_arc(id, center, radius, start, end, options)
+    }
+
+    pub fn new_quarter_circle(
+        &mut self,
+        id: EntityID,
+        center: (Float, Float),
+        radius: Float,
+        quadrant: u8, // 1=top-right, 2=top-left, 3=bottom-left, 4=bottom-right
+        options: ArcOptions,
+    ) -> DiagramTreeNode {
+        let (start, end) = match quadrant {
+            1 => (0.0, 90.0),     // Top-right
+            2 => (90.0, 180.0),   // Top-left
+            3 => (180.0, 270.0),  // Bottom-left
+            4 => (270.0, 360.0),  // Bottom-right
+            _ => (0.0, 90.0),     // Default to top-right
+        };
+        self.new_arc(id, center, radius, start, end, options)
+    }
+
     // Creates a new Vertical stack.
     pub fn new_vstack(
         &mut self,
+        id: EntityID,
         children: Vec<DiagramTreeNode>,
         horizontal_alignment: HorizontalAlignment,
     ) -> DiagramTreeNode {
-        let stack_id = self.new_entity(EntityType::VerticalStackShape);
+        let stack_id = self.new_entity(id.clone(), EntityType::VerticalStackShape);
         let mut vstack = VerticalStack {
-            entity: stack_id,
+            entity: stack_id.clone(),
             elements: Vec::new(),
             horizontal_alignment,
         };
         let mut node = DiagramTreeNode {
             entity_type: EntityType::VerticalStackShape,
-            entity_id: stack_id,
+            entity_id: stack_id.clone(),
             children: Vec::new(),
         };
 
         //set children
         for child in children {
-            vstack.elements.push(child.entity_id);
+            vstack.elements.push(child.entity_id.clone());
             node.add_child(child)
         }
 
-        self.vertical_stacks.insert(stack_id, vstack);
+        self.vertical_stacks.insert(stack_id.clone(), vstack);
 
         node
     }
@@ -3560,24 +3858,25 @@ impl DiagramBuilder {
     // Creates a new Vertical stack.
     pub fn new_hstack(
         &mut self,
+        id : EntityID,
         children: Vec<DiagramTreeNode>,
         vertical_alignment: VerticalAlignment,
     ) -> DiagramTreeNode {
-        let stack_id = self.new_entity(EntityType::HorizontalStackShape);
+        let stack_id = self.new_entity(id.clone(), EntityType::HorizontalStackShape);
         let mut hstack = HorizontalStack {
-            entity: stack_id,
+            entity: stack_id.clone(),
             elements: Vec::new(),
             vertical_alignment,
         };
         let mut node = DiagramTreeNode {
             entity_type: EntityType::HorizontalStackShape,
-            entity_id: stack_id,
+            entity_id: stack_id.clone(),
             children: Vec::new(),
         };
 
         //set children
         for child in children {
-            hstack.elements.push(child.entity_id);
+            hstack.elements.push(child.entity_id.clone());
             node.add_child(child)
         }
 
@@ -3586,11 +3885,11 @@ impl DiagramBuilder {
         node
     }
 
-    pub fn new_rectangle(&mut self, options: RectOptions) -> DiagramTreeNode {
-        let rect_id = self.new_entity(EntityType::RectShape);
-        let rect = ShapeRect::new(rect_id, options);
-        self.rectangles.insert(rect_id, rect);
-        DiagramTreeNode::new(EntityType::RectShape, rect_id)
+    pub fn new_rectangle(&mut self, id: EntityID, options: RectOptions) -> DiagramTreeNode {
+        let rect_id = self.new_entity(id.clone(),EntityType::RectShape);
+        let rect = ShapeRect::new(rect_id.clone(), options);
+        self.rectangles.insert(rect_id.clone(), rect);
+        DiagramTreeNode::new(EntityType::RectShape, rect_id.clone())
     }
 
     // Creates a new Text element
@@ -3599,92 +3898,98 @@ impl DiagramBuilder {
     // ```rust
     // let text = session.new_text("Hello World", TextOptions::new());
     // ```
-    pub fn new_text(&mut self, text: &str, options: TextOptions) -> DiagramTreeNode {
-        let text_id = self.new_entity(EntityType::TextShape);
+    pub fn new_text(&mut self,id : EntityID, text: &str, options: TextOptions) -> DiagramTreeNode {
+        let text_id = self.new_entity(id, EntityType::TextShape);
         //create the lines
         let text_lines = textwrap::wrap(&text, options.line_width);
         let lines: Vec<EntityID> = text_lines
             .iter()
-            .map(|line| {
-                let line_id = self.new_entity(EntityType::TextLine);
+            .enumerate()
+            .map(|(i, line)| {
+                let line_id = format!("text-{}-line-{}", text_id.clone(), i); // Generate a new ID for each line using the index
+                self.new_entity(line_id.clone(), EntityType::TextLine);
                 let text_line = TextLine {
-                    entity: line_id,
+                    entity: line_id.clone(),
                     text: line.to_string(),
                 };
-                self.textlines.insert(line_id, text_line);
+                self.textlines.insert(line_id.clone(), text_line.clone());
                 line_id
             })
             .collect();
 
-        let text = ShapeText::new(text_id, text, options, &lines);
-        self.texts.insert(text_id, text);
+        let text = ShapeText::new(text_id.clone(), text, options, &lines);
+        self.texts.insert(text_id.clone(), text);
         DiagramTreeNode::new(EntityType::TextShape, text_id)
     }
 
     pub fn new_line(
         &mut self,
+        id : EntityID,
         start: (Float, Float),
         end: (Float, Float),
         options: LineOptions,
     ) -> DiagramTreeNode {
-        let line_id = self.new_entity(EntityType::LineShape);
-        let line = ShapeLine::new(line_id, start, end, options);
-        self.lines.insert(line_id, line);
-        println!("Creating new line with id {}", line_id);
+        let line_id = self.new_entity(id, EntityType::LineShape);
+        let line = ShapeLine::new(line_id.clone(), start, end, options);
+        self.lines.insert(line_id.clone(), line);
+        println!("Creating new line with id {}", line_id.clone());
         DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
     pub fn new_elipse(
         &mut self,
+        id: EntityID,
         center: (Float, Float),
         radius: (Float, Float),
         options: EllipseOptions,
     ) -> DiagramTreeNode {
-        let ellipse_id = self.new_entity(EntityType::EllipseShape);
-        let ellipse = ShapeEllipse::new(ellipse_id, center, radius, options);
-        self.ellipses.insert(ellipse_id, ellipse);
-        DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id)
+        let ellipse_id = self.new_entity(id, EntityType::EllipseShape);
+        let ellipse = ShapeEllipse::new(ellipse_id.clone(), center, radius, options);
+        self.ellipses.insert(ellipse_id.clone(), ellipse);
+        DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id.clone())
     }
 
     pub fn new_image(
         &mut self,
+        id: EntityID,
         image_data: &str,
         size: (SizeBehavior, SizeBehavior),
     ) -> DiagramTreeNode {
-        let image_id = self.new_entity(EntityType::ImageShape);
-        let image = ShapeImage::new(image_id, image_data.to_string(), size);
-        self.images.insert(image_id, image);
-        DiagramTreeNode::new(EntityType::ImageShape, image_id)
+        let image_id = self.new_entity(id, EntityType::ImageShape);
+        let image = ShapeImage::new(image_id.clone(), image_data.to_string(), size);
+        self.images.insert(image_id.clone(), image);
+        DiagramTreeNode::new(EntityType::ImageShape, image_id.clone())
     }
 
     pub fn new_image_from_file(
         &mut self,
+        id: EntityID,
         file_path: &str,
         size: (SizeBehavior, SizeBehavior),
     ) -> DiagramTreeNode {
-        let image_id = self.new_entity(EntityType::ImageShape);
-        let image = ShapeImage::from_file(image_id, file_path.to_string(), size);
-        self.images.insert(image_id, image);
-        DiagramTreeNode::new(EntityType::ImageShape, image_id)
+        let image_id = self.new_entity(id, EntityType::ImageShape);
+        let image = ShapeImage::from_file(image_id.clone(), file_path.to_string(), size);
+        self.images.insert(image_id.clone(), image.clone());
+        DiagramTreeNode::new(EntityType::ImageShape, image_id.clone())
     }
 
     // Creates a new Group.
-    pub fn new_group(&mut self, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
-        let group_id = self.new_entity(EntityType::GroupShape);
+    pub fn new_group(&mut self,id : EntityID, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+        let group_id = self.new_entity(id, EntityType::GroupShape);
         let mut sgroup = ShapeGroup {
-            entity: group_id,
+            entity: group_id.clone(),
             elements: Vec::new(),
         };
         let mut node = DiagramTreeNode {
             entity_type: EntityType::GroupShape,
-            entity_id: group_id,
+            entity_id: group_id.clone(),
             children: Vec::new(),
         };
 
         //set children
         for child in children {
-            sgroup.elements.push(child.entity_id);
-            node.add_child(child)
+            sgroup.elements.push(child.entity_id.clone());
+            node.add_child(child.clone())
         }
 
         self.groups.insert(group_id, sgroup);
@@ -3694,61 +3999,68 @@ impl DiagramBuilder {
 
     pub fn new_table(
         &mut self,
+        id: EntityID,
         cells: Vec<DiagramTreeNode>,
         cols: usize,
         options: TableOptions,
     ) -> DiagramTreeNode {
         let mut cell_ids = Vec::new();
         for cell in &cells {
-            cell_ids.push(cell.entity_id);
+            cell_ids.push(cell.entity_id.clone());
         }
         //create entities for the col and row lines
         let mut col_lines = Vec::new();
         for i in 0..cols {
-            let line_id = self.new_entity(EntityType::LineShape);
-            let line = ShapeLine::new(line_id, (0.0, 0.0), (0.0, 0.0), LineOptions::new());
-            self.lines.insert(line_id, line);
-            col_lines.push(line_id);
+            let line_id = format!("{}-col-line-{}", id.clone(), i);
+            self.new_entity(line_id.clone(), EntityType::LineShape);
+            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            self.lines.insert(line_id.clone(), line);
+            col_lines.push(line_id.clone());
         }
         let num_rows = cells.len() / cols;
         let mut row_lines = Vec::new();
         for i in 0..num_rows + 1 {
-            let line_id = self.new_entity(EntityType::LineShape);
-            let line = ShapeLine::new(line_id, (0.0, 0.0), (0.0, 0.0), LineOptions::new());
-            self.lines.insert(line_id, line);
-            row_lines.push(line_id);
+            let line_id = format!("{}-row-line-{}", id.clone(), i);
+            self.new_entity(line_id.clone(), EntityType::LineShape);
+            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            self.lines.insert(line_id.clone(), line);
+            row_lines.push(line_id.clone());
         }
 
         //Add a rectangle for the header row
-        let header = self.new_rectangle(RectOptions {
+        let header_id = format!("{}-header", id);
+        self.new_entity(header_id.clone(), EntityType::RectShape);
+        // Create the rectangle for the header row
+        let header = self.new_rectangle(header_id, RectOptions {
             fill_color: Fill::Color(options.header_fill_color.clone()),
             stroke_color: String::from("black"),
             stroke_width: 1.0,
             ..Default::default()
         });
 
-        let table_id = self.new_entity(EntityType::TableShape);
+        let table_id = format!("{}-table", id.clone());
+        self.new_entity(table_id.clone(), EntityType::TableShape);
         let table = Table::new(
-            table_id,
+            table_id.clone(),
             cell_ids,
             col_lines.clone(),
             row_lines.clone(),
             cols,
-            header.entity_id,
+            header.entity_id.clone(),
             options.clone(),
         );
 
-        self.tables.insert(table_id, table);
+        self.tables.insert(table_id.clone(), table);
         let mut node = DiagramTreeNode {
             entity_type: EntityType::TableShape,
-            entity_id: table_id,
+            entity_id: table_id.clone(),
             children: Vec::new(),
         };
 
         // Add the header before the cells, otherwise it can cover the cells
         node.add_child(DiagramTreeNode::new(
             EntityType::RectShape,
-            header.entity_id,
+            header.entity_id.clone(),
         ));
 
         for child in cells {
@@ -3768,91 +4080,46 @@ impl DiagramBuilder {
 
     pub fn new_polyline(
         &mut self,
+        id: EntityID,
         points: Vec<(Float, Float)>,
         options: LineOptions,
     ) -> DiagramTreeNode {
-        let polyline_id = self.new_entity(EntityType::PolyLine);
-        let polyline = PolyLine::new(polyline_id, points, options);
-        self.polylines.insert(polyline_id, polyline);
-        DiagramTreeNode::new(EntityType::PolyLine, polyline_id)
-    }
-
-    /// Creates a new FreeContainer that allows absolute positioning of children
-    /// The container will size itself based on the positions and sizes of its children
-    pub fn new_free_container(&mut self) -> DiagramTreeNode {
-        let container_id = self.new_entity(EntityType::FreeContainer);
-        let container = FreeContainer::new(container_id);
-        self.free_containers.insert(container_id, container);
-        DiagramTreeNode::new(EntityType::FreeContainer, container_id)
+        self.new_entity(id.clone(), EntityType::PolyLine);
+        let polyline = PolyLine::new(id.clone(), points, options);
+        self.polylines.insert(id.clone(), polyline);
+        DiagramTreeNode::new(EntityType::PolyLine, id.clone())
     }
 
     /// Creates a new FreeContainer with all children at once
-    pub fn new_free_container_with_children(
+    pub fn new_free_container(
         &mut self,
+        id: EntityID,
         children_with_positions: Vec<(DiagramTreeNode, (Float, Float))>,
     ) -> DiagramTreeNode {
-        let container_id = self.new_entity(EntityType::FreeContainer);
+        let container_id = self.new_entity(id.clone(), EntityType::FreeContainer);  
 
         // Create the free container
-        let mut container = FreeContainer::new(container_id);
+        let mut container = FreeContainer::new(container_id.clone());
 
         // Create the node for the tree
         let mut node = DiagramTreeNode {
             entity_type: EntityType::FreeContainer,
-            entity_id: container_id,
+            entity_id: container_id.clone(),
             children: Vec::new(),
         };
 
         // Add all children with their positions
         for (child, position) in children_with_positions {
-            container.add_child(child.entity_id, position);
+            container.add_child(child.entity_id.clone(), position);
             node.add_child(child);
         }
 
         // Store the container
-        self.free_containers.insert(container_id, container);
+        self.free_containers.insert(container_id.clone(), container);
 
         node
     }
 
-    /// Add a child to a FreeContainer at the specified position
-    /// The position is relative to the container's top-left corner
-    pub fn add_to_free_container(
-        &mut self,
-        container_id: EntityID,
-        child: DiagramTreeNode,
-        position: (Float, Float),
-    ) -> DiagramTreeNode {
-        // Get the free container
-        let container = self.free_containers.get_mut(&container_id).unwrap();
-
-        // Add the child to the container with its position
-        container.add_child(child.entity_id, position);
-
-        // Create a new tree node for the container with the child
-        let mut node = DiagramTreeNode {
-            entity_type: EntityType::FreeContainer,
-            entity_id: container_id,
-            children: Vec::new(),
-        };
-
-        // Add the child node
-        node.add_child(child);
-
-        node
-    }
-
-    // Enhanced API convenience methods
-
-    /// Create a new HStackBuilder for fluent horizontal stack creation
-    pub fn hstack(&mut self) -> HStackBuilder {
-        HStackBuilder::new(self)
-    }
-
-    /// Create a new BoxBuilder for fluent box creation
-    pub fn box_with(&mut self, child: DiagramTreeNode) -> BoxBuilder {
-        BoxBuilder::new(self, child)
-    }
 }
 
 // element list accessors
@@ -3917,6 +4184,11 @@ impl DiagramBuilder {
         self.free_containers.get_mut(&id).unwrap()
     }
 
+     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
+        &self.arcs[&id]
+    }
+    
+
     pub fn get_custom_component(
         &self,
         component_type: &str,
@@ -3934,105 +4206,9 @@ impl DiagramBuilder {
     }
 }
 
-// Enhanced API Builder Structs
-
-/// Builder for creating horizontal stacks with fluent syntax
-pub struct HStackBuilder<'a> {
-    builder: &'a mut DiagramBuilder,
-    children: Vec<DiagramTreeNode>,
-}
-
-impl<'a> HStackBuilder<'a> {
-    fn new(builder: &'a mut DiagramBuilder) -> Self {
-        HStackBuilder {
-            builder,
-            children: Vec::new(),
-        }
-    }
-
-    /// Add a child element to the horizontal stack
-    pub fn add(mut self, child: DiagramTreeNode) -> Self {
-        self.children.push(child);
-        self
-    }
-
-    /// Add a text element to the horizontal stack
-    pub fn add_text(mut self, text: &str, options: TextOptions) -> Self {
-        let text_node = self.builder.new_text(text, options);
-        self.children.push(text_node);
-        self
-    }
-
-    /// Add a text element with default options to the horizontal stack
-    pub fn add_text_default(mut self, text: &str) -> Self {
-        let text_node = self.builder.new_text(text, TextOptions::default());
-        self.children.push(text_node);
-        self
-    }
-
-    /// Build the horizontal stack
-    pub fn build(self) -> DiagramTreeNode {
-        self.builder
-            .new_hstack(self.children, VerticalAlignment::Center)
-    }
-}
-
-/// Builder for creating boxes with fluent syntax
-pub struct BoxBuilder<'a> {
-    builder: &'a mut DiagramBuilder,
-    child: DiagramTreeNode,
-    options: BoxOptions,
-}
-
-impl<'a> BoxBuilder<'a> {
-    fn new(builder: &'a mut DiagramBuilder, child: DiagramTreeNode) -> Self {
-        BoxBuilder {
-            builder,
-            child,
-            options: BoxOptions::default(),
-        }
-    }
-
-    /// Set the padding for the box
-    pub fn padding(mut self, padding: Float) -> Self {
-        self.options.padding = padding;
-        self
-    }
-
-    /// Set the background color for the box
-    pub fn background(mut self, color: &str) -> Self {
-        self.options.fill_color = Fill::Color(color.to_string());
-        self
-    }
-
-    /// Set the border color for the box
-    pub fn border_color(mut self, color: &str) -> Self {
-        self.options.stroke_color = color.to_string();
-        self
-    }
-
-    /// Set the border width for the box
-    pub fn border_width(mut self, width: Float) -> Self {
-        self.options.stroke_width = width;
-        self
-    }
-
-    /// Set the border radius for the box
-    pub fn border_radius(mut self, radius: Float) -> Self {
-        self.options.border_radius = radius;
-        self
-    }
-
-    /// Build the box
-    pub fn build(self) -> DiagramTreeNode {
-        self.builder.new_box(self.child, self.options)
-    }
-}
-
 //test
 #[cfg(test)]
 mod tests {
-    use crate::get_entity_type_from_id;
 
     use super::*;
 
@@ -4087,7 +4263,7 @@ mod component_registration_tests {
             line_width: 200,
             line_spacing: 0.0,
         };
-        let text_node = builder.new_text(&text, text_options);
+        let text_node = builder.new_text("text".to_string(), &text, text_options);
 
         // Wrap in rounded box
         let box_options = BoxOptions {
@@ -4099,7 +4275,7 @@ mod component_registration_tests {
             width_behavior: SizeBehavior::Content,  // Auto width based on text
             height_behavior: SizeBehavior::Content, // Auto height based on text
         };
-        let badge = builder.new_box(text_node, box_options);
+        let badge = builder.new_box("container".to_string(), text_node, box_options);
 
         println!("✅ Badge '{}' created successfully", text);
         Ok(badge)

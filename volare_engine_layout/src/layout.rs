@@ -1,7 +1,7 @@
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
-use crate::{HorizontalAlignment, ShapeRect, SizeBehavior, VerticalAlignment};
+use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
@@ -492,6 +492,75 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 
+
+/**
+ * Updates the size of the arc entity based on the radius and angle sweep
+ * The arc's bounding box is calculated from its center, radius, and angle range
+ */
+pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
+    use std::f32::consts::PI;
+    
+    let radius = shape_arc.radius;
+    let (start_angle, end_angle) = shape_arc.normalize_angles();
+    
+    // Convert degrees to radians
+    let start_rad = start_angle * PI / 180.0;
+    let end_rad = end_angle * PI / 180.0;
+    
+    // Calculate the points at start and end angles
+    let start_x = shape_arc.center.0 + radius * start_rad.cos();
+    let start_y = shape_arc.center.1 + radius * start_rad.sin();
+    let end_x = shape_arc.center.0 + radius * end_rad.cos();
+    let end_y = shape_arc.center.1 + radius * end_rad.sin();
+    
+    // For a more accurate bounding box, we need to consider if the arc crosses
+    // the cardinal directions (0°, 90°, 180°, 270°)
+    let mut min_x = start_x.min(end_x);
+    let mut max_x = start_x.max(end_x);
+    let mut min_y = start_y.min(end_y);
+    let mut max_y = start_y.max(end_y);
+    
+    // Check if arc crosses cardinal directions and expand bounding box accordingly
+    let sweep = shape_arc.angle_sweep();
+    let angles_to_check = if end_angle > start_angle {
+        vec![0.0, 90.0, 180.0, 270.0]
+    } else {
+        // Arc crosses 0° (wraps around)
+        vec![0.0, 90.0, 180.0, 270.0, 360.0]
+    };
+    
+    for angle in angles_to_check {
+        let normalized_angle = angle % 360.0;
+        
+        // Check if this cardinal angle is within our arc
+        let angle_in_arc = if end_angle > start_angle {
+            normalized_angle >= start_angle && normalized_angle <= end_angle
+        } else {
+            normalized_angle >= start_angle || normalized_angle <= end_angle
+        };
+        
+        if angle_in_arc {
+            let rad = normalized_angle * PI / 180.0;
+            let x = shape_arc.center.0 + radius * rad.cos();
+            let y = shape_arc.center.1 + radius * rad.sin();
+            
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
+        }
+    }
+    
+    // Calculate width and height from bounding box
+    let width = max_x - min_x;
+    let height = max_y - min_y;
+    
+    // Set the position to the top-left corner of the bounding box
+    session.set_position(shape_arc.entity.clone(), min_x, min_y);
+    session.set_size(shape_arc.entity.clone(), width, height);
+}
+
+
 pub struct BoundingBox {
     x: Float,
     y: Float,
@@ -592,6 +661,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             let container = session.get_free_container(root.entity_id.clone()).clone();
             layout_free_container(session, &container);
         }
+
+        EntityType::ArcShape => {
+        let arc = session.get_arc(root.entity_id.clone()).clone();
+        layout_arc(session, &arc);
+    }
 
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
