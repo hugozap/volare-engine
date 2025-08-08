@@ -1,10 +1,11 @@
 [workspace]
-
+resolver = "2"
 members = [
     "./volare_engine_layout",
     "./svg_renderer",
     "./image_renderer",
-    "./demo"
+    "./demo",
+    "./wasm_bindings"
 ]
 
 # build command that builds all members

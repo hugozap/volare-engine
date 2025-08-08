@@ -100,6 +100,44 @@ impl DiagramBuilder {
         }
     }
 
+    pub fn clear_cache(&mut self) {
+        // Clear core entity data
+        self.entities.clear();
+        self.positions.clear();
+        self.sizes.clear();
+        self.entityTypes.clear();
+        
+        // Clear all component hashmaps
+        self.boxes.clear();
+        self.rectangles.clear();
+        self.groups.clear();
+        self.texts.clear();
+        self.textlines.clear();
+        self.horizontal_stacks.clear();
+        self.vertical_stacks.clear();
+        self.ellipses.clear();
+        self.lines.clear();
+        self.arrows.clear();
+        self.tables.clear();
+        self.images.clear();
+        self.polylines.clear();
+        self.free_containers.clear();
+        self.arcs.clear();
+        
+        // Note: We don't clear custom_components as those are reusable function definitions
+        // Note: We don't clear measure_text function as it should persist across diagrams
+        
+        println!("DiagramBuilder cache cleared - all entities and components removed");
+    }
+
+      pub fn clear_entities_only(&mut self) {
+        self.entities.clear();
+        self.positions.clear();
+        self.sizes.clear();
+        self.entityTypes.clear();
+        println!("DiagramBuilder entities cleared (components preserved)");
+    }
+
     /// Register a custom component with the builder
     pub fn register_custom_component<F>(&mut self, component_type: &str, factory: F)
     where
@@ -153,14 +191,7 @@ impl DiagramBuilder {
         self.entityTypes.insert(id.clone(), entity_type.clone());
         id
     }
-
-    pub fn clear_cache(&mut self) {
-        //clear entities vector
-        self.entities = Vec::new();
-        self.positions = HashMap::new();
-        self.sizes = HashMap::new();
-    }
-
+    
     //set the measure_text function
     pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (Float, Float)) {
         println!("Setting measure text function");

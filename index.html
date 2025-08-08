@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volare Visual Engine Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: calc(100vh - 120px);
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #495057;
+        }
+        .panel-content {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+        }
+        textarea {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            resize: none;
+            background: #ffffff;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        .output-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .svg-output {
+            flex: 1;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            overflow: auto;
+            background: #ffffff;
+            min-height: 200px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .example-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .example-buttons button {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+
+        @media (max-width: 768px) {
+            .layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Volare Visual Engine Test</h1>
+        
+        <div class="layout">
+            <!-- Input Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">📝 JSONL Input</span>
+                    <div class="button-group">
+                        <div class="example-buttons">
+                            <button onclick="loadExample('simple')" class="btn-secondary">Simple</button>
+                            <button onclick="loadExample('text')" class="btn-secondary">Text</button>
+                            <button onclick="loadExample('shapes')" class="btn-secondary">Shapes</button>
+                            <button onclick="testEngine()" class="btn-secondary">Test Engine</button>
+                        </div>
+                        <button onclick="clearInput()" class="btn-secondary">Clear</button>
+                        <button onclick="renderSvg()" class="btn-success">Render SVG</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <textarea id="jsonl-input" placeholder="Paste your JSONL data here...
+
+Example:
+{&quot;id&quot;: &quot;rect1&quot;, &quot;type&quot;: &quot;rect&quot;, &quot;x&quot;: 10, &quot;y&quot;: 10, &quot;width&quot;: 100, &quot;height&quot;: 50, &quot;fill&quot;: &quot;blue&quot;}
+{&quot;id&quot;: &quot;text1&quot;, &quot;type&quot;: &quot;text&quot;, &quot;x&quot;: 60, &quot;y&quot;: 40, &quot;text&quot;: &quot;Hello World&quot;, &quot;font_size&quot;: 16}
+
+Note: Each JSON object must include an &quot;id&quot; field."></textarea>
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">🖼️ SVG Output</span>
+                    <div class="button-group">
+                        <button onclick="downloadSvg()" class="btn-secondary">Download SVG</button>
+                        <button onclick="copyToClipboard()" class="btn-secondary">Copy SVG</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="output-container">
+                        <div id="svg-output" class="svg-output">
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #6c757d; font-style: italic;">
+                                SVG output will appear here...
+                            </div>
+                        </div>
+                        <div id="status" class="status info">Ready to render. Paste JSONL data and click "Render SVG".</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, * as wasm from './pkg/volare_wasm.js';
+
+        let wasmModule = null;
+        let currentSvgContent = '';
+
+        // Initialize WASM on page load
+        async function initWasm() {
+            try {
+                wasmModule = await init();
+                updateStatus('✅ WASM module loaded successfully!', 'success');
+                
+                // Log available exports for debugging
+                const exports = Object.keys(wasm);
+                console.log('Available WASM exports:', exports);
+                
+                return true;
+            } catch (error) {
+                updateStatus(`❌ Failed to load WASM: ${error.message}`, 'error');
+                console.error('WASM loading error:', error);
+                return false;
+            }
+        }
+
+        // Render SVG from JSONL input
+        window.renderSvg = async function() {
+            if (!wasmModule) {
+                const success = await initWasm();
+                if (!success) return;
+            }
+
+            const input = document.getElementById('jsonl-input').value.trim();
+            if (!input) {
+                updateStatus('⚠️ Please enter some JSONL data first.', 'error');
+                return;
+            }
+
+            updateStatus('🔄 Processing JSONL data...', 'info');
+
+            try {
+                let svgResult = null;
+                
+                // Try different approaches to use VolareEngine
+                if (typeof wasm.VolareEngine === 'function') {
+                    console.log('Trying to create VolareEngine instance...');
+                    
+                    try {
+                        // First, try calling greet to make sure WASM is working
+                        if (typeof wasm.greet === 'function') {
+                            const greetResult = wasm.greet('Test');
+                            console.log('Greet test result:', greetResult);
+                        }
+                        
+                        // Method 1: Try as constructor
+                        const engine = new wasm.VolareEngine();
+                        console.log('Engine created:', engine);
+                        
+                        // Look for render methods on the engine instance
+                        const engineMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(engine))
+                            .filter(name => typeof engine[name] === 'function');
+                        console.log('Engine methods:', engineMethods);
+                        
+                        // Try create_diagram method
+                        if (typeof engine.create_diagram === 'function') {
+                            console.log('Calling engine.create_diagram() with input:', input);
+                            console.log('Input length:', input.length);
+                            console.log('Input preview:', input.substring(0, 200));
+                            
+                            svgResult = engine.create_diagram(input);
+                            
+                            console.log('create_diagram returned:', svgResult);
+                            console.log('Return type:', typeof svgResult);
+                            console.log('Return value length:', svgResult ? svgResult.length : 'N/A');
+                            
+                            if (svgResult === undefined || svgResult === null) {
+                                throw new Error('create_diagram returned undefined/null. Check if input format is correct.');
+                            }
+                            
+                            if (typeof svgResult === 'string' && svgResult.length === 0) {
+                                throw new Error('create_diagram returned empty string.');
+                            }
+                            
+                            updateStatus(`✅ Successfully rendered using VolareEngine.create_diagram()`, 'success');
+                        } else {
+                            throw new Error(`create_diagram method not found. Available methods: ${engineMethods.join(', ')}`);
+                        }
+                        
+                    } catch (constructorError) {
+                        console.log('Constructor approach failed:', constructorError);
+                        
+                        // Method 2: Try as static function
+                        try {
+                            svgResult = wasm.VolareEngine(input);
+                            updateStatus(`✅ Successfully rendered using VolareEngine() as function`, 'success');
+                        } catch (staticError) {
+                            console.log('Static function approach failed:', staticError);
+                            throw new Error(`Failed to use VolareEngine: Constructor error: ${constructorError.message}, Static error: ${staticError.message}`);
+                        }
+                    }
+                } else {
+                    // Fallback: try other available functions
+                    const exports = Object.keys(wasm).filter(key => typeof wasm[key] === 'function');
+                    
+                    // Try greet function as a test
+                    if (typeof wasm.greet === 'function') {
+                        const greetResult = wasm.greet('Test');
+                        console.log('Greet result:', greetResult);
+                    }
+                    
+                    throw new Error(`VolareEngine is not a function. Available functions: ${exports.join(', ')}`);
+                }
+
+                // Display the SVG
+                displaySvg(svgResult);
+                currentSvgContent = svgResult;
+                
+            } catch (error) {
+                updateStatus(`❌ Rendering error: ${error.message}`, 'error');
+                console.error('Rendering error:', error);
+                
+                // Show more debug info
+                console.log('WASM exports:', Object.keys(wasm));
+                console.log('VolareEngine type:', typeof wasm.VolareEngine);
+                if (wasm.VolareEngine) {
+                    console.log('VolareEngine:', wasm.VolareEngine);
+                }
+            }
+        };
+
+        // Display SVG in the output panel
+        function displaySvg(svgContent) {
+            const outputDiv = document.getElementById('svg-output');
+            
+            if (typeof svgContent === 'string' && svgContent.trim().startsWith('<svg')) {
+                outputDiv.innerHTML = svgContent;
+            } else {
+                outputDiv.innerHTML = `<pre style="padding: 20px; margin: 0; white-space: pre-wrap; font-family: monospace;">${svgContent}</pre>`;
+            }
+        }
+
+        // Update status message
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        // Load example JSONL data
+        window.loadExample = function(type) {
+            const textarea = document.getElementById('jsonl-input');
+            let example = '';
+
+            switch(type) {
+                case 'simple':
+                    example = `{"id": "rect1", "type": "rect", "x": 10, "y": 10, "width": 200, "height": 100, "fill": "lightblue", "stroke": "blue", "stroke_width": 2}
+{"id": "circle1", "type": "circle", "cx": 110, "cy": 60, "r": 30, "fill": "lightgreen", "stroke": "green"}
+{"id": "text1", "type": "text", "x": 110, "y": 65, "text": "Hello!", "font_size": 18, "text_anchor": "middle", "fill": "darkgreen"}`;
+                    break;
+
+                case 'text':
+                    example = `{"id": "title", "type": "text", "x": 50, "y": 30, "text": "Title Text", "font_size": 24, "font_weight": "bold", "fill": "navy"}
+{"id": "subtitle", "type": "text", "x": 50, "y": 60, "text": "Subtitle", "font_size": 16, "fill": "gray"}
+{"id": "body", "type": "text", "x": 50, "y": 90, "text": "Body text with more content", "font_size": 14, "fill": "black"}
+{"id": "line1", "type": "line", "x1": 50, "y1": 100, "x2": 300, "y2": 100, "stroke": "gray", "stroke_width": 1}`;
+                    break;
+
+                case 'shapes':
+                    example = `{"id": "rect1", "type": "rect", "x": 20, "y": 20, "width": 60, "height": 40, "fill": "red", "rx": 5}
+{"id": "circle1", "type": "circle", "cx": 130, "cy": 40, "r": 20, "fill": "orange"}
+{"id": "ellipse1", "type": "ellipse", "cx": 200, "cy": 40, "rx": 30, "ry": 20, "fill": "yellow"}
+{"id": "polygon1", "type": "polygon", "points": "250,20 270,60 230,60", "fill": "green"}
+{"id": "line1", "type": "line", "x1": 20, "y1": 80, "x2": 280, "y2": 80, "stroke": "purple", "stroke_width": 3}
+{"id": "path1", "type": "path", "d": "M 50 100 Q 100 120 150 100 T 250 100", "stroke": "blue", "stroke_width": 2, "fill": "none"}`;
+                    break;
+
+                default:
+                    example = '{"id": "rect1", "type": "rect", "x": 10, "y": 10, "width": 100, "height": 50, "fill": "blue"}';
+            }
+
+            textarea.value = example;
+            updateStatus(`📋 Loaded ${type} example with required "id" fields. Click "Render SVG" to see output.`, 'info');
+        };
+
+        // Test engine functionality step by step
+        window.testEngine = async function() {
+            if (!wasmModule) {
+                const success = await initWasm();
+                if (!success) return;
+            }
+
+            updateStatus('🔍 Testing engine functionality...', 'info');
+            
+            try {
+                // Test 1: Check if greet works
+                if (typeof wasm.greet === 'function') {
+                    const greetResult = wasm.greet('World');
+                    console.log('✅ Greet test:', greetResult);
+                    updateStatus(`✅ Greet test passed: ${greetResult}`, 'success');
+                } else {
+                    console.log('❌ No greet function found');
+                }
+
+                // Test 2: Create engine instance
+                console.log('Creating VolareEngine instance...');
+                console.log('VolareEngine type:', typeof wasm.VolareEngine);
+                console.log('VolareEngine:', wasm.VolareEngine);
+                console.log('VolareEngine.length (constructor params):', wasm.VolareEngine.length);
+                
+                let engine;
+                try {
+                    // Try without parameters first
+                    console.log('Trying: new wasm.VolareEngine()');
+                    engine = new wasm.VolareEngine();
+                    console.log('✅ Engine created successfully:', engine);
+                } catch (constructorError) {
+                    console.error('❌ Constructor without params failed:', constructorError);
+                    
+                    // Try with different parameter combinations
+                    const paramCombinations = [
+                        [],
+                        [null],
+                        [undefined],
+                        [{}],
+                        [""],
+                        [0],
+                        [800, 600], // Common width/height
+                    ];
+                    
+                    for (let i = 0; i < paramCombinations.length; i++) {
+                        const params = paramCombinations[i];
+                        try {
+                            console.log(`Trying: new wasm.VolareEngine(${params.map(p => JSON.stringify(p)).join(', ')})`);
+                            engine = new wasm.VolareEngine(...params);
+                            console.log(`✅ Engine created with params [${params.join(', ')}]:`, engine);
+                            break;
+                        } catch (paramError) {
+                            console.log(`❌ Failed with params [${params.join(', ')}]:`, paramError.message);
+                        }
+                    }
+                    
+                    if (!engine) {
+                        updateStatus(`❌ Failed to create VolareEngine with any parameter combination`, 'error');
+                        return;
+                    }
+                }
+
+                // Test 3: List all methods
+                const allMethods = [];
+                let obj = engine;
+                do {
+                    allMethods.push(...Object.getOwnPropertyNames(obj).filter(name => typeof engine[name] === 'function'));
+                    obj = Object.getPrototypeOf(obj);
+                } while (obj !== null && obj !== Object.prototype);
+                
+                console.log('✅ All engine methods:', [...new Set(allMethods)]);
+
+                // Test 4: Try create_diagram with simple input
+                if (typeof engine.create_diagram === 'function') {
+                    console.log('Testing create_diagram with simple input...');
+                    
+                    // Try different input formats
+                    const testInputs = [
+                        '{"type": "rect", "x": 10, "y": 10, "width": 50, "height": 30}',
+                        '[{"type": "rect", "x": 10, "y": 10, "width": 50, "height": 30}]',
+                        'simple test',
+                        '',
+                    ];
+                    
+                    for (let i = 0; i < testInputs.length; i++) {
+                        const testInput = testInputs[i];
+                        console.log(`\nTest ${i + 1}: Input = "${testInput}"`);
+                        
+                        try {
+                            const result = engine.create_diagram(testInput);
+                            console.log(`Test ${i + 1} result:`, result);
+                            console.log(`Test ${i + 1} result type:`, typeof result);
+                            console.log(`Test ${i + 1} result length:`, result ? result.length : 'N/A');
+                            
+                            if (result !== undefined && result !== null) {
+                                updateStatus(`✅ Test ${i + 1} succeeded! Result type: ${typeof result}, length: ${result.length || 'N/A'}`, 'success');
+                                
+                                // Show the result
+                                displaySvg(result);
+                                return; // Exit on first success
+                            }
+                        } catch (error) {
+                            console.log(`Test ${i + 1} error:`, error);
+                        }
+                    }
+                    
+                    updateStatus('❌ All create_diagram tests returned undefined/null', 'error');
+                } else {
+                    updateStatus('❌ create_diagram method not found on engine', 'error');
+                }
+
+                // Test 5: Try other methods
+                if (typeof engine.clear === 'function') {
+                    console.log('Testing clear method...');
+                    const clearResult = engine.clear();
+                    console.log('Clear result:', clearResult);
+                }
+
+            } catch (error) {
+                updateStatus(`❌ Engine test error: ${error.message}`, 'error');
+                console.error('Engine test error:', error);
+            }
+        };
+
+        // Clear input
+        window.clearInput = function() {
+            document.getElementById('jsonl-input').value = '';
+            updateStatus('🗑️ Input cleared.', 'info');
+        };
+
+        // Download SVG
+        window.downloadSvg = function() {
+            if (!currentSvgContent) {
+                updateStatus('⚠️ No SVG to download. Render something first.', 'error');
+                return;
+            }
+
+            const blob = new Blob([currentSvgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'volare-output.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            updateStatus('💾 SVG downloaded!', 'success');
+        };
+
+        // Copy SVG to clipboard
+        window.copyToClipboard = async function() {
+            if (!currentSvgContent) {
+                updateStatus('⚠️ No SVG to copy. Render something first.', 'error');
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(currentSvgContent);
+                updateStatus('📋 SVG copied to clipboard!', 'success');
+            } catch (error) {
+                updateStatus('❌ Failed to copy to clipboard.', 'error');
+            }
+        };
+
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            updateStatus('🔄 Loading WASM module...', 'info');
+            await initWasm();
+        });
+
+        // Add keyboard shortcut for rendering
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                renderSvg();
+            }
+        });
+    </script>
+</body>
+</html>
