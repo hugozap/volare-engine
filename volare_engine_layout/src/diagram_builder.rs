@@ -634,6 +634,10 @@ impl DiagramBuilder {
         &self.texts[&id]
     }
 
+    pub fn add_text(&mut self, id: EntityID, text: ShapeText) {
+        self.texts.insert(id, text);
+    }
+
     pub fn get_group(&self, id: EntityID) -> &ShapeGroup {
         &self.groups[&id]
     }
@@ -660,6 +664,12 @@ impl DiagramBuilder {
 
     pub fn get_text_line(&self, id: EntityID) -> &TextLine {
         &self.textlines[&id]
+    }
+    pub fn add_text_line(&mut self, id: EntityID, text_line: TextLine) {
+        self.textlines.insert(id, text_line);
+    }
+    pub fn get_text_line_mut(&mut self, id: EntityID) -> Option<&mut TextLine> {
+        self.textlines.get_mut(&id)
     }
 
     pub fn get_arrow(&self, id: EntityID) -> &ShapeArrow {

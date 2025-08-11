@@ -7,7 +7,7 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection,
+    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
     VerticalAlignment,
 };
 
@@ -21,7 +21,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
 
     // Get the wrapped element dimensions
-    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
+    let mut wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
 
     // Calculate the box dimensions based on size behavior
@@ -41,30 +41,6 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
             wrapped_elem_size.0 + shape_box.box_options.padding * 2.0
         }
     };
-
-    let box_height = match shape_box.box_options.height_behavior {
-        SizeBehavior::Fixed(height) => {
-            // For fixed height, use the specified height
-            height
-        }
-        SizeBehavior::Content => {
-            // Content sizing - size based on wrapped element + padding (current behavior)
-            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
-        }
-        SizeBehavior::Grow => {
-            // TODO: Implement grow behavior in future iterations
-            // For now, fall back to content behavior
-            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
-        }
-    };
-
-    println!(
-        "Box: {}, width: {}, height: {}, padding: {}",
-        shape_box.entity, box_width, box_height, shape_box.box_options.padding
-    );
-
-    // Set the box dimensions
-    session.set_size(shape_box.entity.clone(), box_width, box_height);
 
     // Position the wrapped element within the box
     // For fixed sizing, we might want to center or align the content
@@ -106,6 +82,159 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
 
     // Update the wrapped element position
     session.set_position(shape_box.wrapped_entity.clone(), content_x, content_y);
+
+    // Auto - wrap text if box has fixed width
+    if let SizeBehavior::Fixed(fixed_width) = shape_box.box_options.width_behavior {
+        let wrapped_entity_type = session.entityTypes.get(&shape_box.wrapped_entity);
+        if let Some(EntityType::TextShape) = wrapped_entity_type {
+            let available_width = fixed_width - shape_box.box_options.padding * 2.0;
+            auto_wrap_text_in_box(session, &shape_box.wrapped_entity, available_width);
+            wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone());
+        }
+    }
+
+    // Now that the wrapped element size is set, we can set the box size
+    // this is needed in case the SizeBehavior is set to Content
+    let box_height = match shape_box.box_options.height_behavior {
+        SizeBehavior::Fixed(height) => {
+            // For fixed height, use the specified height
+            height
+        }
+        SizeBehavior::Content => {
+            // Content sizing - size based on wrapped element + padding (current behavior)
+            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+        }
+        SizeBehavior::Grow => {
+            // TODO: Implement grow behavior in future iterations
+            // For now, fall back to content behavior
+            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+        }
+    };
+
+    println!(
+        "Box: {}, width: {}, height: {}, padding: {}",
+        shape_box.entity, box_width, box_height, shape_box.box_options.padding
+    );
+
+    // Set the box dimensions
+    session.set_size(shape_box.entity.clone(), box_width, box_height);
+
+}
+fn calculate_optimal_line_width(
+    session: &DiagramBuilder, 
+    text: &str, 
+    text_options: &TextOptions, 
+    available_width: Float
+) -> usize {
+    // Binary search for optimal line_width
+    let mut min_width = 10;
+    let mut max_width = text.len();
+    let mut best_width = min_width;
+    
+    while min_width <= max_width {
+        let mid_width = (min_width + max_width) / 2;
+        
+        // Test this line_width
+        let mut test_options = text_options.clone();
+        test_options.line_width = mid_width;
+        
+        let wrapped_lines = textwrap::wrap(text, mid_width);
+        if wrapped_lines.is_empty() { break; }
+        
+        // Measure the widest line
+        let max_line_width = wrapped_lines.iter()
+            .map(|line| session.measure_text.unwrap()(line, &test_options).0)
+            .fold(0.0f32, |a, b| a.max(b));
+        
+        if max_line_width <= available_width {
+            best_width = mid_width;
+            min_width = mid_width + 1;  // Try wider
+        } else {
+            max_width = mid_width - 1;  // Try narrower
+        }
+    }
+    
+    best_width
+}
+
+// Add this function to layout.rs
+fn auto_wrap_text_in_box(
+    session: &mut DiagramBuilder,
+    text_entity_id: &EntityID,
+    available_width: Float,
+) {
+    // Get the current text shape
+    let text_shape = session.get_text(text_entity_id.clone()).clone();
+
+     // Calculate optimal line_width using actual text measurement
+    let new_line_width = calculate_optimal_line_width(
+        session, 
+        &text_shape.text, 
+        &text_shape.text_options, 
+        available_width
+    );
+    // Only re-layout if line_width changed significantly
+    if (new_line_width as i32 - text_shape.text_options.line_width as i32).abs() > 5 {
+        // Create new text options with updated line_width
+        let mut new_text_options = text_shape.text_options.clone();
+        new_text_options.line_width = new_line_width;
+
+        // Re-create text lines with new wrapping
+        let text_lines = textwrap::wrap(&text_shape.text, new_line_width);
+        let mut new_lines = Vec::new();
+
+        // Update existing lines or create new ones
+        for (i, line_text) in text_lines.iter().enumerate() {
+            let line_id = if i < text_shape.lines.len() {
+                // Reuse existing line
+                let existing_line_id = text_shape.lines[i].clone();
+                let existing_line = session.get_text_line_mut(existing_line_id.clone());
+                if let Some(existing_line) = existing_line {
+                    existing_line.text = line_text.to_string();
+                } else {
+                    println!(
+                        "Warning: Text line ID {} not found in session",
+                        existing_line_id
+                    );
+                    continue;
+                }
+                existing_line_id
+            } else {
+                // Create new line
+                // Note: here we are creating new elements on layout
+                let line_id = format!("{}-autowrap-line-{}", text_entity_id, i);
+                session.new_entity(line_id.clone(), EntityType::TextLine);
+                let text_line = TextLine {
+                    entity: line_id.clone(),
+                    text: line_text.to_string(),
+                };
+                session.add_text_line(line_id.clone(), text_line);
+                line_id
+            };
+            new_lines.push(line_id);
+        }
+
+        // Update the text shape with new options and lines
+        let updated_text_shape = ShapeText {
+            entity: text_shape.entity.clone(),
+            text: text_shape.text.clone(),
+            text_options: new_text_options,
+            lines: new_lines,
+        };
+
+        // Update the session with the new text shape
+        session.add_text(text_entity_id.clone(), updated_text_shape.clone());
+
+        // Re-layout the text with new dimensions
+        layout_text(session, &updated_text_shape);
+    }
+}
+
+// Helper function to estimate character width based on font
+fn estimate_char_width(text_options: &TextOptions) -> Float {
+    // Rough estimation: font_size * 0.6 for typical fonts
+    // You could make this more sophisticated based on font_family
+    text_options.font_size * 0.6
 }
 
 /**
@@ -130,34 +259,31 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
 }
 
 pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
-    // let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
-    // session.set_size(shape_text.entity, w, h);
-    /* for each line in lines, get the size and use it to position the next */
-    {
-        println!("Text: {:?}", shape_text);
-        let mut y = 0.0;
-        let mut max_line_width = 0.0;
-        for line in shape_text.lines.iter() {
-            println!("Line: {:?}", line);
-            let textLine = session.get_text_line(line.clone());
-            let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
-            if line_size.0 > max_line_width {
-                max_line_width = line_size.0;
-            }
-            session.set_position(line.clone(), 0.0, y);
-            session.set_size(line.clone(), line_size.0, line_size.1);
-            y += line_size.1 + shape_text.text_options.line_spacing as Float;
+    let mut y = 0.0;
+    let mut max_line_width = 0.0;
+    
+    for (i, line) in shape_text.lines.iter().enumerate() {
+        let textLine = session.get_text_line(line.clone());
+        let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
+        
+        if line_size.0 > max_line_width {
+            max_line_width = line_size.0;
         }
-        y -= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
-
-        println!("max_line_width: {}", max_line_width);
-        //set the size of the text element
-        println!(
-            "Setting size to text entity: {} - {} {}",
-            shape_text.entity, max_line_width, y
-        );
-        session.set_size(shape_text.entity.clone(), max_line_width, y);
+        
+        session.set_position(line.clone(), 0.0, y);
+        session.set_size(line.clone(), line_size.0, line_size.1);
+        
+        // Add line height
+        y += line_size.1;
+        
+        // Add line spacing ONLY between lines (not after the last line)
+        if i < shape_text.lines.len() - 1 {
+            y += shape_text.text_options.line_spacing;
+        }
     }
+    
+    // No need to subtract line spacing at the end
+    session.set_size(shape_text.entity.clone(), max_line_width, y);
 }
 
 pub fn layout_spacer(session: &mut DiagramBuilder, spacer: &ShapeSpacer) {
@@ -613,10 +739,8 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     //use methods in the layout module
     match root.entity_type {
         EntityType::SpacerShape => {
-             {
-                let spacer = session.get_spacer(root.entity_id.clone()).clone();
-                layout_spacer(session, &spacer);
-            }
+            let spacer = session.get_spacer(root.entity_id.clone()).clone();
+            layout_spacer(session, &spacer);
         }
         EntityType::TextShape => {
             {

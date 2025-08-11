@@ -1,0 +1,2 @@
+{"id":"test_box","type":"box","width":400,"padding":20,"children":["long_text"]}
+{"id":"long_text","type":"text","content":"This is a very long text that should automatically wrap to fit within the 400px box width with 20px padding on each side."}
