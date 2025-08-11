@@ -647,90 +647,142 @@ pub fn create_badge_component(
 
 /// Quote Block Component - Stylized quote with author attribution
 /// Example: {"type":"quote_block","text":"This changed everything","author":"CEO Jane Smith","style":"large"}
-pub fn create_quote_block_component(
+/// Quote Block Component - Stylized quote with author attribution
+/// Example: {"type":"quote_block","text":"This changed everything","author":"CEO Jane Smith","style":"large"}
+fn create_quote_block_component(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
 ) -> Result<diagram_builder::DiagramTreeNode, String> {
-    let id = get_string_attr(attrs, "id", &generate_unique_id("quote_block"));
-    let text = get_string_attr(attrs, "text", "Quote text");
-    let author = get_string_attr(attrs, "author", "");
-    let style = get_string_attr(attrs, "style", "default");
-    let width = get_float_attr(attrs, "width", 500.0);
+    println!("💬 Creating quote block component with attrs: {:?}", attrs);
 
-    // Style configurations
-    let (quote_size, author_size) = match style.as_str() {
-        "large" => (24.0, 16.0),
-        "small" => (14.0, 12.0),
-        _ => (18.0, 14.0), // default
+    // Extract attributes
+    let quote_text = get_string_attr(attrs, "text", "Quote text");
+    let author = get_string_attr(attrs, "author", "");
+    let width = get_float_attr(attrs, "width", 400.0);
+    let padding = get_float_attr(attrs, "padding", 20.0);
+    let style = get_string_attr(attrs, "style", "default"); // default, modern, minimal, elegant
+    let show_quote_marks = get_bool_attr(attrs, "show_quote_marks", true);
+    let font_size = get_float_attr(attrs, "font_size", 14.0);
+
+    let mut id = get_string_attr(attrs, "id", "");
+    if id.is_empty() {
+        id = uuid::Uuid::new_v4().to_string();
+    }
+
+    // Define styles based on variant
+    let (bg_color, border_color, text_color, author_color, border_width, border_radius) = match style.as_str() {
+        "modern" => ("#f8f9fa", "#007bff", "#333333", "#007bff", 2.0, 8.0),
+        "minimal" => ("#ffffff", "#e9ecef", "#2c3e50", "#6c757d", 1.0, 4.0),
+        "elegant" => ("#fefefe", "#d4af37", "#2c3e50", "#d4af37", 2.0, 12.0),
+        _ => ("#f5f5f5", "#6c757d", "#333333", "#666666", 1.0, 6.0), // default
     };
 
-    // Create quote mark
-    let quote_mark = builder.new_text(
-        format!("{}_mark", id),
-        "\"",
-        TextOptions {
-            font_family: "Arial".to_string(),
-            font_size: quote_size + 8.0,
-            text_color: "#007bff".to_string(),
-            line_width: 50,
-            line_spacing: 0.0,
-        },
-    );
+    // Calculate inner width for text wrapping (total width minus outer padding)
+    let text_width = width - (padding * 2.0);
 
-    // Create quote text
-    let quote_text = builder.new_text(
-        format!("{}_text", id),
-        &text,
+    let mut children = Vec::new();
+
+    // Create the main quote text with auto-wrapping
+    let quote_content = if show_quote_marks {
+        format!("\"{}\"", &quote_text)
+    } else {
+        quote_text.clone()
+    };
+
+    let quote_text_node = builder.new_text(
+        format!("{}_quote_text", id),
+        &quote_content,
         TextOptions {
-            font_family: "Arial".to_string(),
-            font_size: quote_size,
-            text_color: "#333333".to_string(),
-            line_width: (width - 40.0) as usize,
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size,
+            text_color: text_color.to_string(),
+            line_width: 200, // This will be overridden by the box auto-wrapping
             line_spacing: 4.0,
         },
     );
 
-    let mut children = vec![quote_mark, quote_text];
+    // CRITICAL: Wrap the quote text in its own fixed-width box for auto-wrapping
+    let quote_text_box = builder.new_box(
+        format!("{}_quote_text_box", id),
+        quote_text_node,
+        BoxOptions {
+            fill_color: Fill::Color("transparent".to_string()),
+            stroke_color: "transparent".to_string(),
+            stroke_width: 0.0,
+            padding: 0.0,
+            border_radius: 0.0,
+            width_behavior: SizeBehavior::Fixed(text_width), // Fixed width enables auto-wrapping
+            height_behavior: SizeBehavior::Content,
+        },
+    );
+    children.push(quote_text_box);
 
-    // Add author if provided
+    // Add author attribution if provided
     if !author.is_empty() {
-        let author_text = builder.new_text(
+        let author_text = format!("— {}", &author);
+        let author_node = builder.new_text(
             format!("{}_author", id),
-            &format!("-- {}", author),
+            &author_text,
             TextOptions {
-                font_family: "Arial".to_string(),
-                font_size: author_size,
-                text_color: "#666666".to_string(),
-                line_width: (width - 40.0) as usize,
+                font_family: "AnonymicePro Nerd Font".to_string(),
+                font_size: font_size * 0.85, // Slightly smaller than quote text
+                text_color: author_color.to_string(),
+                line_width: 200, // This will be overridden by the box auto-wrapping
                 line_spacing: 0.0,
             },
         );
-        children.push(author_text);
+
+        // CRITICAL: Wrap the author text in its own fixed-width box for auto-wrapping
+        let author_text_box = builder.new_box(
+            format!("{}_author_text_box", id),
+            author_node,
+            BoxOptions {
+                fill_color: Fill::Color("transparent".to_string()),
+                stroke_color: "transparent".to_string(),
+                stroke_width: 0.0,
+                padding: 0.0,
+                border_radius: 0.0,
+                width_behavior: SizeBehavior::Fixed(text_width), // Fixed width enables auto-wrapping
+                height_behavior: SizeBehavior::Content,
+            },
+        );
+        children.push(author_text_box);
     }
 
-    // Layout content
-    let content = builder.new_vstack(
+    // Create vertical layout for the wrapped text boxes
+    let content_stack = builder.new_vstack(
         format!("{}_content", id),
         children,
-        HorizontalAlignment::Left,
+        HorizontalAlignment::Left, // Left-align for natural reading flow
     );
 
-    // Wrap in styled container
-    Ok(builder.new_box(
+    // Create the outer styled container
+    let quote_box = builder.new_box(
         id,
-        content,
+        content_stack,
         BoxOptions {
-            fill_color: Fill::Color("#f8f9fa".to_string()),
-            stroke_color: "#007bff".to_string(),
-            stroke_width: 2.0,
-            padding: 20.0,
-            border_radius: 8.0,
-            width_behavior: SizeBehavior::Fixed(width),
-            height_behavior: SizeBehavior::Content,
+            fill_color: Fill::Color(bg_color.to_string()),
+            stroke_color: border_color.to_string(),
+            stroke_width: border_width,
+            padding,
+            border_radius,
+            width_behavior: SizeBehavior::Fixed(width), // Overall fixed width
+            height_behavior: SizeBehavior::Content,     // Content height accommodates wrapped text
         },
-    ))
-}
+    );
 
+    let quote_preview = if quote_text.len() > 30 { 
+        format!("{}...", &quote_text[..30]) 
+    } else { 
+        quote_text.clone() 
+    };
+
+    println!("✅ Quote block '{}' created with auto-wrapping at {}px width", 
+             quote_preview, 
+             width);
+    
+    Ok(quote_box)
+}
 // ============================================================================
 // REGISTRATION FUNCTION
 // ============================================================================

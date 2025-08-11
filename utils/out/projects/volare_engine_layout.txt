@@ -20,6 +20,336 @@ version = 3
 name = "layout-base"
 version = "0.1.0"
 
+===/docs/JSONL Diagram Specification.md===
+# JSONL Diagram Specification
+v1.0
+
+This specification describes the JSON Lines format for creating diagrams using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+
+## Basic Structure
+
+Each entity follows this format:
+```json
+{"id": "unique_id", "type": "entity_type", "attribute1": "value1", "attribute2": "value2"}
+```
+
+## Core Entity Types
+
+### Text (`"type": "text"`)
+Renders text content with styling options.
+
+**Required Attributes:**
+- `content` or `text` - The text to display
+
+**Optional Attributes:**
+- `font_size` (number) - Font size in pixels (default: 12)
+- `color` or `text_color` (string) - Text color (default: "black")
+- `font_family` (string) - Font family name (default: "Arial")
+- `line_width` (number) - Maximum characters per line for wrapping (default: 200)
+- `line_spacing` (number) - Space between lines (default: 0)
+
+**Example:**
+```json
+{"id":"title","type":"text","content":"Hello World","font_size":24,"color":"blue"}
+```
+
+### Box (`"type": "box"`)
+Wraps another element with padding, background, and border.
+
+**Required Attributes:**
+- `children` (array) - Array with exactly one child element ID
+
+**Optional Attributes:**
+- `padding` (number) - Inner padding (default: 0)
+- `background`, `background_color`, or `fill` (string) - Background color (default: "white")
+- `border_color` or `stroke_color` (string) - Border color (default: "black")
+- `border_width` or `stroke_width` (number) - Border thickness (default: 1)
+- `border_radius` (number) - Corner radius for rounded corners (default: 0)
+- `width` (number or string) - Width behavior: number for fixed, "content" for auto, "grow" for fill
+- `height` (number or string) - Height behavior: number for fixed, "content" for auto, "grow" for fill
+
+**Example:**
+```json
+{"id":"container","type":"box","padding":10,"background":"lightblue","children":["text1"]}
+```
+
+
+**Automatic Text Wrapping:**
+When a box has a fixed width and contains text, the text will automatically wrap to fit within the available space (box width minus padding). This ensures text never overflows the box boundaries.
+
+**Example:**
+```json
+{"id":"container","type":"box","width":400,"padding":20,"children":["long_text"]}
+{"id":"long_text","type":"text","content":"This long text will automatically wrap to fit within the 400px box width"}
+
+### Rectangle (`"type": "rect"`)
+A standalone rectangle shape.
+
+**Optional Attributes:**
+- `width` (number or string) - Width (default: 100)
+- `height` (number or string) - Height (default: 100)
+- `background`, `background_color`, or `fill` (string) - Fill color (default: "white")
+- `border_color` or `stroke_color` (string) - Border color (default: "black")
+- `border_width` or `stroke_width` (number) - Border thickness (default: 1)
+- `border_radius` (number) - Corner radius (default: 0)
+
+**Example:**
+```json
+{"id":"rect1","type":"rect","width":150,"height":100,"background":"red"}
+```
+
+### Vertical Stack (`"type": "vstack"`)
+Arranges children vertically.
+
+**Required Attributes:**
+- `children` (array) - Array of child element IDs
+
+**Optional Attributes:**
+- `h_align` or `horizontal_alignment` (string) - Horizontal alignment: "left", "center", "right" (default: "center")
+
+**Example:**
+```json
+{"id":"stack","type":"vstack","children":["item1","item2","item3"],"h_align":"left"}
+```
+
+### Horizontal Stack (`"type": "hstack"`)
+Arranges children horizontally.
+
+**Required Attributes:**
+- `children` (array) - Array of child element IDs
+
+**Optional Attributes:**
+- `v_align` or `vertical_alignment` (string) - Vertical alignment: "top", "center", "bottom" (default: "center")
+
+**Example:**
+```json
+{"id":"row","type":"hstack","children":["col1","col2","col3"],"v_align":"top"}
+```
+
+### Group (`"type": "group"`)
+Groups elements together without layout constraints.
+
+**Required Attributes:**
+- `children` (array) - Array of child element IDs
+
+**Example:**
+```json
+{"id":"group1","type":"group","children":["elem1","elem2"]}
+```
+
+## Shape Types
+
+### Line (`"type": "line"`)
+Draws a straight line between two points.
+
+**Required Attributes:**
+- `start_x` or `x1` (number) - Starting X coordinate
+- `start_y` or `y1` (number) - Starting Y coordinate
+- `end_x` or `x2` (number) - Ending X coordinate
+- `end_y` or `y2` (number) - Ending Y coordinate
+
+**Optional Attributes:**
+- `stroke_color` or `color` (string) - Line color (default: "black")
+- `stroke_width` (number) - Line thickness (default: 1)
+
+**Example:**
+```json
+{"id":"line1","type":"line","start_x":0,"start_y":0,"end_x":100,"end_y":50,"stroke_color":"blue"}
+```
+
+### Ellipse (`"type": "ellipse"`)
+Draws an ellipse or circle.
+
+**Required Attributes:**
+- `cx` or `center_x` (number) - Center X coordinate
+- `cy` or `center_y` (number) - Center Y coordinate
+- `rx` or `radius_x` (number) - Horizontal radius
+- `ry` or `radius_y` (number) - Vertical radius
+
+**Optional Attributes:**
+- `fill`, `fill_color`, or `background` (string) - Fill color (default: "white")
+- `stroke`, `stroke_color`, or `border_color` (string) - Border color (default: "black")
+- `stroke_width` or `border_width` (number) - Border thickness (default: 1)
+
+**Example:**
+```json
+{"id":"circle","type":"ellipse","cx":50,"cy":50,"rx":25,"ry":25,"fill":"yellow"}
+```
+
+### Arc (`"type": "arc"`)
+Draws an arc segment.
+
+**Required Attributes:**
+- `cx` or `center_x` (number) - Center X coordinate
+- `cy` or `center_y` (number) - Center Y coordinate
+- `radius` or `r` (number) - Arc radius
+- `start_angle` or `start` (number) - Start angle in degrees
+- `end_angle` or `end` (number) - End angle in degrees
+
+**Optional Attributes:**
+- `fill` or `fill_color` (string) - Fill color (default: "none")
+- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
+- `stroke_width` (number) - Stroke thickness (default: 1)
+- `filled` (boolean) - Whether to fill the arc sector (default: false)
+
+**Example:**
+```json
+{"id":"arc1","type":"arc","cx":100,"cy":100,"radius":50,"start_angle":0,"end_angle":90,"stroke_color":"red","filled":true}
+```
+
+### Semicircle (`"type": "semicircle"`)
+Draws a semicircle (180° arc).
+
+**Required Attributes:**
+- `cx` or `center_x` (number) - Center X coordinate
+- `cy` or `center_y` (number) - Center Y coordinate
+- `radius` or `r` (number) - Semicircle radius
+
+**Optional Attributes:**
+- `facing_up` or `up` (boolean) - True for top semicircle, false for bottom (default: true)
+- `fill` or `fill_color` (string) - Fill color (default: "none")
+- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
+- `stroke_width` (number) - Stroke thickness (default: 1)
+- `filled` (boolean) - Whether to fill the semicircle (default: false)
+
+**Example:**
+```json
+{"id":"semi1","type":"semicircle","cx":100,"cy":100,"radius":40,"facing_up":false,"fill":"green"}
+```
+
+### Quarter Circle (`"type": "quarter_circle"`)
+Draws a quarter circle (90° arc).
+
+**Required Attributes:**
+- `cx` or `center_x` (number) - Center X coordinate
+- `cy` or `center_y` (number) - Center Y coordinate
+- `radius` or `r` (number) - Quarter circle radius
+- `quadrant` (number) - Quadrant: 1=top-right, 2=top-left, 3=bottom-left, 4=bottom-right
+
+**Optional Attributes:**
+- `fill` or `fill_color` (string) - Fill color (default: "none")
+- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
+- `stroke_width` (number) - Stroke thickness (default: 1)
+- `filled` (boolean) - Whether to fill the quarter circle (default: false)
+
+**Example:**
+```json
+{"id":"quarter1","type":"quarter_circle","cx":50,"cy":50,"radius":30,"quadrant":1,"fill":"orange"}
+```
+
+### Polyline (`"type": "polyline"`)
+Draws connected line segments.
+
+**Required Attributes:**
+- `points` (array) - Array of [x, y] coordinate pairs
+
+**Optional Attributes:**
+- `stroke_color` or `color` (string) - Line color (default: "black")
+- `stroke_width` (number) - Line thickness (default: 1)
+
+**Example:**
+```json
+{"id":"poly1","type":"polyline","points":[[0,0],[50,25],[100,0],[150,50]],"stroke_color":"purple"}
+```
+
+## Container Types
+
+### Table (`"type": "table"`)
+Arranges children in a grid layout.
+
+**Required Attributes:**
+- `children` (array) - Array of cell element IDs
+- `cols` or `columns` (number) - Number of columns
+
+**Optional Attributes:**
+- `header_fill_color` or `header_background` (string) - Header row background (default: "lightgray")
+- `fill_color` or `background` (string) - Table background (default: "white")
+- `border_color` (string) - Border color (default: "black")
+- `border_width` (number) - Border thickness (default: 1)
+- `cell_padding` or `padding` (number) - Cell padding (default: 20)
+
+**Example:**
+```json
+{"id":"table1","type":"table","children":["cell1","cell2","cell3","cell4"],"cols":2,"cell_padding":15}
+```
+
+### Free Container (`"type": "free_container"`)
+Allows absolute positioning of children.
+
+**Required Attributes:**
+- `children` (array) - Array of child element IDs
+
+**Child Positioning:**
+Each child element should have `x` and `y` attributes for positioning within the container.
+
+**Optional Container Attributes:**
+- `width` (number) - Container width
+- `height` (number) - Container height
+- `background` or `background_color` (string) - Background color
+- `border_color` (string) - Border color
+- `border_width` (number) - Border thickness
+
+**Example:**
+```json
+{"id":"container","type":"free_container","width":400,"height":300,"children":["item1","item2"]}
+{"id":"item1","type":"text","content":"Positioned Text","x":50,"y":100}
+{"id":"item2","type":"rect","width":60,"height":40,"background":"blue","x":200,"y":150}
+```
+
+## Media Types
+
+### Image (`"type": "image"`)
+Displays an image from file or base64 data.
+
+**Required Attributes:**
+- `src` (string) - Base64 image data, OR
+- `file_path` (string) - Path to image file
+
+**Optional Attributes:**
+- `width` (number or string) - Image width
+- `height` (number or string) - Image height
+
+**Example:**
+```json
+{"id":"img1","type":"image","file_path":"assets/logo.png","width":200,"height":150}
+```
+
+## Size Behaviors
+
+For `width` and `height` attributes, you can use:
+
+- **Number** - Fixed size in pixels: `"width": 200`
+- **"content"** or **"auto"** - Size based on content: `"width": "content"`
+- **"grow"** - Take all available space: `"width": "grow"`
+
+## Color Values
+
+Colors can be specified as:
+- Named colors: `"red"`, `"blue"`, `"lightgray"`
+- Hex colors: `"#FF0000"`, `"#0066CC"`
+- RGB colors: `"rgb(255,0,0)"`
+
+## Custom Components
+
+The system supports custom components registered by the application. These components can accept any attributes defined by their implementation.
+
+## Complete Example
+
+```json
+{"id":"root","type":"vstack","children":["header","content","footer"],"h_align":"center"}
+{"id":"header","type":"box","padding":15,"background":"#f0f0f0","children":["title"]}
+{"id":"title","type":"text","content":"My Document","font_size":24,"color":"darkblue"}
+{"id":"content","type":"hstack","children":["sidebar","main"],"v_align":"top"}
+{"id":"sidebar","type":"vstack","children":["nav1","nav2","nav3"],"h_align":"left"}
+{"id":"nav1","type":"text","content":"Home","color":"blue"}
+{"id":"nav2","type":"text","content":"About","color":"blue"}
+{"id":"nav3","type":"text","content":"Contact","color":"blue"}
+{"id":"main","type":"box","padding":20,"background":"white","children":["article"]}
+{"id":"article","type":"text","content":"This is the main content area with longer text that will wrap to multiple lines.","line_width":300}
+{"id":"footer","type":"text","content":"© 2024 My Company","font_size":10,"color":"gray"}
+```
+
+This creates a document layout with header, sidebar navigation, main content area, and footer.
 ===/.gitignore===
 /target
 /Cargo.lock
@@ -63,7 +393,10 @@ use crate::{
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
     ShapeLine, ShapeText, Table, VerticalStack,
 };
-use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
+use crate::{
+    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
+    VerticalAlignment,
+};
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
@@ -75,7 +408,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
 
     // Get the wrapped element dimensions
-    let wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
+    let mut wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
 
     // Calculate the box dimensions based on size behavior
@@ -95,30 +428,6 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
             wrapped_elem_size.0 + shape_box.box_options.padding * 2.0
         }
     };
-
-    let box_height = match shape_box.box_options.height_behavior {
-        SizeBehavior::Fixed(height) => {
-            // For fixed height, use the specified height
-            height
-        }
-        SizeBehavior::Content => {
-            // Content sizing - size based on wrapped element + padding (current behavior)
-            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
-        }
-        SizeBehavior::Grow => {
-            // TODO: Implement grow behavior in future iterations
-            // For now, fall back to content behavior
-            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
-        }
-    };
-
-    println!(
-        "Box: {}, width: {}, height: {}, padding: {}",
-        shape_box.entity, box_width, box_height, shape_box.box_options.padding
-    );
-
-    // Set the box dimensions
-    session.set_size(shape_box.entity.clone(), box_width, box_height);
 
     // Position the wrapped element within the box
     // For fixed sizing, we might want to center or align the content
@@ -160,6 +469,159 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
 
     // Update the wrapped element position
     session.set_position(shape_box.wrapped_entity.clone(), content_x, content_y);
+
+    // Auto - wrap text if box has fixed width
+    if let SizeBehavior::Fixed(fixed_width) = shape_box.box_options.width_behavior {
+        let wrapped_entity_type = session.entityTypes.get(&shape_box.wrapped_entity);
+        if let Some(EntityType::TextShape) = wrapped_entity_type {
+            let available_width = fixed_width - shape_box.box_options.padding * 2.0;
+            auto_wrap_text_in_box(session, &shape_box.wrapped_entity, available_width);
+            wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone());
+        }
+    }
+
+    // Now that the wrapped element size is set, we can set the box size
+    // this is needed in case the SizeBehavior is set to Content
+    let box_height = match shape_box.box_options.height_behavior {
+        SizeBehavior::Fixed(height) => {
+            // For fixed height, use the specified height
+            height
+        }
+        SizeBehavior::Content => {
+            // Content sizing - size based on wrapped element + padding (current behavior)
+            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+        }
+        SizeBehavior::Grow => {
+            // TODO: Implement grow behavior in future iterations
+            // For now, fall back to content behavior
+            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+        }
+    };
+
+    println!(
+        "Box: {}, width: {}, height: {}, padding: {}",
+        shape_box.entity, box_width, box_height, shape_box.box_options.padding
+    );
+
+    // Set the box dimensions
+    session.set_size(shape_box.entity.clone(), box_width, box_height);
+
+}
+fn calculate_optimal_line_width(
+    session: &DiagramBuilder, 
+    text: &str, 
+    text_options: &TextOptions, 
+    available_width: Float
+) -> usize {
+    // Binary search for optimal line_width
+    let mut min_width = 10;
+    let mut max_width = text.len();
+    let mut best_width = min_width;
+    
+    while min_width <= max_width {
+        let mid_width = (min_width + max_width) / 2;
+        
+        // Test this line_width
+        let mut test_options = text_options.clone();
+        test_options.line_width = mid_width;
+        
+        let wrapped_lines = textwrap::wrap(text, mid_width);
+        if wrapped_lines.is_empty() { break; }
+        
+        // Measure the widest line
+        let max_line_width = wrapped_lines.iter()
+            .map(|line| session.measure_text.unwrap()(line, &test_options).0)
+            .fold(0.0f32, |a, b| a.max(b));
+        
+        if max_line_width <= available_width {
+            best_width = mid_width;
+            min_width = mid_width + 1;  // Try wider
+        } else {
+            max_width = mid_width - 1;  // Try narrower
+        }
+    }
+    
+    best_width
+}
+
+// Add this function to layout.rs
+fn auto_wrap_text_in_box(
+    session: &mut DiagramBuilder,
+    text_entity_id: &EntityID,
+    available_width: Float,
+) {
+    // Get the current text shape
+    let text_shape = session.get_text(text_entity_id.clone()).clone();
+
+     // Calculate optimal line_width using actual text measurement
+    let new_line_width = calculate_optimal_line_width(
+        session, 
+        &text_shape.text, 
+        &text_shape.text_options, 
+        available_width
+    );
+    // Only re-layout if line_width changed significantly
+    if (new_line_width as i32 - text_shape.text_options.line_width as i32).abs() > 5 {
+        // Create new text options with updated line_width
+        let mut new_text_options = text_shape.text_options.clone();
+        new_text_options.line_width = new_line_width;
+
+        // Re-create text lines with new wrapping
+        let text_lines = textwrap::wrap(&text_shape.text, new_line_width);
+        let mut new_lines = Vec::new();
+
+        // Update existing lines or create new ones
+        for (i, line_text) in text_lines.iter().enumerate() {
+            let line_id = if i < text_shape.lines.len() {
+                // Reuse existing line
+                let existing_line_id = text_shape.lines[i].clone();
+                let existing_line = session.get_text_line_mut(existing_line_id.clone());
+                if let Some(existing_line) = existing_line {
+                    existing_line.text = line_text.to_string();
+                } else {
+                    println!(
+                        "Warning: Text line ID {} not found in session",
+                        existing_line_id
+                    );
+                    continue;
+                }
+                existing_line_id
+            } else {
+                // Create new line
+                // Note: here we are creating new elements on layout
+                let line_id = format!("{}-autowrap-line-{}", text_entity_id, i);
+                session.new_entity(line_id.clone(), EntityType::TextLine);
+                let text_line = TextLine {
+                    entity: line_id.clone(),
+                    text: line_text.to_string(),
+                };
+                session.add_text_line(line_id.clone(), text_line);
+                line_id
+            };
+            new_lines.push(line_id);
+        }
+
+        // Update the text shape with new options and lines
+        let updated_text_shape = ShapeText {
+            entity: text_shape.entity.clone(),
+            text: text_shape.text.clone(),
+            text_options: new_text_options,
+            lines: new_lines,
+        };
+
+        // Update the session with the new text shape
+        session.add_text(text_entity_id.clone(), updated_text_shape.clone());
+
+        // Re-layout the text with new dimensions
+        layout_text(session, &updated_text_shape);
+    }
+}
+
+// Helper function to estimate character width based on font
+fn estimate_char_width(text_options: &TextOptions) -> Float {
+    // Rough estimation: font_size * 0.6 for typical fonts
+    // You could make this more sophisticated based on font_family
+    text_options.font_size * 0.6
 }
 
 /**
@@ -184,34 +646,41 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
 }
 
 pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
-    // let (w, h) = session.measure_text.unwrap()(&shape_text.text, &shape_text.text_options);
-    // session.set_size(shape_text.entity, w, h);
-    /* for each line in lines, get the size and use it to position the next */
-    {
-        println!("Text: {:?}", shape_text);
-        let mut y = 0.0;
-        let mut max_line_width = 0.0;
-        for line in shape_text.lines.iter() {
-            println!("Line: {:?}", line);
-            let textLine = session.get_text_line(line.clone());
-            let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
-            if line_size.0 > max_line_width {
-                max_line_width = line_size.0;
-            }
-            session.set_position(line.clone(), 0.0, y);
-            session.set_size(line.clone(), line_size.0, line_size.1);
-            y += line_size.1 + shape_text.text_options.line_spacing as Float;
+    let mut y = 0.0;
+    let mut max_line_width = 0.0;
+    
+    for (i, line) in shape_text.lines.iter().enumerate() {
+        let textLine = session.get_text_line(line.clone());
+        let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
+        
+        if line_size.0 > max_line_width {
+            max_line_width = line_size.0;
         }
-        y -= shape_text.text_options.line_spacing as Float; // Adjust for the last line spacing
-
-        println!("max_line_width: {}", max_line_width);
-        //set the size of the text element
-        println!(
-            "Setting size to text entity: {} - {} {}",
-            shape_text.entity, max_line_width, y
-        );
-        session.set_size(shape_text.entity.clone(), max_line_width, y);
+        
+        session.set_position(line.clone(), 0.0, y);
+        session.set_size(line.clone(), line_size.0, line_size.1);
+        
+        // Add line height
+        y += line_size.1;
+        
+        // Add line spacing ONLY between lines (not after the last line)
+        if i < shape_text.lines.len() - 1 {
+            y += shape_text.text_options.line_spacing;
+        }
     }
+    
+    // No need to subtract line spacing at the end
+    session.set_size(shape_text.entity.clone(), max_line_width, y);
+}
+
+pub fn layout_spacer(session: &mut DiagramBuilder, spacer: &ShapeSpacer) {
+    let (width, height) = match spacer.spacer_options.direction {
+        SpacerDirection::Horizontal => (spacer.spacer_options.width, 1.0),
+        SpacerDirection::Vertical => (1.0, spacer.spacer_options.height),
+        SpacerDirection::Both => (spacer.spacer_options.width, spacer.spacer_options.height),
+    };
+
+    session.set_size(spacer.entity.clone(), width, height);
 }
 
 /**
@@ -261,16 +730,16 @@ pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse
     // The ellipse size should be the full diameter
     let width = shape_ellipse.radius.0 * 2.0;
     let height = shape_ellipse.radius.1 * 2.0;
-    
+
     // Set the size for layout spacing calculations
     session.set_size(shape_ellipse.entity.clone(), width, height);
-    
+
     // Position at (0,0) - the layout system will position this appropriately
     session.set_position(shape_ellipse.entity.clone(), 0.0, 0.0);
-    
+
     // CRITICAL: The ellipse center coordinates (cx, cy) in the JSONL should be
     // set to (radius_x, radius_y) so the ellipse is centered in its bounding box
-    // 
+    //
     // For example:
     // - rx=20, ry=20 → cx should be 20, cy should be 20 (for a 40x40 box)
     // - rx=30, ry=15 → cx should be 30, cy should be 15 (for a 60x30 box)
@@ -656,6 +1125,10 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     //Once the children are laid out, we can layout the current element
     //use methods in the layout module
     match root.entity_type {
+        EntityType::SpacerShape => {
+            let spacer = session.get_spacer(root.entity_id.clone()).clone();
+            layout_spacer(session, &spacer);
+        }
         EntityType::TextShape => {
             {
                 //get the Shape text entity
@@ -865,13 +1338,12 @@ pub mod parser;
 
 
 ===/src/components/mod.rs===
-
 pub mod table;
 
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
-use serde_json::{Value, Map};
+use serde_json::{Map, Value};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -879,7 +1351,6 @@ pub type EntityID = String;
 pub type Float = f32;
 
 //Export table and table options
-
 
 pub trait Entity {
     fn get_id(&self) -> EntityID;
@@ -950,6 +1421,7 @@ pub enum EntityType {
     PolyLine,
     FreeContainer,
     ArcShape,
+    SpacerShape,
 }
 
 #[derive(Debug, Copy, PartialEq)]
@@ -968,9 +1440,7 @@ impl Default for SizeBehavior {
     }
 }
 
-impl Eq for SizeBehavior {
-
-}
+impl Eq for SizeBehavior {}
 
 impl Clone for SizeBehavior {
     fn clone(&self) -> Self {
@@ -987,6 +1457,70 @@ impl SizeBehavior {
         match self {
             SizeBehavior::Fixed(val) => Ok(*val),
             _ => Err("Called unwrap_fixed on non-Fixed SizeBehavior"),
+        }
+    }
+}
+
+// Add spacer component
+pub struct ShapeSpacer {
+    pub entity: EntityID,
+    pub spacer_options: SpacerOptions,
+}
+
+impl ShapeSpacer {
+    pub fn new(entity: EntityID, spacer_options: SpacerOptions) -> ShapeSpacer {
+        ShapeSpacer {
+            entity,
+            spacer_options,
+        }
+    }
+}
+
+impl Clone for ShapeSpacer {
+    fn clone(&self) -> Self {
+        ShapeSpacer {
+            entity: self.entity.clone(),
+            spacer_options: self.spacer_options.clone(),
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct SpacerOptions {
+    pub width: Float,
+    pub height: Float,
+    pub direction: SpacerDirection, // Horizontal, Vertical, or Both
+}
+
+impl Clone for SpacerOptions {
+    fn clone(&self) -> Self {
+        SpacerOptions {
+            width: self.width,
+            height: self.height,
+            direction: self.direction.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SpacerDirection {
+    Horizontal, // Takes up width, minimal height
+    Vertical,   // Takes up height, minimal width
+    Both,       // Takes up both dimensions
+}
+
+impl Default for SpacerDirection {
+    fn default() -> Self {
+        SpacerDirection::Vertical
+    }
+}
+
+impl Clone for SpacerDirection {
+    fn clone(&self) -> Self {
+        match self {
+            SpacerDirection::Horizontal => SpacerDirection::Horizontal,
+            SpacerDirection::Vertical => SpacerDirection::Vertical,
+            SpacerDirection::Both => SpacerDirection::Both,
         }
     }
 }
@@ -1029,7 +1563,7 @@ impl Entity for ShapeBox {
 impl ShapeBox {
     pub fn new(entity: EntityID, wrapped_entity: EntityID, box_options: BoxOptions) -> ShapeBox {
         ShapeBox {
-            entity,            
+            entity,
             wrapped_entity,
             box_options,
         }
@@ -1109,8 +1643,6 @@ impl Clone for LinearGradient {
     }
 }
 
-
-
 #[derive(Debug)]
 pub enum Fill {
     Color(String),
@@ -1172,10 +1704,7 @@ impl Eq for LinearGradient {}
 
 impl PartialEq for RadialGradient {
     fn eq(&self, other: &Self) -> bool {
-        self.cx == other.cx
-            && self.cy == other.cy
-            && self.r == other.r
-            && self.stops == other.stops
+        self.cx == other.cx && self.cy == other.cy && self.r == other.r && self.stops == other.stops
     }
 }
 
@@ -1185,12 +1714,24 @@ impl PartialEq for GradientStop {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (
-                GradientStop::ColorStop { offset: a_offset, color: a_color },
-                GradientStop::ColorStop { offset: b_offset, color: b_color },
+                GradientStop::ColorStop {
+                    offset: a_offset,
+                    color: a_color,
+                },
+                GradientStop::ColorStop {
+                    offset: b_offset,
+                    color: b_color,
+                },
             ) => a_offset == b_offset && a_color == b_color,
             (
-                GradientStop::OpacityStop { offset: a_offset, opacity: a_opacity },
-                GradientStop::OpacityStop { offset: b_offset, opacity: b_opacity },
+                GradientStop::OpacityStop {
+                    offset: a_offset,
+                    opacity: a_opacity,
+                },
+                GradientStop::OpacityStop {
+                    offset: b_offset,
+                    opacity: b_opacity,
+                },
             ) => a_offset == b_offset && a_opacity == b_opacity,
             _ => false,
         }
@@ -1206,7 +1747,7 @@ pub struct BoxOptions {
     pub stroke_width: Float,
     pub padding: Float,
     pub border_radius: Float,
-        // Add size behavior fields
+    // Add size behavior fields
     pub width_behavior: SizeBehavior,
     pub height_behavior: SizeBehavior,
 }
@@ -1221,7 +1762,6 @@ impl Clone for BoxOptions {
             border_radius: self.border_radius,
             width_behavior: self.width_behavior.clone(),
             height_behavior: self.height_behavior.clone(),
-
         }
     }
 }
@@ -1246,8 +1786,6 @@ impl BoxOptions {
     }
 }
 
-
-
 /* A group of entities */
 
 //RectOptions
@@ -1265,7 +1803,7 @@ impl Clone for RectOptions {
     fn clone(&self) -> Self {
         RectOptions {
             width_behavior: self.width_behavior.clone(),
-            height_behavior: self.height_behavior.clone(), 
+            height_behavior: self.height_behavior.clone(),
             fill_color: self.fill_color.clone(),
             stroke_color: self.stroke_color.clone(),
             stroke_width: self.stroke_width,
@@ -1324,7 +1862,6 @@ impl Entity for ShapeRect {
         self
     }
 }
-
 
 /* A group of entities */
 pub struct ShapeGroup {
@@ -1404,9 +1941,13 @@ impl Clone for ShapeText {
     }
 }
 
-
 impl ShapeText {
-    pub fn new(entity: EntityID, text: &str, text_options: TextOptions, lines: &[EntityID]) -> ShapeText {
+    pub fn new(
+        entity: EntityID,
+        text: &str,
+        text_options: TextOptions,
+        lines: &[EntityID],
+    ) -> ShapeText {
         ShapeText {
             entity,
             text: text.to_string(),
@@ -1415,8 +1956,6 @@ impl ShapeText {
         }
     }
 }
-
-
 
 impl Entity for ShapeText {
     fn get_id(&self) -> EntityID {
@@ -1481,13 +2020,13 @@ impl Clone for HorizontalAlignment {
             HorizontalAlignment::Right => HorizontalAlignment::Right,
         }
     }
-}   
+}
 
 pub struct VerticalStack {
     pub entity: EntityID,
     //List of entity ids
     pub elements: Vec<EntityID>,
-    pub horizontal_alignment: HorizontalAlignment
+    pub horizontal_alignment: HorizontalAlignment,
 }
 
 impl Clone for VerticalStack {
@@ -1495,7 +2034,7 @@ impl Clone for VerticalStack {
         VerticalStack {
             entity: self.entity.clone(),
             elements: self.elements.clone(),
-            horizontal_alignment: self.horizontal_alignment.clone()
+            horizontal_alignment: self.horizontal_alignment.clone(),
         }
     }
 }
@@ -1513,7 +2052,7 @@ impl Entity for VerticalStack {
         self
     }
 }
-    
+
 pub enum VerticalAlignment {
     Top,
     Center,
@@ -1528,7 +2067,7 @@ impl Clone for VerticalAlignment {
             VerticalAlignment::Bottom => VerticalAlignment::Bottom,
         }
     }
-}   
+}
 impl fmt::Display for VerticalAlignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1590,7 +2129,12 @@ impl Clone for ShapeLine {
 }
 
 impl ShapeLine {
-    pub fn new(line_id: EntityID, start: (Float, Float), end: (Float, Float), options: LineOptions) -> ShapeLine {
+    pub fn new(
+        line_id: EntityID,
+        start: (Float, Float),
+        end: (Float, Float),
+        options: LineOptions,
+    ) -> ShapeLine {
         ShapeLine {
             entity: line_id,
             start,
@@ -1599,7 +2143,6 @@ impl ShapeLine {
         }
     }
 }
-
 
 impl Entity for ShapeLine {
     fn get_id(&self) -> EntityID {
@@ -1646,7 +2189,11 @@ pub struct PolyLine {
 }
 
 impl PolyLine {
-    pub fn new(entity: EntityID, points: Vec<(Float, Float)>, line_options: LineOptions) -> PolyLine {
+    pub fn new(
+        entity: EntityID,
+        points: Vec<(Float, Float)>,
+        line_options: LineOptions,
+    ) -> PolyLine {
         PolyLine {
             entity,
             points,
@@ -1757,7 +2304,12 @@ impl Clone for ShapeEllipse {
 }
 
 impl ShapeEllipse {
-    pub fn new(entity: EntityID, center: (Float, Float), radius: (Float, Float), ellipse_options: EllipseOptions) -> ShapeEllipse {
+    pub fn new(
+        entity: EntityID,
+        center: (Float, Float),
+        radius: (Float, Float),
+        ellipse_options: EllipseOptions,
+    ) -> ShapeEllipse {
         ShapeEllipse {
             entity,
             center,
@@ -1809,8 +2361,6 @@ impl EllipseOptions {
     }
 }
 
-
-
 pub struct ShapeImage {
     pub entity: EntityID,
     //base64 encoded image or empty if using file_path
@@ -1818,7 +2368,7 @@ pub struct ShapeImage {
     //path to image file on disk (optional)
     pub file_path: Option<String>,
     pub width_behavior: SizeBehavior,
-    pub height_behavior: SizeBehavior
+    pub height_behavior: SizeBehavior,
 }
 
 impl Clone for ShapeImage {
@@ -1857,8 +2407,12 @@ impl ShapeImage {
             height_behavior: size.1,
         }
     }
-    
-    pub fn from_file(entity: EntityID, file_path: String, size: (SizeBehavior, SizeBehavior)) -> ShapeImage {
+
+    pub fn from_file(
+        entity: EntityID,
+        file_path: String,
+        size: (SizeBehavior, SizeBehavior),
+    ) -> ShapeImage {
         ShapeImage {
             entity,
             image: String::new(), // Empty as we're using file_path instead
@@ -1874,9 +2428,9 @@ impl ShapeImage {
 pub struct FreeContainer {
     pub entity: EntityID,
     pub children: Vec<(EntityID, (Float, Float))>, // Each child has a position relative to the container
-    pub background_color: Option<String>,      // Optional background color
-    pub border_color: Option<String>,          // Optional border color
-    pub border_width: Float,                    // Border width (0 for no border)
+    pub background_color: Option<String>,          // Optional background color
+    pub border_color: Option<String>,              // Optional border color
+    pub border_width: Float,                       // Border width (0 for no border)
 }
 
 impl Clone for FreeContainer {
@@ -1916,24 +2470,27 @@ impl FreeContainer {
             border_width: 0.0,
         }
     }
-    
+
     /// Add a child to the container at the specified position
     pub fn add_child(&mut self, child_id: EntityID, position: (Float, Float)) {
         self.children.push((child_id, position));
     }
-    
+
     /// Add multiple children at once with their positions
-    pub fn with_children(mut self, children_with_positions: Vec<(EntityID, (Float, Float))>) -> Self {
+    pub fn with_children(
+        mut self,
+        children_with_positions: Vec<(EntityID, (Float, Float))>,
+    ) -> Self {
         self.children.extend(children_with_positions);
         self
     }
-    
+
     /// Set background color
     pub fn with_background_color(mut self, color: &str) -> Self {
         self.background_color = Some(color.to_string());
         self
     }
-    
+
     /// Set border properties
     pub fn with_border(mut self, color: &str, width: Float) -> Self {
         self.border_color = Some(color.to_string());
@@ -1941,7 +2498,6 @@ impl FreeContainer {
         self
     }
 }
-
 
 // Arc options structure
 #[derive(Default, Debug)]
@@ -1977,10 +2533,10 @@ impl ArcOptions {
 // Arc shape structure
 pub struct ShapeArc {
     pub entity: EntityID,
-    pub center: (Float, Float),     // Center point of the arc
-    pub radius: Float,              // Radius of the arc
-    pub start_angle: Float,         // Start angle in degrees
-    pub end_angle: Float,           // End angle in degrees
+    pub center: (Float, Float), // Center point of the arc
+    pub radius: Float,          // Radius of the arc
+    pub start_angle: Float,     // Start angle in degrees
+    pub end_angle: Float,       // End angle in degrees
     pub arc_options: ArcOptions,
 }
 
@@ -2015,22 +2571,22 @@ impl ShapeArc {
             arc_options,
         }
     }
-    
+
     /// Normalize angles to 0-360 degree range
     pub fn normalize_angles(&self) -> (Float, Float) {
         let mut start = self.start_angle % 360.0;
         let mut end = self.end_angle % 360.0;
-        
+
         if start < 0.0 {
             start += 360.0;
         }
         if end < 0.0 {
             end += 360.0;
         }
-        
+
         (start, end)
     }
-    
+
     /// Calculate the angle sweep of the arc
     pub fn angle_sweep(&self) -> Float {
         let (start, end) = self.normalize_angles();
@@ -2040,7 +2596,7 @@ impl ShapeArc {
             360.0 - start + end
         }
     }
-    
+
     /// Check if this is a major arc (> 180 degrees)
     pub fn is_major_arc(&self) -> bool {
         self.angle_sweep() > 180.0
@@ -2061,11 +2617,17 @@ impl Entity for ShapeArc {
     }
 }
 
-
 /// Type alias for custom component factory functions
 /// Takes a map of attributes and a mutable reference to DiagramBuilder
 /// Returns a Result with either a DiagramTreeNode or an error message
-pub type CustomComponentFactory = Arc<dyn Fn(&Map<String, Value>, &mut crate::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync>;
+pub type CustomComponentFactory = Arc<
+    dyn Fn(
+            &Map<String, Value>,
+            &mut crate::DiagramBuilder,
+        ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+        + Send
+        + Sync,
+>;
 
 /// Registry for custom components
 pub struct CustomComponentRegistry {
@@ -2082,9 +2644,16 @@ impl CustomComponentRegistry {
     /// Register a new custom component with the given identifier and factory function
     pub fn register<F>(&mut self, component_type: &str, factory: F)
     where
-        F: Fn(&Map<String, Value>, &mut crate::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync + 'static,
+        F: Fn(
+                &Map<String, Value>,
+                &mut crate::DiagramBuilder,
+            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            + Send
+            + Sync
+            + 'static,
     {
-        self.factories.insert(component_type.to_string(), Arc::new(factory));
+        self.factories
+            .insert(component_type.to_string(), Arc::new(factory));
     }
 
     /// Create a component instance using the registered factory
@@ -2110,10 +2679,19 @@ impl CustomComponentRegistry {
         self.factories.keys().collect()
     }
 
-     pub fn get(
+    pub fn get(
         &self,
         component_type: &str,
-    ) -> Option<&Arc<dyn Fn(&serde_json::Map<String, serde_json::Value>, &mut crate::diagram_builder::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync>> {
+    ) -> Option<
+        &Arc<
+            dyn Fn(
+                    &serde_json::Map<String, serde_json::Value>,
+                    &mut crate::diagram_builder::DiagramBuilder,
+                ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+                + Send
+                + Sync,
+        >,
+    > {
         self.factories.get(component_type)
     }
 }
@@ -2123,7 +2701,6 @@ impl Default for CustomComponentRegistry {
         Self::new()
     }
 }
-
 
 // Helper functions for extracting common attribute types
 impl CustomComponentRegistry {
@@ -2138,29 +2715,19 @@ impl CustomComponentRegistry {
 
     /// Helper to extract a float attribute with a default value
     pub fn get_float_attr(attrs: &Map<String, Value>, key: &str, default: f64) -> Float {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_f64())
-            .unwrap_or(default) as Float
+        attrs.get(key).and_then(|v| v.as_f64()).unwrap_or(default) as Float
     }
 
     /// Helper to extract a boolean attribute with a default value
     pub fn get_bool_attr(attrs: &Map<String, Value>, key: &str, default: bool) -> bool {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_bool())
-            .unwrap_or(default)
+        attrs.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
     }
 
     /// Helper to extract an integer attribute with a default value
     pub fn get_int_attr(attrs: &Map<String, Value>, key: &str, default: i64) -> i64 {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_i64())
-            .unwrap_or(default)
+        attrs.get(key).and_then(|v| v.as_i64()).unwrap_or(default)
     }
 }
-
 
 #[cfg(test)]
 mod custom_component_tests {
@@ -2186,7 +2753,7 @@ mod custom_component_tests {
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        
+
         let textNode = builder.new_text(id, &text, TextOptions::default());
         Ok(textNode)
     }
@@ -2663,6 +3230,27 @@ impl JsonLinesParser {
 
         // Handle built-in components using attribute helpers
         match entity.entity_type.as_str() {
+            "spacer" => {
+                let width = get_float_attr(&entity.attributes, &["width"], 1.0);
+                let height = get_float_attr(&entity.attributes, &["height"], 20.0);
+                let direction = get_string_attr(&entity.attributes, &["direction"], "vertical");
+
+                // Determine spacer direction and final dimensions
+                let spacer_direction = match direction.as_str() {
+                    "horizontal" => SpacerDirection::Horizontal,
+                    "both" => SpacerDirection::Both,
+                    _ => SpacerDirection::Vertical, // default
+                };
+
+                let spacer_options = SpacerOptions {
+                    width,
+                    height,
+                    direction: spacer_direction,
+                };
+
+                Ok(builder.new_spacer(entity_id.to_string(), spacer_options))
+            }
+
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
@@ -2921,47 +3509,39 @@ impl JsonLinesParser {
             }
 
             // Complete fixed semicircle section for parser.rs
+            "semicircle" => {
+                let center = get_point_attr(
+                    &entity.attributes,
+                    &["cx", "center_x"],
+                    &["cy", "center_y"],
+                    (0.0, 0.0),
+                );
+                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+                let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
 
-"semicircle" => {
-    let center = get_point_attr(
-        &entity.attributes,
-        &["cx", "center_x"],
-        &["cy", "center_y"],
-        (0.0, 0.0),
-    );
-    let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
-    let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
+                let (start, end) = if facing_up {
+                    (180.0, 360.0) // FIXED: Top semicircle should be 180° to 360°
+                } else {
+                    (0.0, 180.0) // FIXED: Bottom semicircle should be 0° to 180°
+                };
 
-    let (start, end) = if facing_up {
-        (180.0, 360.0) // FIXED: Top semicircle should be 180° to 360°
-    } else {
-        (0.0, 180.0) // FIXED: Bottom semicircle should be 0° to 180°
-    };
+                let options = ArcOptions {
+                    fill_color: get_string_attr(
+                        &entity.attributes,
+                        &["fill", "fill_color"],
+                        "none",
+                    ),
+                    stroke_color: get_string_attr(
+                        &entity.attributes,
+                        &["stroke", "stroke_color"],
+                        "black",
+                    ),
+                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
+                };
 
-    let options = ArcOptions {
-        fill_color: get_string_attr(
-            &entity.attributes,
-            &["fill", "fill_color"],
-            "none",
-        ),
-        stroke_color: get_string_attr(
-            &entity.attributes,
-            &["stroke", "stroke_color"],
-            "black",
-        ),
-        stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
-        filled: get_bool_attr(&entity.attributes, &["filled"], false),
-    };
-
-    Ok(builder.new_arc(
-        entity_id.to_string(),
-        center,
-        radius,
-        start,
-        end,
-        options,
-    ))
-}
+                Ok(builder.new_arc(entity_id.to_string(), center, radius, start, end, options))
+            }
 
             "quarter_circle" => {
                 let center = get_point_attr(
@@ -3532,7 +4112,8 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
-    arcs : HashMap<EntityID, ShapeArc>,
+    arcs: HashMap<EntityID, ShapeArc>,
+    spacers: HashMap<EntityID, ShapeSpacer>,
     pub custom_components: CustomComponentRegistry,
 }
 
@@ -3591,6 +4172,7 @@ impl DiagramBuilder {
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
             arcs: HashMap::new(),
+            spacers: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
         }
     }
@@ -3601,7 +4183,7 @@ impl DiagramBuilder {
         self.positions.clear();
         self.sizes.clear();
         self.entityTypes.clear();
-        
+
         // Clear all component hashmaps
         self.boxes.clear();
         self.rectangles.clear();
@@ -3618,14 +4200,14 @@ impl DiagramBuilder {
         self.polylines.clear();
         self.free_containers.clear();
         self.arcs.clear();
-        
+
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
-        
+
         println!("DiagramBuilder cache cleared - all entities and components removed");
     }
 
-      pub fn clear_entities_only(&mut self) {
+    pub fn clear_entities_only(&mut self) {
         self.entities.clear();
         self.positions.clear();
         self.sizes.clear();
@@ -3678,7 +4260,7 @@ impl DiagramBuilder {
      * We have another array with the positions of the entities
      * in the same index. So they are fast to access
      */
-    pub fn new_entity(&mut self,id : EntityID, entity_type: EntityType) -> EntityID {
+    pub fn new_entity(&mut self, id: EntityID, entity_type: EntityType) -> EntityID {
         println!("Creating new entity with id {}", id);
         self.entities.push(id.clone());
         self.positions.insert(id.clone(), Point::new(0.0, 0.0));
@@ -3686,7 +4268,7 @@ impl DiagramBuilder {
         self.entityTypes.insert(id.clone(), entity_type.clone());
         id
     }
-    
+
     //set the measure_text function
     pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (Float, Float)) {
         println!("Setting measure text function");
@@ -3718,6 +4300,13 @@ impl DiagramBuilder {
         size.h = height;
     }
 
+    pub fn new_spacer(&mut self, id: EntityID, options: SpacerOptions) -> DiagramTreeNode {
+        let spacer_id = self.new_entity(id, EntityType::SpacerShape);
+        let spacer = ShapeSpacer::new(spacer_id.clone(), options);
+        self.spacers.insert(spacer_id.clone(), spacer);
+        DiagramTreeNode::new(EntityType::SpacerShape, spacer_id)
+    }
+
     /**
      * Architecture note:
      * the new_element methods should only create the necessary elements
@@ -3726,7 +4315,12 @@ impl DiagramBuilder {
      */
 
     // Wraps an element in a box
-    pub fn new_box(&mut self,id: EntityID, child: DiagramTreeNode, options: BoxOptions) -> DiagramTreeNode {
+    pub fn new_box(
+        &mut self,
+        id: EntityID,
+        child: DiagramTreeNode,
+        options: BoxOptions,
+    ) -> DiagramTreeNode {
         let box_id = self.new_entity(id.clone(), EntityType::BoxShape);
 
         let sbox = ShapeBox::new(box_id.clone(), child.entity_id.clone(), options);
@@ -3740,7 +4334,6 @@ impl DiagramBuilder {
         node
     }
 
-
     // Add the new_arc method
     pub fn new_arc(
         &mut self,
@@ -3752,7 +4345,14 @@ impl DiagramBuilder {
         options: ArcOptions,
     ) -> DiagramTreeNode {
         let arc_id = self.new_entity(id, EntityType::ArcShape);
-        let arc = ShapeArc::new(arc_id.clone(), center, radius, start_angle, end_angle, options);
+        let arc = ShapeArc::new(
+            arc_id.clone(),
+            center,
+            radius,
+            start_angle,
+            end_angle,
+            options,
+        );
         self.arcs.insert(arc_id.clone(), arc);
         DiagramTreeNode::new(EntityType::ArcShape, arc_id)
     }
@@ -3795,11 +4395,11 @@ impl DiagramBuilder {
         options: ArcOptions,
     ) -> DiagramTreeNode {
         let (start, end) = match quadrant {
-            1 => (0.0, 90.0),     // Top-right
-            2 => (90.0, 180.0),   // Top-left
-            3 => (180.0, 270.0),  // Bottom-left
-            4 => (270.0, 360.0),  // Bottom-right
-            _ => (0.0, 90.0),     // Default to top-right
+            1 => (0.0, 90.0),    // Top-right
+            2 => (90.0, 180.0),  // Top-left
+            3 => (180.0, 270.0), // Bottom-left
+            4 => (270.0, 360.0), // Bottom-right
+            _ => (0.0, 90.0),    // Default to top-right
         };
         self.new_arc(id, center, radius, start, end, options)
     }
@@ -3837,7 +4437,7 @@ impl DiagramBuilder {
     // Creates a new Vertical stack.
     pub fn new_hstack(
         &mut self,
-        id : EntityID,
+        id: EntityID,
         children: Vec<DiagramTreeNode>,
         vertical_alignment: VerticalAlignment,
     ) -> DiagramTreeNode {
@@ -3865,7 +4465,7 @@ impl DiagramBuilder {
     }
 
     pub fn new_rectangle(&mut self, id: EntityID, options: RectOptions) -> DiagramTreeNode {
-        let rect_id = self.new_entity(id.clone(),EntityType::RectShape);
+        let rect_id = self.new_entity(id.clone(), EntityType::RectShape);
         let rect = ShapeRect::new(rect_id.clone(), options);
         self.rectangles.insert(rect_id.clone(), rect);
         DiagramTreeNode::new(EntityType::RectShape, rect_id.clone())
@@ -3877,7 +4477,7 @@ impl DiagramBuilder {
     // ```rust
     // let text = session.new_text("Hello World", TextOptions::new());
     // ```
-    pub fn new_text(&mut self,id : EntityID, text: &str, options: TextOptions) -> DiagramTreeNode {
+    pub fn new_text(&mut self, id: EntityID, text: &str, options: TextOptions) -> DiagramTreeNode {
         let text_id = self.new_entity(id, EntityType::TextShape);
         //create the lines
         let text_lines = textwrap::wrap(&text, options.line_width);
@@ -3903,7 +4503,7 @@ impl DiagramBuilder {
 
     pub fn new_line(
         &mut self,
-        id : EntityID,
+        id: EntityID,
         start: (Float, Float),
         end: (Float, Float),
         options: LineOptions,
@@ -3953,7 +4553,7 @@ impl DiagramBuilder {
     }
 
     // Creates a new Group.
-    pub fn new_group(&mut self,id : EntityID, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+    pub fn new_group(&mut self, id: EntityID, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
         let group_id = self.new_entity(id, EntityType::GroupShape);
         let mut sgroup = ShapeGroup {
             entity: group_id.clone(),
@@ -4010,12 +4610,15 @@ impl DiagramBuilder {
         let header_id = format!("{}-header", id);
         self.new_entity(header_id.clone(), EntityType::RectShape);
         // Create the rectangle for the header row
-        let header = self.new_rectangle(header_id, RectOptions {
-            fill_color: Fill::Color(options.header_fill_color.clone()),
-            stroke_color: String::from("black"),
-            stroke_width: 1.0,
-            ..Default::default()
-        });
+        let header = self.new_rectangle(
+            header_id,
+            RectOptions {
+                fill_color: Fill::Color(options.header_fill_color.clone()),
+                stroke_color: String::from("black"),
+                stroke_width: 1.0,
+                ..Default::default()
+            },
+        );
 
         let table_id = format!("{}-table", id.clone());
         self.new_entity(table_id.clone(), EntityType::TableShape);
@@ -4075,7 +4678,7 @@ impl DiagramBuilder {
         id: EntityID,
         children_with_positions: Vec<(DiagramTreeNode, (Float, Float))>,
     ) -> DiagramTreeNode {
-        let container_id = self.new_entity(id.clone(), EntityType::FreeContainer);  
+        let container_id = self.new_entity(id.clone(), EntityType::FreeContainer);
 
         // Create the free container
         let mut container = FreeContainer::new(container_id.clone());
@@ -4098,13 +4701,16 @@ impl DiagramBuilder {
 
         node
     }
-
 }
 
 // element list accessors
 impl DiagramBuilder {
     pub fn get_text(&self, id: EntityID) -> &ShapeText {
         &self.texts[&id]
+    }
+
+    pub fn add_text(&mut self, id: EntityID, text: ShapeText) {
+        self.texts.insert(id, text);
     }
 
     pub fn get_group(&self, id: EntityID) -> &ShapeGroup {
@@ -4133,6 +4739,12 @@ impl DiagramBuilder {
 
     pub fn get_text_line(&self, id: EntityID) -> &TextLine {
         &self.textlines[&id]
+    }
+    pub fn add_text_line(&mut self, id: EntityID, text_line: TextLine) {
+        self.textlines.insert(id, text_line);
+    }
+    pub fn get_text_line_mut(&mut self, id: EntityID) -> Option<&mut TextLine> {
+        self.textlines.get_mut(&id)
     }
 
     pub fn get_arrow(&self, id: EntityID) -> &ShapeArrow {
@@ -4163,10 +4775,13 @@ impl DiagramBuilder {
         self.free_containers.get_mut(&id).unwrap()
     }
 
-     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
+    pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
         &self.arcs[&id]
     }
-    
+
+    pub fn get_spacer(&self, id: EntityID) -> &ShapeSpacer {
+        &self.spacers[&id]
+    }
 
     pub fn get_custom_component(
         &self,
@@ -4301,7 +4916,10 @@ mod component_registration_tests {
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);
         assert!(builder.has_custom_component("badge"));
         let badge = builder.get_box(badge_node.entity_id);
-        assert_eq!(badge.box_options.fill_color, Fill::Color("blue".to_string()));
+        assert_eq!(
+            badge.box_options.fill_color,
+            Fill::Color("blue".to_string())
+        );
     }
 
     #[test]

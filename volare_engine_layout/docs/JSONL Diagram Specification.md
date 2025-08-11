@@ -50,6 +50,27 @@ Wraps another element with padding, background, and border.
 {"id":"container","type":"box","padding":10,"background":"lightblue","children":["text1"]}
 ```
 
+
+**Automatic Text Wrapping:**
+When a box has a fixed width and contains text, the text will automatically wrap to fit within the available space (box width minus padding). This ensures text never overflows the box boundaries.
+
+## Best Practices
+
+### Text Layout
+- **Use fixed-width boxes** for consistent layouts - text will automatically wrap to fit
+- **Let height be content-based** for boxes containing text to accommodate wrapped content
+- **Use padding** to ensure proper text spacing from box edges
+- **Disable auto-wrapping** only when you need precise control over line breaks
+
+### Responsive Design
+- Fixed-width boxes with auto-wrapping text create predictable, responsive layouts
+- Combine with different padding values for various spacing needs
+- Stack multiple auto-wrapping boxes for article-like layouts
+**Example:**
+```json
+{"id":"container","type":"box","width":400,"padding":20,"children":["long_text"]}
+{"id":"long_text","type":"text","content":"This long text will automatically wrap to fit within the 400px box width"}
+
 ### Rectangle (`"type": "rect"`)
 A standalone rectangle shape.
 
@@ -288,7 +309,9 @@ For `width` and `height` attributes, you can use:
 
 - **Number** - Fixed size in pixels: `"width": 200`
 - **"content"** or **"auto"** - Size based on content: `"width": "content"`
-- **"grow"** - Take all available space: `"width": "grow"`
+- **"grow"** - Take all available space: `"width": "grow"` (TODO: Not currently supported)
+
+**Note:** When using fixed width with text content, automatic text wrapping ensures optimal text layout within the specified constraints.
 
 ## Color Values
 
@@ -318,3 +341,16 @@ The system supports custom components registered by the application. These compo
 ```
 
 This creates a document layout with header, sidebar navigation, main content area, and footer.
+
+## Best Practices
+
+### Text Layout
+- **Use fixed-width boxes** for consistent layouts - text will automatically wrap to fit
+- **Let height be content-based** for boxes containing text to accommodate wrapped content
+- **Use padding** to ensure proper text spacing from box edges
+- **Disable auto-wrapping** only when you need precise control over line breaks
+
+### Responsive Design
+- Fixed-width boxes with auto-wrapping text create predictable, responsive layouts
+- Combine with different padding values for various spacing needs
+- Stack multiple auto-wrapping boxes for article-like layouts
