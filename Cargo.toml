@@ -5,7 +5,8 @@ members = [
     "./svg_renderer",
     "./image_renderer",
     "./demo",
-    "./wasm_bindings"
+    "./wasm_bindings",
+    "./custom_components",
 ]
 
 # build command that builds all members

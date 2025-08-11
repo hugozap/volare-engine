@@ -1,10 +1,9 @@
-
 pub mod table;
 
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
-use serde_json::{Value, Map};
+use serde_json::{Map, Value};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -12,7 +11,6 @@ pub type EntityID = String;
 pub type Float = f32;
 
 //Export table and table options
-
 
 pub trait Entity {
     fn get_id(&self) -> EntityID;
@@ -83,6 +81,7 @@ pub enum EntityType {
     PolyLine,
     FreeContainer,
     ArcShape,
+    SpacerShape,
 }
 
 #[derive(Debug, Copy, PartialEq)]
@@ -101,9 +100,7 @@ impl Default for SizeBehavior {
     }
 }
 
-impl Eq for SizeBehavior {
-
-}
+impl Eq for SizeBehavior {}
 
 impl Clone for SizeBehavior {
     fn clone(&self) -> Self {
@@ -120,6 +117,70 @@ impl SizeBehavior {
         match self {
             SizeBehavior::Fixed(val) => Ok(*val),
             _ => Err("Called unwrap_fixed on non-Fixed SizeBehavior"),
+        }
+    }
+}
+
+// Add spacer component
+pub struct ShapeSpacer {
+    pub entity: EntityID,
+    pub spacer_options: SpacerOptions,
+}
+
+impl ShapeSpacer {
+    pub fn new(entity: EntityID, spacer_options: SpacerOptions) -> ShapeSpacer {
+        ShapeSpacer {
+            entity,
+            spacer_options,
+        }
+    }
+}
+
+impl Clone for ShapeSpacer {
+    fn clone(&self) -> Self {
+        ShapeSpacer {
+            entity: self.entity.clone(),
+            spacer_options: self.spacer_options.clone(),
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct SpacerOptions {
+    pub width: Float,
+    pub height: Float,
+    pub direction: SpacerDirection, // Horizontal, Vertical, or Both
+}
+
+impl Clone for SpacerOptions {
+    fn clone(&self) -> Self {
+        SpacerOptions {
+            width: self.width,
+            height: self.height,
+            direction: self.direction.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SpacerDirection {
+    Horizontal, // Takes up width, minimal height
+    Vertical,   // Takes up height, minimal width
+    Both,       // Takes up both dimensions
+}
+
+impl Default for SpacerDirection {
+    fn default() -> Self {
+        SpacerDirection::Vertical
+    }
+}
+
+impl Clone for SpacerDirection {
+    fn clone(&self) -> Self {
+        match self {
+            SpacerDirection::Horizontal => SpacerDirection::Horizontal,
+            SpacerDirection::Vertical => SpacerDirection::Vertical,
+            SpacerDirection::Both => SpacerDirection::Both,
         }
     }
 }
@@ -162,7 +223,7 @@ impl Entity for ShapeBox {
 impl ShapeBox {
     pub fn new(entity: EntityID, wrapped_entity: EntityID, box_options: BoxOptions) -> ShapeBox {
         ShapeBox {
-            entity,            
+            entity,
             wrapped_entity,
             box_options,
         }
@@ -242,8 +303,6 @@ impl Clone for LinearGradient {
     }
 }
 
-
-
 #[derive(Debug)]
 pub enum Fill {
     Color(String),
@@ -305,10 +364,7 @@ impl Eq for LinearGradient {}
 
 impl PartialEq for RadialGradient {
     fn eq(&self, other: &Self) -> bool {
-        self.cx == other.cx
-            && self.cy == other.cy
-            && self.r == other.r
-            && self.stops == other.stops
+        self.cx == other.cx && self.cy == other.cy && self.r == other.r && self.stops == other.stops
     }
 }
 
@@ -318,12 +374,24 @@ impl PartialEq for GradientStop {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (
-                GradientStop::ColorStop { offset: a_offset, color: a_color },
-                GradientStop::ColorStop { offset: b_offset, color: b_color },
+                GradientStop::ColorStop {
+                    offset: a_offset,
+                    color: a_color,
+                },
+                GradientStop::ColorStop {
+                    offset: b_offset,
+                    color: b_color,
+                },
             ) => a_offset == b_offset && a_color == b_color,
             (
-                GradientStop::OpacityStop { offset: a_offset, opacity: a_opacity },
-                GradientStop::OpacityStop { offset: b_offset, opacity: b_opacity },
+                GradientStop::OpacityStop {
+                    offset: a_offset,
+                    opacity: a_opacity,
+                },
+                GradientStop::OpacityStop {
+                    offset: b_offset,
+                    opacity: b_opacity,
+                },
             ) => a_offset == b_offset && a_opacity == b_opacity,
             _ => false,
         }
@@ -339,7 +407,7 @@ pub struct BoxOptions {
     pub stroke_width: Float,
     pub padding: Float,
     pub border_radius: Float,
-        // Add size behavior fields
+    // Add size behavior fields
     pub width_behavior: SizeBehavior,
     pub height_behavior: SizeBehavior,
 }
@@ -354,7 +422,6 @@ impl Clone for BoxOptions {
             border_radius: self.border_radius,
             width_behavior: self.width_behavior.clone(),
             height_behavior: self.height_behavior.clone(),
-
         }
     }
 }
@@ -379,8 +446,6 @@ impl BoxOptions {
     }
 }
 
-
-
 /* A group of entities */
 
 //RectOptions
@@ -398,7 +463,7 @@ impl Clone for RectOptions {
     fn clone(&self) -> Self {
         RectOptions {
             width_behavior: self.width_behavior.clone(),
-            height_behavior: self.height_behavior.clone(), 
+            height_behavior: self.height_behavior.clone(),
             fill_color: self.fill_color.clone(),
             stroke_color: self.stroke_color.clone(),
             stroke_width: self.stroke_width,
@@ -457,7 +522,6 @@ impl Entity for ShapeRect {
         self
     }
 }
-
 
 /* A group of entities */
 pub struct ShapeGroup {
@@ -537,9 +601,13 @@ impl Clone for ShapeText {
     }
 }
 
-
 impl ShapeText {
-    pub fn new(entity: EntityID, text: &str, text_options: TextOptions, lines: &[EntityID]) -> ShapeText {
+    pub fn new(
+        entity: EntityID,
+        text: &str,
+        text_options: TextOptions,
+        lines: &[EntityID],
+    ) -> ShapeText {
         ShapeText {
             entity,
             text: text.to_string(),
@@ -548,8 +616,6 @@ impl ShapeText {
         }
     }
 }
-
-
 
 impl Entity for ShapeText {
     fn get_id(&self) -> EntityID {
@@ -614,13 +680,13 @@ impl Clone for HorizontalAlignment {
             HorizontalAlignment::Right => HorizontalAlignment::Right,
         }
     }
-}   
+}
 
 pub struct VerticalStack {
     pub entity: EntityID,
     //List of entity ids
     pub elements: Vec<EntityID>,
-    pub horizontal_alignment: HorizontalAlignment
+    pub horizontal_alignment: HorizontalAlignment,
 }
 
 impl Clone for VerticalStack {
@@ -628,7 +694,7 @@ impl Clone for VerticalStack {
         VerticalStack {
             entity: self.entity.clone(),
             elements: self.elements.clone(),
-            horizontal_alignment: self.horizontal_alignment.clone()
+            horizontal_alignment: self.horizontal_alignment.clone(),
         }
     }
 }
@@ -646,7 +712,7 @@ impl Entity for VerticalStack {
         self
     }
 }
-    
+
 pub enum VerticalAlignment {
     Top,
     Center,
@@ -661,7 +727,7 @@ impl Clone for VerticalAlignment {
             VerticalAlignment::Bottom => VerticalAlignment::Bottom,
         }
     }
-}   
+}
 impl fmt::Display for VerticalAlignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -723,7 +789,12 @@ impl Clone for ShapeLine {
 }
 
 impl ShapeLine {
-    pub fn new(line_id: EntityID, start: (Float, Float), end: (Float, Float), options: LineOptions) -> ShapeLine {
+    pub fn new(
+        line_id: EntityID,
+        start: (Float, Float),
+        end: (Float, Float),
+        options: LineOptions,
+    ) -> ShapeLine {
         ShapeLine {
             entity: line_id,
             start,
@@ -732,7 +803,6 @@ impl ShapeLine {
         }
     }
 }
-
 
 impl Entity for ShapeLine {
     fn get_id(&self) -> EntityID {
@@ -779,7 +849,11 @@ pub struct PolyLine {
 }
 
 impl PolyLine {
-    pub fn new(entity: EntityID, points: Vec<(Float, Float)>, line_options: LineOptions) -> PolyLine {
+    pub fn new(
+        entity: EntityID,
+        points: Vec<(Float, Float)>,
+        line_options: LineOptions,
+    ) -> PolyLine {
         PolyLine {
             entity,
             points,
@@ -890,7 +964,12 @@ impl Clone for ShapeEllipse {
 }
 
 impl ShapeEllipse {
-    pub fn new(entity: EntityID, center: (Float, Float), radius: (Float, Float), ellipse_options: EllipseOptions) -> ShapeEllipse {
+    pub fn new(
+        entity: EntityID,
+        center: (Float, Float),
+        radius: (Float, Float),
+        ellipse_options: EllipseOptions,
+    ) -> ShapeEllipse {
         ShapeEllipse {
             entity,
             center,
@@ -942,8 +1021,6 @@ impl EllipseOptions {
     }
 }
 
-
-
 pub struct ShapeImage {
     pub entity: EntityID,
     //base64 encoded image or empty if using file_path
@@ -951,7 +1028,7 @@ pub struct ShapeImage {
     //path to image file on disk (optional)
     pub file_path: Option<String>,
     pub width_behavior: SizeBehavior,
-    pub height_behavior: SizeBehavior
+    pub height_behavior: SizeBehavior,
 }
 
 impl Clone for ShapeImage {
@@ -990,8 +1067,12 @@ impl ShapeImage {
             height_behavior: size.1,
         }
     }
-    
-    pub fn from_file(entity: EntityID, file_path: String, size: (SizeBehavior, SizeBehavior)) -> ShapeImage {
+
+    pub fn from_file(
+        entity: EntityID,
+        file_path: String,
+        size: (SizeBehavior, SizeBehavior),
+    ) -> ShapeImage {
         ShapeImage {
             entity,
             image: String::new(), // Empty as we're using file_path instead
@@ -1007,9 +1088,9 @@ impl ShapeImage {
 pub struct FreeContainer {
     pub entity: EntityID,
     pub children: Vec<(EntityID, (Float, Float))>, // Each child has a position relative to the container
-    pub background_color: Option<String>,      // Optional background color
-    pub border_color: Option<String>,          // Optional border color
-    pub border_width: Float,                    // Border width (0 for no border)
+    pub background_color: Option<String>,          // Optional background color
+    pub border_color: Option<String>,              // Optional border color
+    pub border_width: Float,                       // Border width (0 for no border)
 }
 
 impl Clone for FreeContainer {
@@ -1049,24 +1130,27 @@ impl FreeContainer {
             border_width: 0.0,
         }
     }
-    
+
     /// Add a child to the container at the specified position
     pub fn add_child(&mut self, child_id: EntityID, position: (Float, Float)) {
         self.children.push((child_id, position));
     }
-    
+
     /// Add multiple children at once with their positions
-    pub fn with_children(mut self, children_with_positions: Vec<(EntityID, (Float, Float))>) -> Self {
+    pub fn with_children(
+        mut self,
+        children_with_positions: Vec<(EntityID, (Float, Float))>,
+    ) -> Self {
         self.children.extend(children_with_positions);
         self
     }
-    
+
     /// Set background color
     pub fn with_background_color(mut self, color: &str) -> Self {
         self.background_color = Some(color.to_string());
         self
     }
-    
+
     /// Set border properties
     pub fn with_border(mut self, color: &str, width: Float) -> Self {
         self.border_color = Some(color.to_string());
@@ -1074,7 +1158,6 @@ impl FreeContainer {
         self
     }
 }
-
 
 // Arc options structure
 #[derive(Default, Debug)]
@@ -1110,10 +1193,10 @@ impl ArcOptions {
 // Arc shape structure
 pub struct ShapeArc {
     pub entity: EntityID,
-    pub center: (Float, Float),     // Center point of the arc
-    pub radius: Float,              // Radius of the arc
-    pub start_angle: Float,         // Start angle in degrees
-    pub end_angle: Float,           // End angle in degrees
+    pub center: (Float, Float), // Center point of the arc
+    pub radius: Float,          // Radius of the arc
+    pub start_angle: Float,     // Start angle in degrees
+    pub end_angle: Float,       // End angle in degrees
     pub arc_options: ArcOptions,
 }
 
@@ -1148,22 +1231,22 @@ impl ShapeArc {
             arc_options,
         }
     }
-    
+
     /// Normalize angles to 0-360 degree range
     pub fn normalize_angles(&self) -> (Float, Float) {
         let mut start = self.start_angle % 360.0;
         let mut end = self.end_angle % 360.0;
-        
+
         if start < 0.0 {
             start += 360.0;
         }
         if end < 0.0 {
             end += 360.0;
         }
-        
+
         (start, end)
     }
-    
+
     /// Calculate the angle sweep of the arc
     pub fn angle_sweep(&self) -> Float {
         let (start, end) = self.normalize_angles();
@@ -1173,7 +1256,7 @@ impl ShapeArc {
             360.0 - start + end
         }
     }
-    
+
     /// Check if this is a major arc (> 180 degrees)
     pub fn is_major_arc(&self) -> bool {
         self.angle_sweep() > 180.0
@@ -1194,11 +1277,17 @@ impl Entity for ShapeArc {
     }
 }
 
-
 /// Type alias for custom component factory functions
 /// Takes a map of attributes and a mutable reference to DiagramBuilder
 /// Returns a Result with either a DiagramTreeNode or an error message
-pub type CustomComponentFactory = Arc<dyn Fn(&Map<String, Value>, &mut crate::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync>;
+pub type CustomComponentFactory = Arc<
+    dyn Fn(
+            &Map<String, Value>,
+            &mut crate::DiagramBuilder,
+        ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+        + Send
+        + Sync,
+>;
 
 /// Registry for custom components
 pub struct CustomComponentRegistry {
@@ -1215,9 +1304,16 @@ impl CustomComponentRegistry {
     /// Register a new custom component with the given identifier and factory function
     pub fn register<F>(&mut self, component_type: &str, factory: F)
     where
-        F: Fn(&Map<String, Value>, &mut crate::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync + 'static,
+        F: Fn(
+                &Map<String, Value>,
+                &mut crate::DiagramBuilder,
+            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            + Send
+            + Sync
+            + 'static,
     {
-        self.factories.insert(component_type.to_string(), Arc::new(factory));
+        self.factories
+            .insert(component_type.to_string(), Arc::new(factory));
     }
 
     /// Create a component instance using the registered factory
@@ -1243,10 +1339,19 @@ impl CustomComponentRegistry {
         self.factories.keys().collect()
     }
 
-     pub fn get(
+    pub fn get(
         &self,
         component_type: &str,
-    ) -> Option<&Arc<dyn Fn(&serde_json::Map<String, serde_json::Value>, &mut crate::diagram_builder::DiagramBuilder) -> Result<crate::diagram_builder::DiagramTreeNode, String> + Send + Sync>> {
+    ) -> Option<
+        &Arc<
+            dyn Fn(
+                    &serde_json::Map<String, serde_json::Value>,
+                    &mut crate::diagram_builder::DiagramBuilder,
+                ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+                + Send
+                + Sync,
+        >,
+    > {
         self.factories.get(component_type)
     }
 }
@@ -1256,7 +1361,6 @@ impl Default for CustomComponentRegistry {
         Self::new()
     }
 }
-
 
 // Helper functions for extracting common attribute types
 impl CustomComponentRegistry {
@@ -1271,29 +1375,19 @@ impl CustomComponentRegistry {
 
     /// Helper to extract a float attribute with a default value
     pub fn get_float_attr(attrs: &Map<String, Value>, key: &str, default: f64) -> Float {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_f64())
-            .unwrap_or(default) as Float
+        attrs.get(key).and_then(|v| v.as_f64()).unwrap_or(default) as Float
     }
 
     /// Helper to extract a boolean attribute with a default value
     pub fn get_bool_attr(attrs: &Map<String, Value>, key: &str, default: bool) -> bool {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_bool())
-            .unwrap_or(default)
+        attrs.get(key).and_then(|v| v.as_bool()).unwrap_or(default)
     }
 
     /// Helper to extract an integer attribute with a default value
     pub fn get_int_attr(attrs: &Map<String, Value>, key: &str, default: i64) -> i64 {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_i64())
-            .unwrap_or(default)
+        attrs.get(key).and_then(|v| v.as_i64()).unwrap_or(default)
     }
 }
-
 
 #[cfg(test)]
 mod custom_component_tests {
@@ -1319,7 +1413,7 @@ mod custom_component_tests {
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        
+
         let textNode = builder.new_text(id, &text, TextOptions::default());
         Ok(textNode)
     }

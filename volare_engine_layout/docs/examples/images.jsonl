@@ -1,0 +1,29 @@
+{"id":"root","type":"vstack","children":["header","main_content","footer"],"h_align":"center"}
+{"id":"header","type":"box","padding":20,"background":"#2c3e50","children":["header_content"]}
+{"id":"header_content","type":"text","content":"📷 Multi-Service Image Test","font_size":28,"color":"white"}
+{"id":"main_content","type":"vstack","children":["placeholders_section","avatars_section","mixed_section"],"h_align":"center"}
+{"id":"placeholders_section","type":"vstack","children":["placeholder_title","placeholder_images"],"h_align":"center"}
+{"id":"placeholder_title","type":"text","content":"Lorem Picsum Placeholders","font_size":20,"color":"#34495e"}
+{"id":"placeholder_images","type":"hstack","children":["placeholder_1","placeholder_2","placeholder_3","placeholder_4"],"v_align":"center"}
+{"id":"placeholder_1","type":"image","src":"https://picsum.photos/150/150?random=10","width":150,"height":150}
+{"id":"placeholder_2","type":"image","src":"https://picsum.photos/150/150?random=20","width":150,"height":150}
+{"id":"placeholder_3","type":"image","src":"https://picsum.photos/150/150?random=30","width":150,"height":150}
+{"id":"placeholder_4","type":"image","src":"https://picsum.photos/150/150?random=40","width":150,"height":150}
+{"id":"avatars_section","type":"vstack","children":["avatar_title","avatar_images"],"h_align":"center"}
+{"id":"avatar_title","type":"text","content":"DiceBear Avatar Generator","font_size":20,"color":"#34495e"}
+{"id":"avatar_images","type":"hstack","children":["avatar_1","avatar_2","avatar_3"],"v_align":"center"}
+{"id":"avatar_1","type":"image","src":"https://api.dicebear.com/7.x/avataaars/svg?seed=Felix","width":100,"height":100}
+{"id":"avatar_2","type":"image","src":"https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka","width":100,"height":100}
+{"id":"avatar_3","type":"image","src":"https://api.dicebear.com/7.x/avataaars/svg?seed=John","width":100,"height":100}
+{"id":"mixed_section","type":"vstack","children":["mixed_title","mixed_content"],"h_align":"center"}
+{"id":"mixed_title","type":"text","content":"Mixed Content Layout","font_size":20,"color":"#34495e"}
+{"id":"mixed_content","type":"free_container","width":600,"height":300,"background":"#ecf0f1","border_color":"#bdc3c7","border_width":2,"children":["large_img","info_card","small_avatars"]}
+{"id":"large_img","type":"image","src":"https://picsum.photos/250/200?random=100","width":250,"height":200,"x":20,"y":20}
+{"id":"info_card","type":"box","padding":15,"background":"white","border_color":"#95a5a6","border_width":1,"border_radius":8,"children":["info_text"],"x":300,"y":30}
+{"id":"info_text","type":"text","content":"This large image demonstrates absolute positioning within a free container. The image uses Lorem Picsum with specific dimensions and a random seed.","line_width":250,"font_size":12,"color":"#2c3e50"}
+{"id":"small_avatars","type":"hstack","children":["mini_avatar_1","mini_avatar_2","mini_avatar_3"],"v_align":"center","x":350,"y":200}
+{"id":"mini_avatar_1","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test1","width":40,"height":40}
+{"id":"mini_avatar_2","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test2","width":40,"height":40}
+{"id":"mini_avatar_3","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test3","width":40,"height":40}
+{"id":"footer","type":"box","padding":10,"background":"#95a5a6","children":["footer_text"]}
+{"id":"footer_text","type":"text","content":"🌐 Images loaded from: picsum.photos (photos) • dicebear.com (avatars)","font_size":12,"color":"#2c3e50"}

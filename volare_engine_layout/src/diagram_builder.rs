@@ -37,7 +37,8 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
-    arcs : HashMap<EntityID, ShapeArc>,
+    arcs: HashMap<EntityID, ShapeArc>,
+    spacers: HashMap<EntityID, ShapeSpacer>,
     pub custom_components: CustomComponentRegistry,
 }
 
@@ -96,6 +97,7 @@ impl DiagramBuilder {
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
             arcs: HashMap::new(),
+            spacers: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
         }
     }
@@ -106,7 +108,7 @@ impl DiagramBuilder {
         self.positions.clear();
         self.sizes.clear();
         self.entityTypes.clear();
-        
+
         // Clear all component hashmaps
         self.boxes.clear();
         self.rectangles.clear();
@@ -123,14 +125,14 @@ impl DiagramBuilder {
         self.polylines.clear();
         self.free_containers.clear();
         self.arcs.clear();
-        
+
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
-        
+
         println!("DiagramBuilder cache cleared - all entities and components removed");
     }
 
-      pub fn clear_entities_only(&mut self) {
+    pub fn clear_entities_only(&mut self) {
         self.entities.clear();
         self.positions.clear();
         self.sizes.clear();
@@ -183,7 +185,7 @@ impl DiagramBuilder {
      * We have another array with the positions of the entities
      * in the same index. So they are fast to access
      */
-    pub fn new_entity(&mut self,id : EntityID, entity_type: EntityType) -> EntityID {
+    pub fn new_entity(&mut self, id: EntityID, entity_type: EntityType) -> EntityID {
         println!("Creating new entity with id {}", id);
         self.entities.push(id.clone());
         self.positions.insert(id.clone(), Point::new(0.0, 0.0));
@@ -191,7 +193,7 @@ impl DiagramBuilder {
         self.entityTypes.insert(id.clone(), entity_type.clone());
         id
     }
-    
+
     //set the measure_text function
     pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (Float, Float)) {
         println!("Setting measure text function");
@@ -223,6 +225,13 @@ impl DiagramBuilder {
         size.h = height;
     }
 
+    pub fn new_spacer(&mut self, id: EntityID, options: SpacerOptions) -> DiagramTreeNode {
+        let spacer_id = self.new_entity(id, EntityType::SpacerShape);
+        let spacer = ShapeSpacer::new(spacer_id.clone(), options);
+        self.spacers.insert(spacer_id.clone(), spacer);
+        DiagramTreeNode::new(EntityType::SpacerShape, spacer_id)
+    }
+
     /**
      * Architecture note:
      * the new_element methods should only create the necessary elements
@@ -231,7 +240,12 @@ impl DiagramBuilder {
      */
 
     // Wraps an element in a box
-    pub fn new_box(&mut self,id: EntityID, child: DiagramTreeNode, options: BoxOptions) -> DiagramTreeNode {
+    pub fn new_box(
+        &mut self,
+        id: EntityID,
+        child: DiagramTreeNode,
+        options: BoxOptions,
+    ) -> DiagramTreeNode {
         let box_id = self.new_entity(id.clone(), EntityType::BoxShape);
 
         let sbox = ShapeBox::new(box_id.clone(), child.entity_id.clone(), options);
@@ -245,7 +259,6 @@ impl DiagramBuilder {
         node
     }
 
-
     // Add the new_arc method
     pub fn new_arc(
         &mut self,
@@ -257,7 +270,14 @@ impl DiagramBuilder {
         options: ArcOptions,
     ) -> DiagramTreeNode {
         let arc_id = self.new_entity(id, EntityType::ArcShape);
-        let arc = ShapeArc::new(arc_id.clone(), center, radius, start_angle, end_angle, options);
+        let arc = ShapeArc::new(
+            arc_id.clone(),
+            center,
+            radius,
+            start_angle,
+            end_angle,
+            options,
+        );
         self.arcs.insert(arc_id.clone(), arc);
         DiagramTreeNode::new(EntityType::ArcShape, arc_id)
     }
@@ -300,11 +320,11 @@ impl DiagramBuilder {
         options: ArcOptions,
     ) -> DiagramTreeNode {
         let (start, end) = match quadrant {
-            1 => (0.0, 90.0),     // Top-right
-            2 => (90.0, 180.0),   // Top-left
-            3 => (180.0, 270.0),  // Bottom-left
-            4 => (270.0, 360.0),  // Bottom-right
-            _ => (0.0, 90.0),     // Default to top-right
+            1 => (0.0, 90.0),    // Top-right
+            2 => (90.0, 180.0),  // Top-left
+            3 => (180.0, 270.0), // Bottom-left
+            4 => (270.0, 360.0), // Bottom-right
+            _ => (0.0, 90.0),    // Default to top-right
         };
         self.new_arc(id, center, radius, start, end, options)
     }
@@ -342,7 +362,7 @@ impl DiagramBuilder {
     // Creates a new Vertical stack.
     pub fn new_hstack(
         &mut self,
-        id : EntityID,
+        id: EntityID,
         children: Vec<DiagramTreeNode>,
         vertical_alignment: VerticalAlignment,
     ) -> DiagramTreeNode {
@@ -370,7 +390,7 @@ impl DiagramBuilder {
     }
 
     pub fn new_rectangle(&mut self, id: EntityID, options: RectOptions) -> DiagramTreeNode {
-        let rect_id = self.new_entity(id.clone(),EntityType::RectShape);
+        let rect_id = self.new_entity(id.clone(), EntityType::RectShape);
         let rect = ShapeRect::new(rect_id.clone(), options);
         self.rectangles.insert(rect_id.clone(), rect);
         DiagramTreeNode::new(EntityType::RectShape, rect_id.clone())
@@ -382,7 +402,7 @@ impl DiagramBuilder {
     // ```rust
     // let text = session.new_text("Hello World", TextOptions::new());
     // ```
-    pub fn new_text(&mut self,id : EntityID, text: &str, options: TextOptions) -> DiagramTreeNode {
+    pub fn new_text(&mut self, id: EntityID, text: &str, options: TextOptions) -> DiagramTreeNode {
         let text_id = self.new_entity(id, EntityType::TextShape);
         //create the lines
         let text_lines = textwrap::wrap(&text, options.line_width);
@@ -408,7 +428,7 @@ impl DiagramBuilder {
 
     pub fn new_line(
         &mut self,
-        id : EntityID,
+        id: EntityID,
         start: (Float, Float),
         end: (Float, Float),
         options: LineOptions,
@@ -458,7 +478,7 @@ impl DiagramBuilder {
     }
 
     // Creates a new Group.
-    pub fn new_group(&mut self,id : EntityID, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
+    pub fn new_group(&mut self, id: EntityID, children: Vec<DiagramTreeNode>) -> DiagramTreeNode {
         let group_id = self.new_entity(id, EntityType::GroupShape);
         let mut sgroup = ShapeGroup {
             entity: group_id.clone(),
@@ -515,12 +535,15 @@ impl DiagramBuilder {
         let header_id = format!("{}-header", id);
         self.new_entity(header_id.clone(), EntityType::RectShape);
         // Create the rectangle for the header row
-        let header = self.new_rectangle(header_id, RectOptions {
-            fill_color: Fill::Color(options.header_fill_color.clone()),
-            stroke_color: String::from("black"),
-            stroke_width: 1.0,
-            ..Default::default()
-        });
+        let header = self.new_rectangle(
+            header_id,
+            RectOptions {
+                fill_color: Fill::Color(options.header_fill_color.clone()),
+                stroke_color: String::from("black"),
+                stroke_width: 1.0,
+                ..Default::default()
+            },
+        );
 
         let table_id = format!("{}-table", id.clone());
         self.new_entity(table_id.clone(), EntityType::TableShape);
@@ -580,7 +603,7 @@ impl DiagramBuilder {
         id: EntityID,
         children_with_positions: Vec<(DiagramTreeNode, (Float, Float))>,
     ) -> DiagramTreeNode {
-        let container_id = self.new_entity(id.clone(), EntityType::FreeContainer);  
+        let container_id = self.new_entity(id.clone(), EntityType::FreeContainer);
 
         // Create the free container
         let mut container = FreeContainer::new(container_id.clone());
@@ -603,7 +626,6 @@ impl DiagramBuilder {
 
         node
     }
-
 }
 
 // element list accessors
@@ -668,10 +690,13 @@ impl DiagramBuilder {
         self.free_containers.get_mut(&id).unwrap()
     }
 
-     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
+    pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
         &self.arcs[&id]
     }
-    
+
+    pub fn get_spacer(&self, id: EntityID) -> &ShapeSpacer {
+        &self.spacers[&id]
+    }
 
     pub fn get_custom_component(
         &self,
@@ -806,7 +831,10 @@ mod component_registration_tests {
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);
         assert!(builder.has_custom_component("badge"));
         let badge = builder.get_box(badge_node.entity_id);
-        assert_eq!(badge.box_options.fill_color, Fill::Color("blue".to_string()));
+        assert_eq!(
+            badge.box_options.fill_color,
+            Fill::Color("blue".to_string())
+        );
     }
 
     #[test]

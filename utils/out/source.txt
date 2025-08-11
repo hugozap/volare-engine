@@ -335,6 +335,7 @@ fn render_node(
         _ => {}
     }
 }
+// Fixed render_arc function for image_renderer/src/lib.rs
 
 fn render_arc(
     session: &DiagramBuilder,
@@ -345,25 +346,28 @@ fn render_arc(
     scale: Float,
 ) {
     use std::f32::consts::PI;
-    
+
     let arc_shape = session.get_arc(entity_id.clone());
     let size = session.get_size(entity_id.clone());
-    
+
     // Apply scaling factor to dimensions
     let scaled_radius = arc_shape.radius * scale;
-    let center_x = (pos.0 + arc_shape.center.0 * scale) as i32;
-    let center_y = (pos.1 + arc_shape.center.1 * scale) as i32;
-    
+
+    // FIXED: Use the arc's center coordinates directly, don't add pos again
+    // The pos parameter already positions this arc correctly via the transform system
+    let center_x = (arc_shape.center.0 * scale) as i32;
+    let center_y = (arc_shape.center.1 * scale) as i32;
+
     // Get colors
     let stroke_color = parse_color(&arc_shape.arc_options.stroke_color);
     let fill_color = parse_color(&arc_shape.arc_options.fill_color);
     let stroke_width = arc_shape.arc_options.stroke_width * scale;
-    
+
     // Get normalized angles and convert to radians
     let (start_angle, end_angle) = arc_shape.normalize_angles();
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
-    
+
     // For filled arcs, we need to fill the sector
     if arc_shape.arc_options.filled {
         render_filled_arc_sector(
@@ -405,7 +409,7 @@ fn render_filled_arc_sector(
     stroke_width: Float,
 ) {
     let radius_i = radius as i32;
-    
+
     // Fill the sector by checking each pixel in the bounding box
     for y in (center_y - radius_i)..=(center_y + radius_i) {
         for x in (center_x - radius_i)..=(center_x + radius_i) {
@@ -413,23 +417,27 @@ fn render_filled_arc_sector(
                 let dx = (x - center_x) as Float;
                 let dy = (y - center_y) as Float;
                 let distance = (dx * dx + dy * dy).sqrt();
-                
+
                 if distance <= radius {
                     // Calculate angle of this pixel
                     let angle = dy.atan2(dx);
                     let angle_deg = angle * 180.0 / std::f32::consts::PI;
-                    let normalized_angle = if angle_deg < 0.0 { angle_deg + 360.0 } else { angle_deg };
-                    
+                    let normalized_angle = if angle_deg < 0.0 {
+                        angle_deg + 360.0
+                    } else {
+                        angle_deg
+                    };
+
                     // Check if this angle is within our arc
                     let start_deg = start_rad * 180.0 / std::f32::consts::PI;
                     let end_deg = end_rad * 180.0 / std::f32::consts::PI;
-                    
+
                     let angle_in_arc = if end_deg > start_deg {
                         normalized_angle >= start_deg && normalized_angle <= end_deg
                     } else {
                         normalized_angle >= start_deg || normalized_angle <= end_deg
                     };
-                    
+
                     if angle_in_arc {
                         imgbuf.put_pixel(x as u32, y as u32, fill_color);
                     }
@@ -437,18 +445,43 @@ fn render_filled_arc_sector(
             }
         }
     }
-    
+
     // Draw the arc outline
-    render_arc_curve(imgbuf, center_x, center_y, radius, start_rad, end_rad, stroke_color, stroke_width);
-    
+    render_arc_curve(
+        imgbuf,
+        center_x,
+        center_y,
+        radius,
+        start_rad,
+        end_rad,
+        stroke_color,
+        stroke_width,
+    );
+
     // Draw lines from center to arc endpoints for filled sectors
     let start_x = center_x + (radius * start_rad.cos()) as i32;
     let start_y = center_y + (radius * start_rad.sin()) as i32;
     let end_x = center_x + (radius * end_rad.cos()) as i32;
     let end_y = center_y + (radius * end_rad.sin()) as i32;
-    
-    draw_anti_aliased_line(imgbuf, center_x, center_y, start_x, start_y, stroke_color, stroke_width);
-    draw_anti_aliased_line(imgbuf, center_x, center_y, end_x, end_y, stroke_color, stroke_width);
+
+    draw_anti_aliased_line(
+        imgbuf,
+        center_x,
+        center_y,
+        start_x,
+        start_y,
+        stroke_color,
+        stroke_width,
+    );
+    draw_anti_aliased_line(
+        imgbuf,
+        center_x,
+        center_y,
+        end_x,
+        end_y,
+        stroke_color,
+        stroke_width,
+    );
 }
 
 // Helper function to render just the arc curve
@@ -469,12 +502,12 @@ fn render_arc_curve(
     } else {
         (2.0 * std::f32::consts::PI) - start_rad + end_rad
     };
-    
+
     let angle_step = angle_range / num_steps as Float;
-    
+
     let mut prev_x = center_x + (radius * start_rad.cos()) as i32;
     let mut prev_y = center_y + (radius * start_rad.sin()) as i32;
-    
+
     for i in 1..=num_steps {
         let current_angle = if end_rad > start_rad {
             start_rad + angle_step * i as Float
@@ -486,12 +519,20 @@ fn render_arc_curve(
                 angle
             }
         };
-        
+
         let current_x = center_x + (radius * current_angle.cos()) as i32;
         let current_y = center_y + (radius * current_angle.sin()) as i32;
-        
-        draw_anti_aliased_line(imgbuf, prev_x, prev_y, current_x, current_y, stroke_color, stroke_width);
-        
+
+        draw_anti_aliased_line(
+            imgbuf,
+            prev_x,
+            prev_y,
+            current_x,
+            current_y,
+            stroke_color,
+            stroke_width,
+        );
+
         prev_x = current_x;
         prev_y = current_y;
     }
@@ -1549,6 +1590,156 @@ pub fn measure_text_ultra_tight(text: &str, options: &TextOptions) -> (Float, Fl
 
     println!("ULTRA TIGHT: '{}' -> {:.2}x{:.2}", text, width, height);
     (width as Float, height as Float)
+}
+
+===/src/bin/arrows-ellipses.rs===
+// src/bin/arrows_ellipses_demo.rs
+// Demo program to test arrows and ellipses positioning
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🏹 Arrows and Ellipses Demo Starting...\n");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("arrows_ellipses_demo");
+    std::fs::create_dir_all(&output_dir)?;
+
+    // Generate various demos to test positioning
+    generate_basic_arrows_demo(&output_dir)?;
+    generate_basic_ellipses_demo(&output_dir)?;
+    generate_mixed_positioning_demo(&output_dir)?;
+    generate_free_container_test(&output_dir)?;
+
+    println!("\n✅ All arrows and ellipses demos generated successfully!");
+    println!("📁 Files saved in: {}", output_dir.display());
+
+    Ok(())
+}
+
+// Demo 1: Basic Arrows in Different Layouts
+fn generate_basic_arrows_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","arrows_hstack","arrows_free"],"h_align":"center"}
+{"id":"title","type":"text","content":"🏹 Arrow Positioning Test","font_size":24,"color":"darkblue"}
+{"id":"arrows_hstack","type":"vstack","children":["hstack_label","hstack_arrows"],"h_align":"center"}
+{"id":"hstack_label","type":"text","content":"Arrows in HStack","font_size":16,"color":"#333"}
+{"id":"hstack_arrows","type":"hstack","children":["arrow1","arrow2","arrow3"],"v_align":"center"}
+{"id":"arrow1","type":"line","start_x":0,"start_y":0,"end_x":50,"end_y":0,"stroke_color":"red","stroke_width":3}
+{"id":"arrow2","type":"line","start_x":0,"start_y":0,"end_x":0,"end_y":50,"stroke_color":"green","stroke_width":3}
+{"id":"arrow3","type":"line","start_x":0,"start_y":0,"end_x":50,"end_y":50,"stroke_color":"blue","stroke_width":3}
+{"id":"arrows_free","type":"vstack","children":["free_label","free_container"],"h_align":"center"}
+{"id":"free_label","type":"text","content":"Arrows in Free Container","font_size":16,"color":"#333"}
+{"id":"free_container","type":"free_container","width":300,"height":200,"children":["arrow4","arrow5","arrow6"]}
+{"id":"arrow4","type":"line","start_x":50,"start_y":50,"end_x":100,"end_y":50,"stroke_color":"red","stroke_width":3,"x":0,"y":0}
+{"id":"arrow5","type":"line","start_x":150,"start_y":50,"end_x":150,"end_y":100,"stroke_color":"green","stroke_width":3,"x":0,"y":0}
+{"id":"arrow6","type":"line","start_x":200,"start_y":50,"end_x":250,"end_y":100,"stroke_color":"blue","stroke_width":3,"x":0,"y":0}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("01_basic_arrows.svg"), "Basic Arrows Test")
+}
+
+// Demo 2: Basic Ellipses in Different Layouts
+fn generate_basic_ellipses_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","ellipses_hstack","ellipses_free"],"h_align":"center"}
+{"id":"title","type":"text","content":"⭕ Ellipse Positioning Test","font_size":24,"color":"darkgreen"}
+{"id":"ellipses_hstack","type":"vstack","children":["hstack_label","hstack_ellipses"],"h_align":"center"}
+{"id":"hstack_label","type":"text","content":"Ellipses in HStack","font_size":16,"color":"#333"}
+{"id":"hstack_ellipses","type":"hstack","children":["ellipse1","ellipse2","ellipse3"],"v_align":"center"}
+{"id":"ellipse1","type":"ellipse","cx":20,"cy":20,"rx":20,"ry":20,"fill":"red","stroke":"darkred","stroke_width":2}
+{"id":"ellipse2","type":"ellipse","cx":15,"cy":30,"rx":15,"ry":30,"fill":"green","stroke":"darkgreen","stroke_width":2}
+{"id":"ellipse3","type":"ellipse","cx":30,"cy":15,"rx":30,"ry":15,"fill":"blue","stroke":"darkblue","stroke_width":2}
+{"id":"ellipses_free","type":"vstack","children":["free_label","free_ellipses_container"],"h_align":"center"}
+{"id":"free_label","type":"text","content":"Ellipses in Free Container","font_size":16,"color":"#333"}
+{"id":"free_ellipses_container","type":"free_container","width":300,"height":200,"children":["ellipse4","ellipse5","ellipse6"]}
+{"id":"ellipse4","type":"ellipse","cx":30,"cy":30,"rx":25,"ry":25,"fill":"red","stroke":"darkred","stroke_width":2,"x":20,"y":20}
+{"id":"ellipse5","type":"ellipse","cx":30,"cy":30,"rx":20,"ry":35,"fill":"green","stroke":"darkgreen","stroke_width":2,"x":120,"y":20}
+{"id":"ellipse6","type":"ellipse","cx":30,"cy":30,"rx":35,"ry":20,"fill":"blue","stroke":"darkblue","stroke_width":2,"x":220,"y":20}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("02_basic_ellipses.svg"), "Basic Ellipses Test")
+}
+
+// Demo 3: Mixed Positioning - Arrows and Ellipses Together
+fn generate_mixed_positioning_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","mixed_demo"],"h_align":"center"}
+{"id":"title","type":"text","content":"Mixed Arrows & Ellipses","font_size":24,"color":"darkorange"}
+{"id":"mixed_demo","type":"free_container","width":400,"height":300,"children":["target1","target2","target3","arrow_to_1","arrow_to_2","arrow_to_3","labels"]}
+{"id":"target1","type":"ellipse","cx":25,"cy":25,"rx":20,"ry":20,"fill":"red","stroke":"darkred","stroke_width":3,"x":50,"y":50}
+{"id":"target2","type":"ellipse","cx":25,"cy":25,"rx":20,"ry":20,"fill":"green","stroke":"darkgreen","stroke_width":3,"x":200,"y":50}
+{"id":"target3","type":"ellipse","cx":25,"cy":25,"rx":20,"ry":20,"fill":"blue","stroke":"darkblue","stroke_width":3,"x":125,"y":150}
+{"id":"arrow_to_1","type":"line","start_x":10,"start_y":10,"end_x":65,"end_y":65,"stroke_color":"black","stroke_width":2,"x":10,"y":10}
+{"id":"arrow_to_2","type":"line","start_x":10,"start_y":10,"end_x":75,"end_y":65,"stroke_color":"black","stroke_width":2,"x":150,"y":10}
+{"id":"arrow_to_3","type":"line","start_x":10,"start_y":10,"end_x":40,"end_y":65,"stroke_color":"black","stroke_width":2,"x":100,"y":100}
+{"id":"labels","type":"vstack","children":["label1","label2"],"h_align":"left","x":50,"y":250}
+{"id":"label1","type":"text","content":"• Arrows should point toward ellipses","font_size":12,"color":"#333"}
+{"id":"label2","type":"text","content":"• If positioning works, arrows point to targets","font_size":12,"color":"#333"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("03_mixed_positioning.svg"), "Mixed Arrows & Ellipses")
+}
+
+// Demo 4: Free Container Edge Cases
+fn generate_free_container_test(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","edge_cases"],"h_align":"center"}
+{"id":"title","type":"text","content":"🔍 Edge Case Testing","font_size":24,"color":"darkviolet"}
+{"id":"edge_cases","type":"free_container","width":500,"height":400,"children":["corner_ellipses","center_cross","coordinate_test"]}
+{"id":"corner_ellipses","type":"free_container","width":200,"height":200,"children":["tl_ellipse","tr_ellipse","bl_ellipse","br_ellipse"],"x":20,"y":20}
+{"id":"tl_ellipse","type":"ellipse","cx":15,"cy":15,"rx":10,"ry":10,"fill":"red","stroke":"darkred","stroke_width":1,"x":0,"y":0}
+{"id":"tr_ellipse","type":"ellipse","cx":15,"cy":15,"rx":10,"ry":10,"fill":"green","stroke":"darkgreen","stroke_width":1,"x":170,"y":0}
+{"id":"bl_ellipse","type":"ellipse","cx":15,"cy":15,"rx":10,"ry":10,"fill":"blue","stroke":"darkblue","stroke_width":1,"x":0,"y":170}
+{"id":"br_ellipse","type":"ellipse","cx":15,"cy":15,"rx":10,"ry":10,"fill":"orange","stroke":"darkorange","stroke_width":1,"x":170,"y":170}
+{"id":"center_cross","type":"free_container","width":100,"height":100,"children":["h_line","v_line","center_dot"],"x":250,"y":50}
+{"id":"h_line","type":"line","start_x":0,"start_y":50,"end_x":100,"end_y":50,"stroke_color":"black","stroke_width":2,"x":0,"y":0}
+{"id":"v_line","type":"line","start_x":50,"start_y":0,"end_x":50,"end_y":100,"stroke_color":"black","stroke_width":2,"x":0,"y":0}
+{"id":"center_dot","type":"ellipse","cx":5,"cy":5,"rx":5,"ry":5,"fill":"red","stroke":"darkred","stroke_width":1,"x":45,"y":45}
+{"id":"coordinate_test","type":"vstack","children":["coord_label","coord_details"],"h_align":"left","x":50,"y":300}
+{"id":"coord_label","type":"text","content":"Coordinate System Test:","font_size":14,"color":"#333"}
+{"id":"coord_details","type":"vstack","children":["detail1","detail2","detail3"],"h_align":"left"}
+{"id":"detail1","type":"text","content":"• Corner ellipses should be at actual corners","font_size":11,"color":"#666"}
+{"id":"detail2","type":"text","content":"• Cross lines should intersect at red dot center","font_size":11,"color":"#666"}
+{"id":"detail3","type":"text","content":"• All shapes should be positioned as specified","font_size":11,"color":"#666"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("04_edge_cases.svg"), "Edge Case Testing")
+}
+
+// Helper function to generate SVG from JSONL
+fn generate_svg_from_jsonl(
+    jsonl_input: &str,
+    output_path: std::path::PathBuf,
+    description: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("  📄 Generating: {}", description);
+
+    // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(jsonl_input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+    println!("    ✅ Saved: {}", output_path.file_name().unwrap().to_str().unwrap());
+
+    Ok(())
 }
 
 ===/src/bin/city.rs===
@@ -3266,6 +3457,228 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+===/src/bin/arcs.rs===
+// src/bin/arc_shapes_demo.rs
+// Demo program showcasing Arc, Semicircle, and Quarter Circle shapes
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🌀 Arc Shapes Demo Starting...\n");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("arc_shapes_demo");
+    std::fs::create_dir_all(&output_dir)?;
+
+    // Generate various arc shape demonstrations
+    generate_basic_arcs_demo(&output_dir)?;
+    generate_semicircles_demo(&output_dir)?;
+    generate_quarter_circles_demo(&output_dir)?;
+    generate_filled_arcs_demo(&output_dir)?;
+    generate_complex_arc_patterns(&output_dir)?;
+    generate_arc_dashboard(&output_dir)?;
+
+    println!("\n✅ All arc shape demos generated successfully!");
+    println!("📁 Files saved in: {}", output_dir.display());
+
+    Ok(())
+}
+
+// Demo 1: Basic Arc Shapes
+fn generate_basic_arcs_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","arcs_container"],"h_align":"center"}
+{"id":"title","type":"text","content":"🌀 Basic Arc Shapes","font_size":24,"color":"darkblue"}
+{"id":"arcs_container","type":"free_container","width":900,"height":400,"children":["arc_45","arc_90","arc_180","arc_270","arc_300","labels"]}
+{"id":"arc_45","type":"arc","cx":0,"cy":0,"radius":40,"start_angle":0,"end_angle":45,"stroke_color":"#ff4444","stroke_width":3,"x":80,"y":120}
+{"id":"arc_90","type":"arc","cx":0,"cy":0,"radius":40,"start_angle":0,"end_angle":90,"stroke_color":"#44ff44","stroke_width":3,"x":200,"y":120}
+{"id":"arc_180","type":"arc","cx":0,"cy":0,"radius":40,"start_angle":0,"end_angle":180,"stroke_color":"#4444ff","stroke_width":3,"x":320,"y":120}
+{"id":"arc_270","type":"arc","cx":0,"cy":0,"radius":40,"start_angle":0,"end_angle":270,"stroke_color":"#ff44ff","stroke_width":3,"x":440,"y":120}
+{"id":"arc_300","type":"arc","cx":0,"cy":0,"radius":40,"start_angle":0,"end_angle":300,"stroke_color":"#44ffff","stroke_width":3,"x":560,"y":120}
+{"id":"labels","type":"vstack","children":["label_45","label_90","label_180","label_270","label_300"],"h_align":"left","x":50,"y":320}
+{"id":"label_45","type":"text","content":"• 45° Arc (Red)","font_size":14,"color":"#ff4444"}
+{"id":"label_90","type":"text","content":"• 90° Arc (Green)","font_size":14,"color":"#44ff44"}
+{"id":"label_180","type":"text","content":"• 180° Arc (Blue)","font_size":14,"color":"#4444ff"}
+{"id":"label_270","type":"text","content":"• 270° Arc (Magenta)","font_size":14,"color":"#ff44ff"}
+{"id":"label_300","type":"text","content":"• 300° Arc (Cyan)","font_size":14,"color":"#44ffff"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("01_basic_arcs.svg"), "Basic Arc Shapes")
+}
+
+// Demo 2: Semicircles in Different Orientations
+fn generate_semicircles_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","semicircles_layout"],"h_align":"center"}
+{"id":"title","type":"text","content":"🔄 Semicircle Variations","font_size":24,"color":"darkgreen"}
+{"id":"semicircles_layout","type":"free_container","width":600,"height":350,"children":["semi_up","semi_down","semi_left","semi_right","descriptions"]}
+{"id":"semi_up","type":"semicircle","cx":150,"cy":150,"radius":50,"facing_up":true,"stroke_color":"#e74c3c","stroke_width":4,"filled":false,"x":0,"y":0}
+{"id":"semi_down","type":"semicircle","cx":450,"cy":150,"radius":50,"facing_up":false,"stroke_color":"#3498db","stroke_width":4,"filled":false,"x":0,"y":0}
+{"id":"semi_left","type":"arc","cx":150,"cy":300,"radius":50,"start_angle":90,"end_angle":270,"stroke_color":"#f39c12","stroke_width":4,"x":0,"y":0}
+{"id":"semi_right","type":"arc","cx":450,"cy":300,"radius":50,"start_angle":270,"end_angle":90,"stroke_color":"#9b59b6","stroke_width":4,"x":0,"y":0}
+{"id":"descriptions","type":"vstack","children":["desc1","desc2","desc3","desc4"],"h_align":"left","x":50,"y":50}
+{"id":"desc1","type":"text","content":"Top Semicircle (0°-180°)","font_size":12,"color":"#e74c3c"}
+{"id":"desc2","type":"text","content":"Bottom Semicircle (180°-360°)","font_size":12,"color":"#3498db"}
+{"id":"desc3","type":"text","content":"Left Semicircle (90°-270°)","font_size":12,"color":"#f39c12"}
+{"id":"desc4","type":"text","content":"Right Semicircle (270°-90°)","font_size":12,"color":"#9b59b6"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("02_semicircles.svg"), "Semicircle Variations")
+}
+
+// Demo 3: Quarter Circles in All Quadrants
+fn generate_quarter_circles_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","quarters_container"],"h_align":"center"}
+{"id":"title","type":"text","content":"📐 Quarter Circle Quadrants","font_size":24,"color":"darkorchid"}
+{"id":"quarters_container","type":"free_container","width":400,"height":400,"children":["q1","q2","q3","q4","center_point","quadrant_labels"]}
+{"id":"q1","type":"quarter_circle","cx":200,"cy":200,"radius":80,"quadrant":1,"stroke_color":"#e74c3c","stroke_width":5,"filled":false,"x":0,"y":0}
+{"id":"q2","type":"quarter_circle","cx":200,"cy":200,"radius":80,"quadrant":2,"stroke_color":"#2ecc71","stroke_width":5,"filled":false,"x":0,"y":0}
+{"id":"q3","type":"quarter_circle","cx":200,"cy":200,"radius":80,"quadrant":3,"stroke_color":"#3498db","stroke_width":5,"filled":false,"x":0,"y":0}
+{"id":"q4","type":"quarter_circle","cx":200,"cy":200,"radius":80,"quadrant":4,"stroke_color":"#f39c12","stroke_width":5,"filled":false,"x":0,"y":0}
+{"id":"center_point","type":"ellipse","cx":5,"cy":5,"rx":5,"ry":5,"fill":"black","x":195,"y":195}
+{"id":"quadrant_labels","type":"vstack","children":["q1_label","q2_label","q3_label","q4_label"],"h_align":"left","x":50,"y":50}
+{"id":"q1_label","type":"text","content":"Q1: Top-Right (0°-90°)","font_size":12,"color":"#e74c3c"}
+{"id":"q2_label","type":"text","content":"Q2: Top-Left (90°-180°)","font_size":12,"color":"#2ecc71"}
+{"id":"q3_label","type":"text","content":"Q3: Bottom-Left (180°-270°)","font_size":12,"color":"#3498db"}
+{"id":"q4_label","type":"text","content":"Q4: Bottom-Right (270°-360°)","font_size":12,"color":"#f39c12"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("03_quarter_circles.svg"), "Quarter Circle Quadrants")
+}
+
+// Demo 4: Filled vs Unfilled Arcs
+fn generate_filled_arcs_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","filled_comparison"],"h_align":"center"}
+{"id":"title","type":"text","content":"🎨 Filled vs Unfilled Arcs","font_size":24,"color":"darkred"}
+{"id":"filled_comparison","type":"hstack","children":["unfilled_section","filled_section"],"v_align":"center"}
+{"id":"unfilled_section","type":"vstack","children":["unfilled_label","unfilled_arcs"],"h_align":"center"}
+{"id":"unfilled_label","type":"text","content":"Outline Only","font_size":16,"color":"#333"}
+{"id":"unfilled_arcs","type":"hstack","children":["arc_outline_1","arc_outline_2","arc_outline_3"],"v_align":"center"}
+{"id":"arc_outline_1","type":"arc","cx":40,"cy":40,"radius":25,"start_angle":0,"end_angle":90,"stroke_color":"#e74c3c","stroke_width":4,"filled":false}
+{"id":"arc_outline_2","type":"arc","cx":40,"cy":40,"radius":25,"start_angle":0,"end_angle":180,"stroke_color":"#3498db","stroke_width":4,"filled":false}
+{"id":"arc_outline_3","type":"arc","cx":40,"cy":40,"radius":25,"start_angle":0,"end_angle":270,"stroke_color":"#2ecc71","stroke_width":4,"filled":false}
+{"id":"filled_section","type":"vstack","children":["filled_label","filled_arcs"],"h_align":"center"}
+{"id":"filled_label","type":"text","content":"Filled Sectors","font_size":16,"color":"#333"}
+{"id":"filled_arcs","type":"hstack","children":["arc_filled_1","arc_filled_2","arc_filled_3"],"v_align":"center"}
+{"id":"arc_filled_1","type":"arc","cx":40,"cy":40,"radius":25,"start_angle":0,"end_angle":90,"stroke_color":"#c0392b","stroke_width":2,"fill_color":"#e74c3c","filled":true}
+{"id":"arc_filled_2","type":"arc","cx":40,"cy":40,"radius":25,"start_angle":0,"end_angle":180,"stroke_color":"#2980b9","stroke_width":2,"fill_color":"#3498db","filled":true}
+{"id":"arc_filled_3","type":"arc","cx":40,"cy":40,"radius":25,"start_angle":0,"end_angle":270,"stroke_color":"#27ae60","stroke_width":2,"fill_color":"#2ecc71","filled":true}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("04_filled_arcs.svg"), "Filled vs Unfilled Arcs")
+}
+
+// Demo 5: Complex Arc Patterns
+fn generate_complex_arc_patterns(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["title","patterns_container"],"h_align":"center"}
+{"id":"title","type":"text","content":"🌟 Complex Arc Patterns","font_size":24,"color":"darkcyan"}
+{"id":"patterns_container","type":"free_container","width":800,"height":500,"children":["flower_pattern","spiral_pattern","clock_pattern","legend"]}
+{"id":"flower_pattern","type":"free_container","width":200,"height":200,"children":["petal1","petal2","petal3","petal4","petal5","petal6","flower_center"],"x":50,"y":50}
+{"id":"petal1","type":"arc","cx":100,"cy":100,"radius":40,"start_angle":0,"end_angle":60,"stroke_color":"#e91e63","stroke_width":4,"fill_color":"#fce4ec","filled":true}
+{"id":"petal2","type":"arc","cx":100,"cy":100,"radius":40,"start_angle":60,"end_angle":120,"stroke_color":"#e91e63","stroke_width":4,"fill_color":"#f8bbd9","filled":true}
+{"id":"petal3","type":"arc","cx":100,"cy":100,"radius":40,"start_angle":120,"end_angle":180,"stroke_color":"#e91e63","stroke_width":4,"fill_color":"#fce4ec","filled":true}
+{"id":"petal4","type":"arc","cx":100,"cy":100,"radius":40,"start_angle":180,"end_angle":240,"stroke_color":"#e91e63","stroke_width":4,"fill_color":"#f8bbd9","filled":true}
+{"id":"petal5","type":"arc","cx":100,"cy":100,"radius":40,"start_angle":240,"end_angle":300,"stroke_color":"#e91e63","stroke_width":4,"fill_color":"#fce4ec","filled":true}
+{"id":"petal6","type":"arc","cx":100,"cy":100,"radius":40,"start_angle":300,"end_angle":360,"stroke_color":"#e91e63","stroke_width":4,"fill_color":"#f8bbd9","filled":true}
+{"id":"flower_center","type":"ellipse","cx":10,"cy":10,"rx":10,"ry":10,"fill":"#ffeb3b","stroke":"#ff9800","stroke_width":2,"x":90,"y":90}
+{"id":"spiral_pattern","type":"free_container","width":200,"height":200,"children":["spiral1","spiral2","spiral3","spiral4","spiral5"],"x":300,"y":50}
+{"id":"spiral1","type":"arc","cx":100,"cy":100,"radius":20,"start_angle":0,"end_angle":270,"stroke_color":"#9c27b0","stroke_width":6,"filled":false}
+{"id":"spiral2","type":"arc","cx":100,"cy":100,"radius":35,"start_angle":45,"end_angle":315,"stroke_color":"#673ab7","stroke_width":5,"filled":false}
+{"id":"spiral3","type":"arc","cx":100,"cy":100,"radius":50,"start_angle":90,"end_angle":360,"stroke_color":"#3f51b5","stroke_width":4,"filled":false}
+{"id":"spiral4","type":"arc","cx":100,"cy":100,"radius":65,"start_angle":135,"end_angle":405,"stroke_color":"#2196f3","stroke_width":3,"filled":false}
+{"id":"spiral5","type":"arc","cx":100,"cy":100,"radius":80,"start_angle":180,"end_angle":450,"stroke_color":"#03a9f4","stroke_width":2,"filled":false}
+{"id":"clock_pattern","type":"free_container","width":200,"height":200,"children":["clock_12","clock_3","clock_6","clock_9","clock_center","hour_hand","minute_hand"],"x":550,"y":50}
+{"id":"clock_12","type":"quarter_circle","cx":100,"cy":100,"radius":80,"quadrant":1,"stroke_color":"#795548","stroke_width":3,"filled":false}
+{"id":"clock_3","type":"quarter_circle","cx":100,"cy":100,"radius":80,"quadrant":4,"stroke_color":"#795548","stroke_width":3,"filled":false}
+{"id":"clock_6","type":"quarter_circle","cx":100,"cy":100,"radius":80,"quadrant":3,"stroke_color":"#795548","stroke_width":3,"filled":false}
+{"id":"clock_9","type":"quarter_circle","cx":100,"cy":100,"radius":80,"quadrant":2,"stroke_color":"#795548","stroke_width":3,"filled":false}
+{"id":"clock_center","type":"ellipse","cx":8,"cy":8,"rx":8,"ry":8,"fill":"#424242","x":92,"y":92}
+{"id":"hour_hand","type":"line","start_x":100,"start_y":100,"end_x":100,"end_y":60,"stroke_color":"#212121","stroke_width":4,"x":0,"y":0}
+{"id":"minute_hand","type":"line","start_x":100,"start_y":100,"end_x":130,"end_y":100,"stroke_color":"#424242","stroke_width":2,"x":0,"y":0}
+{"id":"legend","type":"vstack","children":["flower_desc","spiral_desc","clock_desc"],"h_align":"left","x":50,"y":300}
+{"id":"flower_desc","type":"text","content":"🌸 Flower Pattern: 6 filled arc petals (60° each)","font_size":14,"color":"#e91e63"}
+{"id":"spiral_desc","type":"text","content":"🌀 Spiral Pattern: Concentric arcs with increasing radius","font_size":14,"color":"#9c27b0"}
+{"id":"clock_desc","type":"text","content":"🕒 Clock Pattern: Quarter circles forming clock face","font_size":14,"color":"#795548"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("05_complex_patterns.svg"), "Complex Arc Patterns")
+}
+
+// Demo 6: Arc Dashboard with Various Metrics
+fn generate_arc_dashboard(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl_input = r##"
+{"id":"root","type":"vstack","children":["header","dashboard_content"],"h_align":"center"}
+{"id":"header","type":"text","content":"📊 Arc-Based Dashboard","font_size":26,"color":"#2c3e50"}
+{"id":"dashboard_content","type":"free_container","width":900,"height":600,"children":["progress_gauges","pie_charts","status_indicators","dashboard_labels"]}
+{"id":"progress_gauges","type":"free_container","width":300,"height":200,"children":["gauge1_bg","gauge1_fill","gauge1_text","gauge2_bg","gauge2_fill","gauge2_text","gauge3_bg","gauge3_fill","gauge3_text"],"x":50,"y":50}
+{"id":"gauge1_bg","type":"arc","cx":100,"cy":100,"radius":60,"start_angle":180,"end_angle":360,"stroke_color":"#ecf0f1","stroke_width":12,"filled":false}
+{"id":"gauge1_fill","type":"arc","cx":100,"cy":100,"radius":60,"start_angle":180,"end_angle":288,"stroke_color":"#e74c3c","stroke_width":12,"filled":false}
+{"id":"gauge1_text","type":"text","content":"CPU 60%","font_size":12,"color":"#2c3e50","x":75,"y":120}
+{"id":"gauge2_bg","type":"arc","cx":100,"cy":250,"radius":60,"start_angle":180,"end_angle":360,"stroke_color":"#ecf0f1","stroke_width":12,"filled":false}
+{"id":"gauge2_fill","type":"arc","cx":100,"cy":250,"radius":60,"start_angle":180,"end_angle":324,"stroke_color":"#f39c12","stroke_width":12,"filled":false}
+{"id":"gauge2_text","type":"text","content":"RAM 80%","font_size":12,"color":"#2c3e50","x":75,"y":270}
+{"id":"gauge3_bg","type":"arc","cx":250,"cy":175,"radius":60,"start_angle":180,"end_angle":360,"stroke_color":"#ecf0f1","stroke_width":12,"filled":false}
+{"id":"gauge3_fill","type":"arc","cx":250,"cy":175,"radius":60,"start_angle":180,"end_angle":252,"stroke_color":"#27ae60","stroke_width":12,"filled":false}
+{"id":"gauge3_text","type":"text","content":"Disk 40%","font_size":12,"color":"#2c3e50","x":225,"y":195}
+{"id":"pie_charts","type":"free_container","width":250,"height":250,"children":["pie1_s1","pie1_s2","pie1_s3","pie1_s4","pie2_s1","pie2_s2","pie2_s3"],"x":400,"y":50}
+{"id":"pie1_s1","type":"arc","cx":80,"cy":80,"radius":50,"start_angle":0,"end_angle":144,"stroke_color":"#3498db","stroke_width":2,"fill_color":"#3498db","filled":true}
+{"id":"pie1_s2","type":"arc","cx":80,"cy":80,"radius":50,"start_angle":144,"end_angle":216,"stroke_color":"#e74c3c","stroke_width":2,"fill_color":"#e74c3c","filled":true}
+{"id":"pie1_s3","type":"arc","cx":80,"cy":80,"radius":50,"start_angle":216,"end_angle":288,"stroke_color":"#2ecc71","stroke_width":2,"fill_color":"#2ecc71","filled":true}
+{"id":"pie1_s4","type":"arc","cx":80,"cy":80,"radius":50,"start_angle":288,"end_angle":360,"stroke_color":"#f39c12","stroke_width":2,"fill_color":"#f39c12","filled":true}
+{"id":"pie2_s1","type":"arc","cx":80,"cy":200,"radius":40,"start_angle":0,"end_angle":180,"stroke_color":"#9b59b6","stroke_width":2,"fill_color":"#9b59b6","filled":true}
+{"id":"pie2_s2","type":"arc","cx":80,"cy":200,"radius":40,"start_angle":180,"end_angle":270,"stroke_color":"#1abc9c","stroke_width":2,"fill_color":"#1abc9c","filled":true}
+{"id":"pie2_s3","type":"arc","cx":80,"cy":200,"radius":40,"start_angle":270,"end_angle":360,"stroke_color":"#e67e22","stroke_width":2,"fill_color":"#e67e22","filled":true}
+{"id":"status_indicators","type":"free_container","width":200,"height":300,"children":["status1","status2","status3","status4"],"x":700,"y":50}
+{"id":"status1","type":"arc","cx":50,"cy":50,"radius":30,"start_angle":0,"end_angle":90,"stroke_color":"#27ae60","stroke_width":8,"filled":false}
+{"id":"status2","type":"arc","cx":150,"cy":50,"radius":30,"start_angle":0,"end_angle":180,"stroke_color":"#f39c12","stroke_width":8,"filled":false}
+{"id":"status3","type":"arc","cx":50,"cy":150,"radius":30,"start_angle":0,"end_angle":270,"stroke_color":"#e74c3c","stroke_width":8,"filled":false}
+{"id":"status4","type":"arc","cx":150,"cy":150,"radius":30,"start_angle":0,"end_angle":360,"stroke_color":"#8e44ad","stroke_width":8,"filled":false}
+{"id":"dashboard_labels","type":"vstack","children":["gauges_label","pie_label","status_label"],"h_align":"left","x":50,"y":400}
+{"id":"gauges_label","type":"text","content":"📈 Progress Gauges: System resource usage","font_size":16,"color":"#34495e"}
+{"id":"pie_label","type":"text","content":"🍰 Pie Charts: Data distribution visualization","font_size":16,"color":"#34495e"}
+{"id":"status_label","type":"text","content":"🔄 Status Indicators: Service availability levels","font_size":16,"color":"#34495e"}
+"##;
+
+    generate_svg_from_jsonl(jsonl_input, output_dir.join("06_arc_dashboard.svg"), "Arc-Based Dashboard")
+}
+
+// Helper function to generate SVG from JSONL
+fn generate_svg_from_jsonl(
+    jsonl_input: &str,
+    output_path: std::path::PathBuf,
+    description: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("  📄 Generating: {}", description);
+
+    // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(jsonl_input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+    println!("    ✅ Saved: {}", output_path.file_name().unwrap().to_str().unwrap());
+
+    Ok(())
+}
 ===/src/lib.rs===
 pub mod measure_text; 
 
@@ -3821,86 +4234,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
-textwrap = "0.16.0"
-
-===/target/CACHEDIR.TAG===
-Signature: 8a477f597d28d172789f06886806bc55
-# This file is a cache directory tag created by cargo.
-# For information about cache directory tags see https://bford.info/cachedir/
-
-===/target/debug/.fingerprint/layout-base-d68186a17e09bb62/lib-layout-base===
-e1fb921afd0324c9
-===/target/debug/.fingerprint/layout-base-d68186a17e09bb62/invoked.timestamp===
-This file has an mtime of when this was started.
-===/target/debug/.fingerprint/layout-base-3046ca7ae66b4c03/test-lib-layout-base===
-c2a4ddc523aefc46
-===/target/debug/.fingerprint/layout-base-3046ca7ae66b4c03/invoked.timestamp===
-This file has an mtime of when this was started.
-===/target/debug/.fingerprint/layout-base-eed9ca7d180c0e5c/lib-layout-base===
-9111b90f7f500e00
-===/target/debug/.fingerprint/layout-base-eed9ca7d180c0e5c/invoked.timestamp===
-This file has an mtime of when this was started.
-===/target/debug/.fingerprint/layout-base-65ec7ba58964b4ee/test-lib-layout-base===
-23f059a2e9751bb5
-===/target/debug/.fingerprint/layout-base-65ec7ba58964b4ee/invoked.timestamp===
-This file has an mtime of when this was started.
-===/target/debug/deps/layout_base-65ec7ba58964b4ee.d===
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-65ec7ba58964b4ee.rmeta: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-65ec7ba58964b4ee.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-src/lib.rs:
-src/diagram_layout.rs:
-src/location.rs:
-src/shape_box.rs:
-src/bounding_box.rs:
-src/shape_text.rs:
-src/shape_group.rs:
-src/session.rs:
-
-===/target/debug/deps/layout_base-eed9ca7d180c0e5c.d===
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-eed9ca7d180c0e5c.rmeta: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/liblayout_base-eed9ca7d180c0e5c.rlib: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-eed9ca7d180c0e5c.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-src/lib.rs:
-src/diagram_layout.rs:
-src/location.rs:
-src/shape_box.rs:
-src/bounding_box.rs:
-src/shape_text.rs:
-src/shape_group.rs:
-src/session.rs:
-
-===/target/debug/deps/layout_base-3046ca7ae66b4c03.d===
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-3046ca7ae66b4c03: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-3046ca7ae66b4c03.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-src/lib.rs:
-src/diagram_layout.rs:
-src/location.rs:
-src/shape_box.rs:
-src/bounding_box.rs:
-src/shape_text.rs:
-src/shape_group.rs:
-src/session.rs:
-
-===/target/debug/deps/layout_base-d68186a17e09bb62.d===
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-d68186a17e09bb62.rmeta: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-/Users/hugo/repos/github.com/volare/volare-visual-engine/volare-engine-layout/target/debug/deps/layout_base-d68186a17e09bb62.d: src/lib.rs src/diagram_layout.rs src/location.rs src/shape_box.rs src/bounding_box.rs src/shape_text.rs src/shape_group.rs src/session.rs
-
-src/lib.rs:
-src/diagram_layout.rs:
-src/location.rs:
-src/shape_box.rs:
-src/bounding_box.rs:
-src/shape_text.rs:
-src/shape_group.rs:
-src/session.rs:
+textwrap = "0.16.2"
 
 ===/Cargo.lock===
 # This file is automatically @generated by Cargo.
@@ -3949,12 +4283,12 @@ jobs:
 /* Layout calculation for each type of entity */
 
 use crate::components::Float;
-use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
     ShapeLine, ShapeText, Table, VerticalStack,
 };
+use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
@@ -3964,7 +4298,7 @@ The wrapped element position is relative to the box position.
 */
 pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
-    
+
     // Get the wrapped element dimensions
     let wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
     println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
@@ -4149,20 +4483,32 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
  * The position of the ellipse is the top left corner of the bounding box
  */
 pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
-    let w = shape_ellipse.radius.0 * 2.0;
-    let h = shape_ellipse.radius.1 * 2.0;
-    session.set_size(shape_ellipse.entity.clone(), w, h);
+    // The ellipse size should be the full diameter
+    let width = shape_ellipse.radius.0 * 2.0;
+    let height = shape_ellipse.radius.1 * 2.0;
+    
+    // Set the size for layout spacing calculations
+    session.set_size(shape_ellipse.entity.clone(), width, height);
+    
+    // Position at (0,0) - the layout system will position this appropriately
+    session.set_position(shape_ellipse.entity.clone(), 0.0, 0.0);
+    
+    // CRITICAL: The ellipse center coordinates (cx, cy) in the JSONL should be
+    // set to (radius_x, radius_y) so the ellipse is centered in its bounding box
+    // 
+    // For example:
+    // - rx=20, ry=20 → cx should be 20, cy should be 20 (for a 40x40 box)
+    // - rx=30, ry=15 → cx should be 30, cy should be 15 (for a 60x30 box)
 }
-
 pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
     // If the rect has a fixed size, use that
     let width = match rect.rect_options.width_behavior {
         SizeBehavior::Fixed(w) => w,
-        _ => 0.0
+        _ => 0.0,
     };
     let height = match rect.rect_options.height_behavior {
         SizeBehavior::Fixed(h) => h,
-        _ => 0.0
+        _ => 0.0,
     };
 
     session.set_size(rect.entity.clone(), width, height);
@@ -4172,24 +4518,19 @@ pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
  * Sets the image entity size to the preferred size
  */
 pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
-
     let width = match shape_image.width_behavior {
         SizeBehavior::Fixed(val) => val,
         SizeBehavior::Content => 100.0, // TODO: Obtener size de la data de la imagen
-        _ => 100.0
+        _ => 100.0,
     };
 
-     let height = match shape_image.height_behavior {
+    let height = match shape_image.height_behavior {
         SizeBehavior::Fixed(val) => val,
         SizeBehavior::Content => 100.0, // TODO: Obtener size de la data de la imagen
-        _ => 100.0
+        _ => 100.0,
     };
 
-    session.set_size(
-        shape_image.entity.clone(),
-        width,
-        height,
-    );
+    session.set_size(shape_image.entity.clone(), width, height);
 }
 
 /**
@@ -4210,17 +4551,17 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     }
     session.set_size(vertical_stack.entity.clone(), width, y);
 
-      // Second pass: only adjust x positions if alignment is specified
-        for elem in vertical_stack.elements.iter() {
-            let elem_size = session.get_size(elem.clone());
-            let current_pos = session.get_position(elem.clone());
-            let x = match vertical_stack.horizontal_alignment {
-                HorizontalAlignment::Left => 0.0,
-                HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
-                HorizontalAlignment::Right => width - elem_size.0,
-            };
-            session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y   
-        }
+    // Second pass: only adjust x positions if alignment is specified
+    for elem in vertical_stack.elements.iter() {
+        let elem_size = session.get_size(elem.clone());
+        let current_pos = session.get_position(elem.clone());
+        let x = match vertical_stack.horizontal_alignment {
+            HorizontalAlignment::Left => 0.0,
+            HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
+            HorizontalAlignment::Right => width - elem_size.0,
+        };
+        session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y
+    }
 }
 
 pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
@@ -4237,16 +4578,16 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
     session.set_size(horizontal_stack.entity.clone(), x, height);
 
     // Second pass: only adjust y positions, keep existing x positions
-        for elem in horizontal_stack.elements.iter() {
-            let elem_size = session.get_size(elem.clone());
-            let current_pos = session.get_position(elem.clone()); // Get the x we already set
-            let y = match horizontal_stack.vertical_alignment {
-                VerticalAlignment::Top => 0.0,
-                VerticalAlignment::Center => (height - elem_size.1) / 2.0,
-                VerticalAlignment::Bottom => height - elem_size.1,
-            };
-            session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
-        }
+    for elem in horizontal_stack.elements.iter() {
+        let elem_size = session.get_size(elem.clone());
+        let current_pos = session.get_position(elem.clone()); // Get the x we already set
+        let y = match horizontal_stack.vertical_alignment {
+            VerticalAlignment::Top => 0.0,
+            VerticalAlignment::Center => (height - elem_size.1) / 2.0,
+            VerticalAlignment::Bottom => height - elem_size.1,
+        };
+        session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
+    }
 }
 
 /**
@@ -4440,34 +4781,36 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 
+// BETTER FIX: Adjust the arc layout to work with existing renderer expectations
 
 /**
  * Updates the size of the arc entity based on the radius and angle sweep
- * The arc's bounding box is calculated from its center, radius, and angle range
+ * Sets position to (0,0) since arcs use their cx,cy for center positioning
+ * The size represents the full space needed for the arc
  */
 pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     use std::f32::consts::PI;
-    
+
     let radius = shape_arc.radius;
     let (start_angle, end_angle) = shape_arc.normalize_angles();
-    
+
     // Convert degrees to radians
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
-    
-    // Calculate the points at start and end angles
+
+    // Calculate the points at start and end angles relative to center
     let start_x = shape_arc.center.0 + radius * start_rad.cos();
     let start_y = shape_arc.center.1 + radius * start_rad.sin();
     let end_x = shape_arc.center.0 + radius * end_rad.cos();
     let end_y = shape_arc.center.1 + radius * end_rad.sin();
-    
+
     // For a more accurate bounding box, we need to consider if the arc crosses
     // the cardinal directions (0°, 90°, 180°, 270°)
     let mut min_x = start_x.min(end_x);
     let mut max_x = start_x.max(end_x);
     let mut min_y = start_y.min(end_y);
     let mut max_y = start_y.max(end_y);
-    
+
     // Check if arc crosses cardinal directions and expand bounding box accordingly
     let sweep = shape_arc.angle_sweep();
     let angles_to_check = if end_angle > start_angle {
@@ -4476,38 +4819,44 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
         // Arc crosses 0° (wraps around)
         vec![0.0, 90.0, 180.0, 270.0, 360.0]
     };
-    
+
     for angle in angles_to_check {
         let normalized_angle = angle % 360.0;
-        
+
         // Check if this cardinal angle is within our arc
         let angle_in_arc = if end_angle > start_angle {
             normalized_angle >= start_angle && normalized_angle <= end_angle
         } else {
             normalized_angle >= start_angle || normalized_angle <= end_angle
         };
-        
+
         if angle_in_arc {
             let rad = normalized_angle * PI / 180.0;
             let x = shape_arc.center.0 + radius * rad.cos();
             let y = shape_arc.center.1 + radius * rad.sin();
-            
+
             min_x = min_x.min(x);
             max_x = max_x.max(x);
             min_y = min_y.min(y);
             max_y = max_y.max(y);
         }
     }
-    
+
     // Calculate width and height from bounding box
     let width = max_x - min_x;
     let height = max_y - min_y;
-    
-    // Set the position to the top-left corner of the bounding box
-    session.set_position(shape_arc.entity.clone(), min_x, min_y);
-    session.set_size(shape_arc.entity.clone(), width, height);
-}
 
+    // FIXED: Set position to (0,0) and let the arc use its cx,cy for positioning
+    // This matches how other shapes work - they render relative to their position
+    session.set_position(shape_arc.entity.clone(), 0.0, 0.0);
+
+    // The size should be large enough to contain the entire arc
+    // Add padding to ensure the arc fits regardless of center position
+    let total_width = (shape_arc.center.0 + radius).max(width);
+    let total_height = (shape_arc.center.1 + radius).max(height);
+
+    session.set_size(shape_arc.entity.clone(), total_width, total_height);
+}
 
 pub struct BoundingBox {
     x: Float,
@@ -4517,9 +4866,6 @@ pub struct BoundingBox {
 }
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
-
-    
-
     //start with the bottom elements
     for child in &root.children {
         println!("Layout child: {:?}", child);
@@ -4551,10 +4897,7 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::RectShape => {
             //get the Rect entity
             let rect = session.get_rectangle(root.entity_id.clone()).clone();
-            layout_rect(
-                session,
-                &rect
-            );
+            layout_rect(session, &rect);
         }
 
         EntityType::LineShape => {
@@ -4611,9 +4954,9 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::ArcShape => {
-        let arc = session.get_arc(root.entity_id.clone()).clone();
-        layout_arc(session, &arc);
-    }
+            let arc = session.get_arc(root.entity_id.clone()).clone();
+            layout_arc(session, &arc);
+        }
 
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
@@ -4709,11 +5052,19 @@ fn test_box_fixed_size() {
     // Assert that the text is centered within the box
     assert_eq!(
         text_position.0,
-        box_options.padding + (box_options.width_behavior.unwrap_fixed().unwrap() - box_options.padding * 2.0 - text_size.0) / 2.0
+        box_options.padding
+            + (box_options.width_behavior.unwrap_fixed().unwrap()
+                - box_options.padding * 2.0
+                - text_size.0)
+                / 2.0
     );
     assert_eq!(
         text_position.1,
-        box_options.padding + (box_options.height_behavior.unwrap_fixed().unwrap() - box_options.padding * 2.0 - text_size.1) / 2.0
+        box_options.padding
+            + (box_options.height_behavior.unwrap_fixed().unwrap()
+                - box_options.padding * 2.0
+                - text_size.1)
+                / 2.0
     );
     assert_eq!(box_position, (0.0, 0.0));
 
@@ -4721,6 +5072,7 @@ fn test_box_fixed_size() {
     assert_eq!(box_size.0, 100.0);
     assert_eq!(box_size.1, 50.0);
 }
+
 ===/src/lib.rs===
 
 pub use crate::diagram_builder::{DiagramBuilder};
@@ -6793,39 +7145,48 @@ impl JsonLinesParser {
                 ))
             }
 
-            "semicircle" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (0.0, 0.0),
-                );
-                let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
-                let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
+            // Complete fixed semicircle section for parser.rs
 
-                let options = ArcOptions {
-                    fill_color: get_string_attr(
-                        &entity.attributes,
-                        &["fill", "fill_color"],
-                        "none",
-                    ),
-                    stroke_color: get_string_attr(
-                        &entity.attributes,
-                        &["stroke", "stroke_color"],
-                        "black",
-                    ),
-                    stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
-                    filled: get_bool_attr(&entity.attributes, &["filled"], false),
-                };
+"semicircle" => {
+    let center = get_point_attr(
+        &entity.attributes,
+        &["cx", "center_x"],
+        &["cy", "center_y"],
+        (0.0, 0.0),
+    );
+    let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
+    let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
 
-                Ok(builder.new_semicircle(
-                    entity_id.to_string(),
-                    center,
-                    radius,
-                    facing_up,
-                    options,
-                ))
-            }
+    let (start, end) = if facing_up {
+        (180.0, 360.0) // FIXED: Top semicircle should be 180° to 360°
+    } else {
+        (0.0, 180.0) // FIXED: Bottom semicircle should be 0° to 180°
+    };
+
+    let options = ArcOptions {
+        fill_color: get_string_attr(
+            &entity.attributes,
+            &["fill", "fill_color"],
+            "none",
+        ),
+        stroke_color: get_string_attr(
+            &entity.attributes,
+            &["stroke", "stroke_color"],
+            "black",
+        ),
+        stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
+        filled: get_bool_attr(&entity.attributes, &["filled"], false),
+    };
+
+    Ok(builder.new_arc(
+        entity_id.to_string(),
+        center,
+        radius,
+        start,
+        end,
+        options,
+    ))
+}
 
             "quarter_circle" => {
                 let center = get_point_attr(
@@ -7459,6 +7820,44 @@ impl DiagramBuilder {
         }
     }
 
+    pub fn clear_cache(&mut self) {
+        // Clear core entity data
+        self.entities.clear();
+        self.positions.clear();
+        self.sizes.clear();
+        self.entityTypes.clear();
+        
+        // Clear all component hashmaps
+        self.boxes.clear();
+        self.rectangles.clear();
+        self.groups.clear();
+        self.texts.clear();
+        self.textlines.clear();
+        self.horizontal_stacks.clear();
+        self.vertical_stacks.clear();
+        self.ellipses.clear();
+        self.lines.clear();
+        self.arrows.clear();
+        self.tables.clear();
+        self.images.clear();
+        self.polylines.clear();
+        self.free_containers.clear();
+        self.arcs.clear();
+        
+        // Note: We don't clear custom_components as those are reusable function definitions
+        // Note: We don't clear measure_text function as it should persist across diagrams
+        
+        println!("DiagramBuilder cache cleared - all entities and components removed");
+    }
+
+      pub fn clear_entities_only(&mut self) {
+        self.entities.clear();
+        self.positions.clear();
+        self.sizes.clear();
+        self.entityTypes.clear();
+        println!("DiagramBuilder entities cleared (components preserved)");
+    }
+
     /// Register a custom component with the builder
     pub fn register_custom_component<F>(&mut self, component_type: &str, factory: F)
     where
@@ -7512,14 +7911,7 @@ impl DiagramBuilder {
         self.entityTypes.insert(id.clone(), entity_type.clone());
         id
     }
-
-    pub fn clear_cache(&mut self) {
-        //clear entities vector
-        self.entities = Vec::new();
-        self.positions = HashMap::new();
-        self.sizes = HashMap::new();
-    }
-
+    
     //set the measure_text function
     pub fn set_measure_text_fn(&mut self, measure_text: fn(&str, &TextOptions) -> (Float, Float)) {
         println!("Setting measure text function");
@@ -8414,20 +8806,28 @@ fn read_image_file_as_data_url(file_path: &str) -> Result<String, std::io::Error
     
     Ok(data_url)
 }
+// Fixed render_line function for svg_renderer/src/lib.rs
 
 fn render_line(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
-    let size = session.get_size(entity_id.clone());
     let line_shape = session.get_line(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
-     size.0, 
-     size.1, 
-     line_shape.line_options.stroke_color,
-     line_shape.line_options.stroke_width));
+    
+    // FIXED: Use the actual line start and end coordinates, not size
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+        line_shape.start.0,   // Use actual start point
+        line_shape.start.1,
+        line_shape.end.0,     // Use actual end point  
+        line_shape.end.1,
+        line_shape.line_options.stroke_color,
+        line_shape.line_options.stroke_width
+    ));
+    
     svg.push_str("</g>");
 }
 
@@ -8449,40 +8849,54 @@ fn render_rectangle(session: &DiagramBuilder, svg: &mut String, entity_id: Entit
      rect_shape.rect_options.border_radius));
     svg.push_str("</g>");
 }
-
 fn render_arrow(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
-    let size = session.get_size(entity_id.clone());
     let arrow_shape = session.get_arrow(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<line x1="0" y1="0" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
-     size.0, 
-     size.1, 
-     arrow_shape.arrow_options.stroke_color,
-     arrow_shape.arrow_options.stroke_width));
-    //TODO: paint arrow head
+    
+    // FIXED: Use actual arrow start/end coordinates, not size
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+        arrow_shape.start.0,   // FIXED: was using size.0, size.1
+        arrow_shape.start.1,
+        arrow_shape.end.0,     
+        arrow_shape.end.1,
+        arrow_shape.arrow_options.stroke_color,
+        arrow_shape.arrow_options.stroke_width
+    ));
+    
+    // TODO: Add actual arrow head rendering
     svg.push_str("</g>");
 }
 
 fn render_ellipse(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
-    let size = session.get_size(entity_id.clone());
     let ellipse_shape = session.get_ellipse(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" >"#,
         pos.0, pos.1
     ));
-    svg.push_str(&format!(r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
-     size.0/2.0, 
-     size.1/2.0, 
-     size.0/2.0, 
-     size.1/2.0, 
-     ellipse_shape.ellipse_options.stroke_color,
-     ellipse_shape.ellipse_options.stroke_width,
-     ellipse_shape.ellipse_options.fill_color));
+    
+    // POTENTIAL ISSUE: Using size/2 instead of actual ellipse center and radius
+    // Current code: cx=size.0/2, cy=size.1/2, rx=size.0/2, ry=size.1/2
+    // Should use: cx=ellipse_shape.center.0, cy=ellipse_shape.center.1, rx=ellipse_shape.radius.0, ry=ellipse_shape.radius.1
+    
+    svg.push_str(&format!(
+        r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
+        ellipse_shape.center.0,    // FIXED: Use actual center
+        ellipse_shape.center.1,    // FIXED: Use actual center
+        ellipse_shape.radius.0,    // FIXED: Use actual radius
+        ellipse_shape.radius.1,    // FIXED: Use actual radius
+        ellipse_shape.ellipse_options.stroke_color,
+        ellipse_shape.ellipse_options.stroke_width,
+        ellipse_shape.ellipse_options.fill_color
+    ));
+    
     svg.push_str("</g>");
 }
 
@@ -8576,10 +8990,21 @@ fn render_box(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     svg.push_str("</g>");
 }
 
+fn escape_xml(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+// Then update the render_text function to use it:
+
 fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     let text_shape = session.get_text(node.entity_id.clone());
     let pos = session.get_position(entity_id.clone());
     let size = session.get_size(entity_id.clone());
+    
     svg.push_str(&format!(
         r#"<g transform="translate({} {})" data-debug="{}" >"#,
         pos.0, pos.1,
@@ -8588,7 +9013,6 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
             pos.0, pos.1)
     ));
 
-    //render parent text container
     svg.push_str(&format!(r#"<text x="0" y="{}" fill="{}" font-size="{}px" font-family="{}" >"#,
         0,
         text_shape.text_options.text_color,
@@ -8600,25 +9024,26 @@ fn render_text(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, 
         let line = session.get_text_line(line_id.clone());
         let pos = session.get_position(line.entity.clone());
         let lineSize = session.get_size(line.entity.clone());
+        
         svg.push_str(&format!(r#"<tspan x="{}" y="{}" fill="{}" font-size="{}px" font-family="{}" alignment-baseline="hanging" data-debug="{}" >"#,
         pos.0,
         pos.1,
         text_shape.text_options.text_color,
         text_shape.text_options.font_size,
         text_shape.text_options.font_family,
-        //debug info
         format!("size: {}, {}, pos: {}, {}",
             lineSize.0, lineSize.1,
             pos.0, pos.1)
         ));
-        let txt = if line.text.trim().is_empty() {
-            "&#8203;".to_string()  // Create a new String directly
+        
+        // FIXED: Escape XML special characters in text content
+        let escaped_text = if line.text.trim().is_empty() {
+            "&#8203;".to_string()  // Zero-width space for empty lines
         } else {
-            line.text.clone()  // Clone the original
+            escape_xml(&line.text)  // Escape XML characters
         };
-        println!("text:::");
-        println!("text {}", txt);
-        svg.push_str(&txt);
+        
+        svg.push_str(&escaped_text);
         svg.push_str("</tspan>");
     }
     svg.push_str("</text>");
@@ -8652,9 +9077,7 @@ fn render_horizontal_stack(session: &DiagramBuilder, svg: &mut String, entity_id
     }
     svg.push_str("</g>");
 }
-
-
-// Add this function to render arcs
+// Fixed render_arc function for svg_renderer/src/lib.rs
 fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, node: &DiagramTreeNode) {
     use std::f32::consts::PI;
     
@@ -8670,7 +9093,7 @@ fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
     
-    // Calculate start and end points
+    // Calculate start and end points RELATIVE TO THE CENTER (not absolute)
     let start_x = arc_shape.center.0 + arc_shape.radius * start_rad.cos();
     let start_y = arc_shape.center.1 + arc_shape.radius * start_rad.sin();
     let end_x = arc_shape.center.0 + arc_shape.radius * end_rad.cos();
@@ -8684,18 +9107,18 @@ fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
     
     svg.push_str(&format!(
         r#"<g transform="translate({} {})">"#,
-        pos.0, pos.1
+        pos.0, pos.1  // This translates to the layout position
     ));
     
     if arc_shape.arc_options.filled {
         // For filled arcs, create a path that includes the center (pie slice)
         svg.push_str(&format!(
             r#"<path d="M {} {} L {} {} A {} {} 0 {} {} {} {} Z" fill="{}" stroke="{}" stroke-width="{}" />"#,
-            arc_shape.center.0 - pos.0, arc_shape.center.1 - pos.1, // Move to center
-            start_x - pos.0, start_y - pos.1, // Line to start point
+            arc_shape.center.0, arc_shape.center.1, // Move to center (relative to translated position)
+            start_x, start_y, // Line to start point
             arc_shape.radius, arc_shape.radius, // Arc radii
             large_arc_flag, sweep_flag, // Arc flags
-            end_x - pos.0, end_y - pos.1, // Arc end point
+            end_x, end_y, // Arc end point
             arc_shape.arc_options.fill_color,
             arc_shape.arc_options.stroke_color,
             arc_shape.arc_options.stroke_width
@@ -8704,10 +9127,10 @@ fn render_arc(session: &DiagramBuilder, svg: &mut String, entity_id: EntityID, n
         // For unfilled arcs, just draw the arc curve
         svg.push_str(&format!(
             r#"<path d="M {} {} A {} {} 0 {} {} {} {}" fill="none" stroke="{}" stroke-width="{}" />"#,
-            start_x - pos.0, start_y - pos.1, // Move to start point
+            start_x, start_y, // Move to start point (NO subtraction)
             arc_shape.radius, arc_shape.radius, // Arc radii
             large_arc_flag, sweep_flag, // Arc flags
-            end_x - pos.0, end_y - pos.1, // Arc end point
+            end_x, end_y, // Arc end point (NO subtraction)
             arc_shape.arc_options.stroke_color,
             arc_shape.arc_options.stroke_width
         ));

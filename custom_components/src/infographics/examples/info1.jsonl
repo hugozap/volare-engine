@@ -1,0 +1,25 @@
+{"id":"root","type":"vstack","children":["title","spacer1","metrics","spacer2","progress","spacer3","timeline","spacer4","quote"],"h_align":"center"}
+
+{"id":"title","type":"hero_section","title":"Q4 2024 Summary","subtitle":"Outstanding Performance Across All Metrics","background":"#f8f8f8","width":600,"title_color":"#000000","subtitle_color":"#333333"}
+
+{"id":"spacer1","type":"spacer","height":30}
+
+{"id":"metrics","type":"hstack","children":["stat1","stat2","stat3"],"v_align":"center"}
+{"id":"stat1","type":"stat_card","title":"Sales","value":"$1.2M","change":"+25%","trend":"up","icon":"$","color":"#000000"}
+{"id":"stat2","type":"stat_card","title":"Customers","value":"5,847","change":"+18%","trend":"up","icon":"▲","color":"#000000"}
+{"id":"stat3","type":"stat_card","title":"Satisfaction","value":"94%","change":"+3%","trend":"up","icon":"★","color":"#000000"}
+
+{"id":"spacer2","type":"spacer","height":40}
+
+{"id":"progress","type":"vstack","children":["progress_title","progress_spacer","goal_progress"],"h_align":"center"}
+{"id":"progress_title","type":"text","content":"Goal Achievement","font_size":18,"color":"#000000"}
+{"id":"progress_spacer","type":"spacer","height":10}
+{"id":"goal_progress","type":"progress_bar","label":"Annual Sales Goal","value":85,"max":100,"color":"#666666","width":400,"show_percentage":true}
+
+{"id":"spacer3","type":"spacer","height":40}
+
+{"id":"timeline","type":"timeline","title":"Key Events","items":[{"date":"Oct","event":"Product Launch"},{"date":"Nov","event":"Black Friday Success"},{"date":"Dec","event":"Holiday Campaign"}],"orientation":"horizontal","color":"#333333"}
+
+{"id":"spacer4","type":"spacer","height":30}
+
+{"id":"quote","type":"quote_block","text":"This quarter exceeded all expectations. The team's dedication really shows in these results.","author":"Jane Smith, CEO","style":"default","width":500}

@@ -1,6 +1,8 @@
+
 use wasm_bindgen::prelude::*;
 use volare_engine_layout::*;
 use svg_renderer::SVGRenderer;
+use custom_components::*;
 
 // Simple text measurement function
 fn simple_measure_text(text: &str, options: &TextOptions) -> (Float, Float) {
@@ -9,6 +11,43 @@ fn simple_measure_text(text: &str, options: &TextOptions) -> (Float, Float) {
     let height = options.font_size;
     (width, height)
 }
+
+// JavaScript callback for text measurement
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = "measureTextCallback")]
+    pub type MeasureTextCallback;
+
+    #[wasm_bindgen(method, js_name = "call")]
+    fn call(this: &MeasureTextCallback, text: &str, font_size: f32, font_family: &str, line_width: usize) -> Vec<f32>;
+}
+
+// Global storage for the JavaScript callback
+static mut MEASURE_TEXT_CALLBACK: Option<MeasureTextCallback> = None;
+
+fn measure_text_wrapper(text: &str, options: &TextOptions) -> (Float, Float) {
+    unsafe {
+        if let Some(ref callback) = MEASURE_TEXT_CALLBACK {
+            let result = callback.call(
+                text,
+                options.font_size,
+                &options.font_family,
+                options.line_width
+            );
+            
+            if result.len() >= 2 {
+                (result[0], result[1])
+            } else {
+                // Fallback to simple measurement
+                simple_measure_text(text, options)
+            }
+        } else {
+            // Fallback to simple measurement
+            simple_measure_text(text, options)
+        }
+    }
+}
+
 
 // Main WASM interface
 #[wasm_bindgen]
@@ -21,9 +60,20 @@ impl VolareEngine {
     #[wasm_bindgen(constructor)]
     pub fn new() -> VolareEngine {
         let mut builder = DiagramBuilder::new();
-        builder.set_measure_text_fn(simple_measure_text);
-        
+        builder.set_measure_text_fn(measure_text_wrapper);
+        custom_components::register_all_components(&mut builder);
+        println!("Volare Engine initialized with custom components!");
         VolareEngine { builder }
+    }
+
+        /// Set the JavaScript function to be used for text measurement
+    /// The callback should take (text: string, fontSize: number, fontFamily: string, lineWidth: number)
+    /// and return [width: number, height: number]
+    #[wasm_bindgen(js_name = "setMeasureTextFunction")]
+    pub fn set_measure_text_function(&mut self, callback: MeasureTextCallback) {
+        unsafe {
+            MEASURE_TEXT_CALLBACK = Some(callback);
+        }
     }
 
     /// Create SVG from JSON Lines string
@@ -47,6 +97,7 @@ impl VolareEngine {
         String::from_utf8(svg_output)
             .map_err(|e| JsValue::from_str(&format!("UTF-8 error: {}", e)))
     }
+
 
     /// Clear internal state
     #[wasm_bindgen]

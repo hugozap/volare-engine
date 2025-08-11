@@ -18,7 +18,7 @@ fi
 folder="$(cd "$(dirname "$folder")"; pwd)/$(basename "$folder")"
 
 # List folders to ignore
-declare -a ignore_folders=(".git" "node_modules" "build" "dist" "temp" "assets")
+declare -a ignore_folders=(".git" "node_modules" "build" "dist" "temp" "assets" "target" "pkg")
 
 # List files to ignore
 declare -a ignore_files=(

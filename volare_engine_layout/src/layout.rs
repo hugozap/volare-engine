@@ -6,7 +6,10 @@ use crate::{
     HorizontalStack, PolyLine, ShapeArrow, ShapeBox, ShapeEllipse, ShapeGroup, ShapeImage,
     ShapeLine, ShapeText, Table, VerticalStack,
 };
-use crate::{HorizontalAlignment, ShapeArc, ShapeRect, SizeBehavior, VerticalAlignment};
+use crate::{
+    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection,
+    VerticalAlignment,
+};
 
 /* The box layout includes the padding and the dimensions
 of the wrapped element
@@ -157,6 +160,16 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
     }
 }
 
+pub fn layout_spacer(session: &mut DiagramBuilder, spacer: &ShapeSpacer) {
+    let (width, height) = match spacer.spacer_options.direction {
+        SpacerDirection::Horizontal => (spacer.spacer_options.width, 1.0),
+        SpacerDirection::Vertical => (1.0, spacer.spacer_options.height),
+        SpacerDirection::Both => (spacer.spacer_options.width, spacer.spacer_options.height),
+    };
+
+    session.set_size(spacer.entity.clone(), width, height);
+}
+
 /**
  * Updates the size of the line entity based on the start and end points
  */
@@ -204,16 +217,16 @@ pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse
     // The ellipse size should be the full diameter
     let width = shape_ellipse.radius.0 * 2.0;
     let height = shape_ellipse.radius.1 * 2.0;
-    
+
     // Set the size for layout spacing calculations
     session.set_size(shape_ellipse.entity.clone(), width, height);
-    
+
     // Position at (0,0) - the layout system will position this appropriately
     session.set_position(shape_ellipse.entity.clone(), 0.0, 0.0);
-    
+
     // CRITICAL: The ellipse center coordinates (cx, cy) in the JSONL should be
     // set to (radius_x, radius_y) so the ellipse is centered in its bounding box
-    // 
+    //
     // For example:
     // - rx=20, ry=20 → cx should be 20, cy should be 20 (for a 40x40 box)
     // - rx=30, ry=15 → cx should be 30, cy should be 15 (for a 60x30 box)
@@ -599,6 +612,12 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     //Once the children are laid out, we can layout the current element
     //use methods in the layout module
     match root.entity_type {
+        EntityType::SpacerShape => {
+             {
+                let spacer = session.get_spacer(root.entity_id.clone()).clone();
+                layout_spacer(session, &spacer);
+            }
+        }
         EntityType::TextShape => {
             {
                 //get the Shape text entity

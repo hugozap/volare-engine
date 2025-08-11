@@ -173,6 +173,7 @@
                             <button onclick="loadExample('simple')" class="btn-secondary">Simple</button>
                             <button onclick="loadExample('text')" class="btn-secondary">Text</button>
                             <button onclick="loadExample('shapes')" class="btn-secondary">Shapes</button>
+                            <button onclick="loadExample('volare')" class="btn-secondary">Volare Format</button>
                             <button onclick="testEngine()" class="btn-secondary">Test Engine</button>
                         </div>
                         <button onclick="clearInput()" class="btn-secondary">Clear</button>
@@ -182,11 +183,10 @@
                 <div class="panel-content">
                     <textarea id="jsonl-input" placeholder="Paste your JSONL data here...
 
-Example:
-{&quot;id&quot;: &quot;rect1&quot;, &quot;type&quot;: &quot;rect&quot;, &quot;x&quot;: 10, &quot;y&quot;: 10, &quot;width&quot;: 100, &quot;height&quot;: 50, &quot;fill&quot;: &quot;blue&quot;}
-{&quot;id&quot;: &quot;text1&quot;, &quot;type&quot;: &quot;text&quot;, &quot;x&quot;: 60, &quot;y&quot;: 40, &quot;text&quot;: &quot;Hello World&quot;, &quot;font_size&quot;: 16}
-
-Note: Each JSON object must include an &quot;id&quot; field."></textarea>
+Example (Volare format):
+{&quot;id&quot;:&quot;root&quot;,&quot;type&quot;:&quot;vstack&quot;,&quot;children&quot;:[&quot;title&quot;,&quot;content&quot;],&quot;h_align&quot;:&quot;center&quot;}
+{&quot;id&quot;:&quot;title&quot;,&quot;type&quot;:&quot;text&quot;,&quot;content&quot;:&quot;Hello World&quot;,&quot;font_size&quot;:24,&quot;color&quot;:&quot;darkblue&quot;}
+{&quot;id&quot;:&quot;content&quot;,&quot;type&quot;:&quot;text&quot;,&quot;content&quot;:&quot;Testing Volare Engine&quot;,&quot;font_size&quot;:16,&quot;color&quot;:&quot;black&quot;}"></textarea>
                 </div>
             </div>
 
@@ -213,11 +213,74 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
         </div>
     </div>
 
+    <!-- Hidden canvas for text measurement -->
+    <canvas id="measureCanvas" style="position: absolute; left: -9999px; top: -9999px;"></canvas>
+
     <script type="module">
         import init, * as wasm from './pkg/volare_wasm.js';
 
         let wasmModule = null;
         let currentSvgContent = '';
+        let volareEngine = null;
+
+        // Canvas 2D Text Measurement Function
+        class TextMeasurement {
+            constructor() {
+                this.canvas = document.getElementById('measureCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.cache = new Map();
+            }
+
+            // Main measurement function using Canvas 2D
+            measureCanvas2D(text, fontSize, fontFamily, lineWidth) {
+                const font = `${fontSize}px ${fontFamily}`;
+                const cacheKey = `${text}_${font}_${lineWidth}`;
+                
+                // Check cache first
+                if (this.cache.has(cacheKey)) {
+                    return this.cache.get(cacheKey);
+                }
+
+                // Set font on canvas context
+                this.ctx.font = font;
+                
+                // Measure the text
+                const metrics = this.ctx.measureText(text);
+                
+                // Calculate width
+                const width = metrics.width;
+                
+                // Calculate height using various metrics
+                let height;
+                if (metrics.actualBoundingBoxAscent && metrics.actualBoundingBoxDescent) {
+                    // Most accurate: actual bounding box
+                    height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+                } else if (metrics.fontBoundingBoxAscent && metrics.fontBoundingBoxDescent) {
+                    // Fallback: font bounding box
+                    height = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+                } else {
+                    // Final fallback: approximate based on font size
+                    height = fontSize * 1.2;
+                }
+                
+                const result = [width, height];
+                
+                // Cache the result
+                this.cache.set(cacheKey, result);
+                
+                console.log(`Measured text: "${text}" | Font: ${font} | Width: ${width.toFixed(2)} | Height: ${height.toFixed(2)}`);
+                
+                return result;
+            }
+
+            // Clear the cache
+            clearCache() {
+                this.cache.clear();
+            }
+        }
+
+        // Create global text measurement instance
+        const textMeasurement = new TextMeasurement();
 
         // Initialize WASM on page load
         async function initWasm() {
@@ -229,6 +292,13 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
                 const exports = Object.keys(wasm);
                 console.log('Available WASM exports:', exports);
                 
+                // Create VolareEngine instance
+                volareEngine = new wasm.VolareEngine();
+                console.log('VolareEngine instance created:', volareEngine);
+                
+                // Set up the measurement callback
+                setupMeasurementCallback();
+                
                 return true;
             } catch (error) {
                 updateStatus(`❌ Failed to load WASM: ${error.message}`, 'error');
@@ -237,9 +307,45 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
             }
         }
 
+        // Setup the measurement callback for WASM
+        function setupMeasurementCallback() {
+            if (!volareEngine) {
+                console.error('VolareEngine not initialized');
+                return;
+            }
+
+            // Create the measurement callback object
+            const measurementCallback = {
+                call: (text, fontSize, fontFamily, lineWidth) => {
+                    console.log(`Measurement callback called: text="${text}", fontSize=${fontSize}, fontFamily="${fontFamily}", lineWidth=${lineWidth}`);
+                    
+                    // Use the Canvas 2D measurement
+                    const result = textMeasurement.measureCanvas2D(text, fontSize, fontFamily, lineWidth);
+                    
+                    console.log(`Measurement result: [${result[0]}, ${result[1]}]`);
+                    return result;
+                }
+            };
+
+            try {
+                // Set the measurement function in WASM
+                if (typeof volareEngine.setMeasureTextFunction === 'function') {
+                    volareEngine.setMeasureTextFunction(measurementCallback);
+                    console.log('✅ Text measurement function set successfully');
+                } else if (typeof volareEngine.set_measure_text_function === 'function') {
+                    volareEngine.set_measure_text_function(measurementCallback);
+                    console.log('✅ Text measurement function set successfully (snake_case)');
+                } else {
+                    console.warn('⚠️ setMeasureTextFunction method not found on engine');
+                }
+            } catch (error) {
+                console.error('Failed to set measurement function:', error);
+            }
+        }
+
         // Render SVG from JSONL input
         window.renderSvg = async function() {
-            if (!wasmModule) {
+            if (!wasmModule || !volareEngine) {
                 const success = await initWasm();
                 if (!success) return;
             }
@@ -253,92 +359,34 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
             updateStatus('🔄 Processing JSONL data...', 'info');
 
             try {
-                let svgResult = null;
+                // Clear the measurement cache for fresh measurements
+                textMeasurement.clearCache();
                 
-                // Try different approaches to use VolareEngine
-                if (typeof wasm.VolareEngine === 'function') {
-                    console.log('Trying to create VolareEngine instance...');
-                    
-                    try {
-                        // First, try calling greet to make sure WASM is working
-                        if (typeof wasm.greet === 'function') {
-                            const greetResult = wasm.greet('Test');
-                            console.log('Greet test result:', greetResult);
-                        }
-                        
-                        // Method 1: Try as constructor
-                        const engine = new wasm.VolareEngine();
-                        console.log('Engine created:', engine);
-                        
-                        // Look for render methods on the engine instance
-                        const engineMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(engine))
-                            .filter(name => typeof engine[name] === 'function');
-                        console.log('Engine methods:', engineMethods);
-                        
-                        // Try create_diagram method
-                        if (typeof engine.create_diagram === 'function') {
-                            console.log('Calling engine.create_diagram() with input:', input);
-                            console.log('Input length:', input.length);
-                            console.log('Input preview:', input.substring(0, 200));
-                            
-                            svgResult = engine.create_diagram(input);
-                            
-                            console.log('create_diagram returned:', svgResult);
-                            console.log('Return type:', typeof svgResult);
-                            console.log('Return value length:', svgResult ? svgResult.length : 'N/A');
-                            
-                            if (svgResult === undefined || svgResult === null) {
-                                throw new Error('create_diagram returned undefined/null. Check if input format is correct.');
-                            }
-                            
-                            if (typeof svgResult === 'string' && svgResult.length === 0) {
-                                throw new Error('create_diagram returned empty string.');
-                            }
-                            
-                            updateStatus(`✅ Successfully rendered using VolareEngine.create_diagram()`, 'success');
-                        } else {
-                            throw new Error(`create_diagram method not found. Available methods: ${engineMethods.join(', ')}`);
-                        }
-                        
-                    } catch (constructorError) {
-                        console.log('Constructor approach failed:', constructorError);
-                        
-                        // Method 2: Try as static function
-                        try {
-                            svgResult = wasm.VolareEngine(input);
-                            updateStatus(`✅ Successfully rendered using VolareEngine() as function`, 'success');
-                        } catch (staticError) {
-                            console.log('Static function approach failed:', staticError);
-                            throw new Error(`Failed to use VolareEngine: Constructor error: ${constructorError.message}, Static error: ${staticError.message}`);
-                        }
-                    }
-                } else {
-                    // Fallback: try other available functions
-                    const exports = Object.keys(wasm).filter(key => typeof wasm[key] === 'function');
-                    
-                    // Try greet function as a test
-                    if (typeof wasm.greet === 'function') {
-                        const greetResult = wasm.greet('Test');
-                        console.log('Greet result:', greetResult);
-                    }
-                    
-                    throw new Error(`VolareEngine is not a function. Available functions: ${exports.join(', ')}`);
+                // Clear the engine's internal state
+                if (typeof volareEngine.clear === 'function') {
+                    volareEngine.clear();
                 }
-
+                
+                console.log('Calling create_diagram with input:', input);
+                
+                // Create the diagram
+                const svgResult = volareEngine.create_diagram(input);
+                
+                if (!svgResult) {
+                    throw new Error('create_diagram returned null or undefined');
+                }
+                
+                console.log('SVG result received, length:', svgResult.length);
+                
                 // Display the SVG
                 displaySvg(svgResult);
                 currentSvgContent = svgResult;
                 
+                updateStatus(`✅ Successfully rendered SVG (${svgResult.length} characters)`, 'success');
+                
             } catch (error) {
                 updateStatus(`❌ Rendering error: ${error.message}`, 'error');
                 console.error('Rendering error:', error);
-                
-                // Show more debug info
-                console.log('WASM exports:', Object.keys(wasm));
-                console.log('VolareEngine type:', typeof wasm.VolareEngine);
-                if (wasm.VolareEngine) {
-                    console.log('VolareEngine:', wasm.VolareEngine);
-                }
             }
         };
 
@@ -346,7 +394,7 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
         function displaySvg(svgContent) {
             const outputDiv = document.getElementById('svg-output');
             
-            if (typeof svgContent === 'string' && svgContent.trim().startsWith('<svg')) {
+            if (typeof svgContent === 'string' && svgContent.trim().startsWith('<svg') || svgContent.trim().startsWith('<?xml')) {
                 outputDiv.innerHTML = svgContent;
             } else {
                 outputDiv.innerHTML = `<pre style="padding: 20px; margin: 0; white-space: pre-wrap; font-family: monospace;">${svgContent}</pre>`;
@@ -367,38 +415,47 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
 
             switch(type) {
                 case 'simple':
-                    example = `{"id": "rect1", "type": "rect", "x": 10, "y": 10, "width": 200, "height": 100, "fill": "lightblue", "stroke": "blue", "stroke_width": 2}
-{"id": "circle1", "type": "circle", "cx": 110, "cy": 60, "r": 30, "fill": "lightgreen", "stroke": "green"}
-{"id": "text1", "type": "text", "x": 110, "y": 65, "text": "Hello!", "font_size": 18, "text_anchor": "middle", "fill": "darkgreen"}`;
+                    example = `{"id":"root","type":"text","content":"Hello World","font_size":24,"color":"blue"}`;
                     break;
 
                 case 'text':
-                    example = `{"id": "title", "type": "text", "x": 50, "y": 30, "text": "Title Text", "font_size": 24, "font_weight": "bold", "fill": "navy"}
-{"id": "subtitle", "type": "text", "x": 50, "y": 60, "text": "Subtitle", "font_size": 16, "fill": "gray"}
-{"id": "body", "type": "text", "x": 50, "y": 90, "text": "Body text with more content", "font_size": 14, "fill": "black"}
-{"id": "line1", "type": "line", "x1": 50, "y1": 100, "x2": 300, "y2": 100, "stroke": "gray", "stroke_width": 1}`;
+                    example = `{"id":"root","type":"vstack","children":["title","subtitle","body"],"h_align":"center"}
+{"id":"title","type":"text","content":"Title Text","font_size":24,"color":"navy"}
+{"id":"subtitle","type":"text","content":"Subtitle goes here","font_size":16,"color":"gray"}
+{"id":"body","type":"text","content":"Body text with more content that might wrap to multiple lines","font_size":14,"color":"black","line_width":50}`;
                     break;
 
                 case 'shapes':
-                    example = `{"id": "rect1", "type": "rect", "x": 20, "y": 20, "width": 60, "height": 40, "fill": "red", "rx": 5}
-{"id": "circle1", "type": "circle", "cx": 130, "cy": 40, "r": 20, "fill": "orange"}
-{"id": "ellipse1", "type": "ellipse", "cx": 200, "cy": 40, "rx": 30, "ry": 20, "fill": "yellow"}
-{"id": "polygon1", "type": "polygon", "points": "250,20 270,60 230,60", "fill": "green"}
-{"id": "line1", "type": "line", "x1": 20, "y1": 80, "x2": 280, "y2": 80, "stroke": "purple", "stroke_width": 3}
-{"id": "path1", "type": "path", "d": "M 50 100 Q 100 120 150 100 T 250 100", "stroke": "blue", "stroke_width": 2, "fill": "none"}`;
+                    example = `{"id":"root","type":"vstack","children":["shapes_row","text_label"],"h_align":"center"}
+{"id":"shapes_row","type":"hstack","children":["rect1","ellipse1"],"v_align":"center"}
+{"id":"rect1","type":"rect","width":100,"height":60,"background":"lightblue","border_color":"blue"}
+{"id":"ellipse1","type":"ellipse","cx":30,"cy":30,"rx":30,"ry":20,"fill":"lightgreen","stroke":"green"}
+{"id":"text_label","type":"text","content":"Shapes Demo","font_size":16,"color":"black"}`;
+                    break;
+
+                case 'volare':
+                    example = `{"id":"root","type":"vstack","children":["header","content","footer"],"h_align":"center"}
+{"id":"header","type":"box","padding":20,"background":"#f0f0f0","border_color":"#333","children":["header_text"]}
+{"id":"header_text","type":"text","content":"Volare Engine Demo","font_size":28,"color":"darkblue"}
+{"id":"content","type":"hstack","children":["left_panel","right_panel"],"v_align":"top"}
+{"id":"left_panel","type":"box","padding":15,"background":"lightblue","children":["left_text"]}
+{"id":"left_text","type":"text","content":"Left Panel Content","font_size":16,"color":"black"}
+{"id":"right_panel","type":"box","padding":15,"background":"lightgreen","children":["right_text"]}
+{"id":"right_text","type":"text","content":"Right Panel with longer text that demonstrates text wrapping","font_size":16,"color":"black","line_width":30}
+{"id":"footer","type":"text","content":"© 2024 Volare Engine","font_size":12,"color":"gray"}`;
                     break;
 
                 default:
-                    example = '{"id": "rect1", "type": "rect", "x": 10, "y": 10, "width": 100, "height": 50, "fill": "blue"}';
+                    example = '{"id":"root","type":"text","content":"Default Example","font_size":16,"color":"black"}';
             }
 
             textarea.value = example;
-            updateStatus(`📋 Loaded ${type} example with required "id" fields. Click "Render SVG" to see output.`, 'info');
+            updateStatus(`📋 Loaded ${type} example. Click "Render SVG" to see output.`, 'info');
         };
 
         // Test engine functionality step by step
         window.testEngine = async function() {
-            if (!wasmModule) {
+            if (!wasmModule || !volareEngine) {
                 const success = await initWasm();
                 if (!success) return;
             }
@@ -408,111 +465,26 @@ Note: Each JSON object must include an &quot;id&quot; field."></textarea>
             try {
                 // Test 1: Check if greet works
                 if (typeof wasm.greet === 'function') {
-                    const greetResult = wasm.greet('World');
-                    console.log('✅ Greet test:', greetResult);
-                    updateStatus(`✅ Greet test passed: ${greetResult}`, 'success');
-                } else {
-                    console.log('❌ No greet function found');
+                    wasm.greet('Test User');
+                    console.log('✅ Greet function works');
                 }
 
-                // Test 2: Create engine instance
-                console.log('Creating VolareEngine instance...');
-                console.log('VolareEngine type:', typeof wasm.VolareEngine);
-                console.log('VolareEngine:', wasm.VolareEngine);
-                console.log('VolareEngine.length (constructor params):', wasm.VolareEngine.length);
+                // Test 2: Test text measurement
+                console.log('Testing text measurement...');
+                const testMeasurement = textMeasurement.measureCanvas2D('Test Text', 16, 'Arial', 100);
+                console.log('Text measurement result:', testMeasurement);
+                updateStatus(`✅ Text measurement works: width=${testMeasurement[0].toFixed(2)}, height=${testMeasurement[1].toFixed(2)}`, 'success');
+
+                // Test 3: Test simple diagram
+                const simpleInput = `{"id":"root","type":"text","content":"Test","font_size":20,"color":"red"}`;
+                const result = volareEngine.create_diagram(simpleInput);
                 
-                let engine;
-                try {
-                    // Try without parameters first
-                    console.log('Trying: new wasm.VolareEngine()');
-                    engine = new wasm.VolareEngine();
-                    console.log('✅ Engine created successfully:', engine);
-                } catch (constructorError) {
-                    console.error('❌ Constructor without params failed:', constructorError);
-                    
-                    // Try with different parameter combinations
-                    const paramCombinations = [
-                        [],
-                        [null],
-                        [undefined],
-                        [{}],
-                        [""],
-                        [0],
-                        [800, 600], // Common width/height
-                    ];
-                    
-                    for (let i = 0; i < paramCombinations.length; i++) {
-                        const params = paramCombinations[i];
-                        try {
-                            console.log(`Trying: new wasm.VolareEngine(${params.map(p => JSON.stringify(p)).join(', ')})`);
-                            engine = new wasm.VolareEngine(...params);
-                            console.log(`✅ Engine created with params [${params.join(', ')}]:`, engine);
-                            break;
-                        } catch (paramError) {
-                            console.log(`❌ Failed with params [${params.join(', ')}]:`, paramError.message);
-                        }
-                    }
-                    
-                    if (!engine) {
-                        updateStatus(`❌ Failed to create VolareEngine with any parameter combination`, 'error');
-                        return;
-                    }
-                }
-
-                // Test 3: List all methods
-                const allMethods = [];
-                let obj = engine;
-                do {
-                    allMethods.push(...Object.getOwnPropertyNames(obj).filter(name => typeof engine[name] === 'function'));
-                    obj = Object.getPrototypeOf(obj);
-                } while (obj !== null && obj !== Object.prototype);
-                
-                console.log('✅ All engine methods:', [...new Set(allMethods)]);
-
-                // Test 4: Try create_diagram with simple input
-                if (typeof engine.create_diagram === 'function') {
-                    console.log('Testing create_diagram with simple input...');
-                    
-                    // Try different input formats
-                    const testInputs = [
-                        '{"type": "rect", "x": 10, "y": 10, "width": 50, "height": 30}',
-                        '[{"type": "rect", "x": 10, "y": 10, "width": 50, "height": 30}]',
-                        'simple test',
-                        '',
-                    ];
-                    
-                    for (let i = 0; i < testInputs.length; i++) {
-                        const testInput = testInputs[i];
-                        console.log(`\nTest ${i + 1}: Input = "${testInput}"`);
-                        
-                        try {
-                            const result = engine.create_diagram(testInput);
-                            console.log(`Test ${i + 1} result:`, result);
-                            console.log(`Test ${i + 1} result type:`, typeof result);
-                            console.log(`Test ${i + 1} result length:`, result ? result.length : 'N/A');
-                            
-                            if (result !== undefined && result !== null) {
-                                updateStatus(`✅ Test ${i + 1} succeeded! Result type: ${typeof result}, length: ${result.length || 'N/A'}`, 'success');
-                                
-                                // Show the result
-                                displaySvg(result);
-                                return; // Exit on first success
-                            }
-                        } catch (error) {
-                            console.log(`Test ${i + 1} error:`, error);
-                        }
-                    }
-                    
-                    updateStatus('❌ All create_diagram tests returned undefined/null', 'error');
+                if (result) {
+                    console.log('✅ Simple diagram created successfully');
+                    displaySvg(result);
+                    updateStatus('✅ Engine test successful! Simple diagram rendered.', 'success');
                 } else {
-                    updateStatus('❌ create_diagram method not found on engine', 'error');
-                }
-
-                // Test 5: Try other methods
-                if (typeof engine.clear === 'function') {
-                    console.log('Testing clear method...');
-                    const clearResult = engine.clear();
-                    console.log('Clear result:', clearResult);
+                    updateStatus('❌ Engine test failed: no result', 'error');
                 }
 
             } catch (error) {
