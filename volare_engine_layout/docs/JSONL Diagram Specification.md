@@ -1,5 +1,5 @@
 # JSONL Diagram Specification
-v1.0
+v1.1 - 
 
 This specification describes the JSON Lines format for creating diagrams using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
 
@@ -50,45 +50,28 @@ Wraps another element with padding, background, and border.
 {"id":"container","type":"box","padding":10,"background":"lightblue","children":["text1"]}
 ```
 
-
-**Automatic Text Wrapping:**
-When a box has a fixed width and contains text, the text will automatically wrap to fit within the available space (box width minus padding). This ensures text never overflows the box boundaries.
-
-## Best Practices
-
-### Text Layout
-- **Use fixed-width boxes** for consistent layouts - text will automatically wrap to fit
-- **Let height be content-based** for boxes containing text to accommodate wrapped content
-- **Use padding** to ensure proper text spacing from box edges
-- **Disable auto-wrapping** only when you need precise control over line breaks
-
-### Responsive Design
-- Fixed-width boxes with auto-wrapping text create predictable, responsive layouts
-- Combine with different padding values for various spacing needs
-- Stack multiple auto-wrapping boxes for article-like layouts
-**Example:**
-```json
-{"id":"container","type":"box","width":400,"padding":20,"children":["long_text"]}
-{"id":"long_text","type":"text","content":"This long text will automatically wrap to fit within the 400px box width"}
-
 ### Rectangle (`"type": "rect"`)
-A standalone rectangle shape.
+Draws a rectangle shape.
+
+**Required Attributes:**
+- `width` (number) - Rectangle width
+- `height` (number) - Rectangle height
 
 **Optional Attributes:**
-- `width` (number or string) - Width (default: 100)
-- `height` (number or string) - Height (default: 100)
 - `background`, `background_color`, or `fill` (string) - Fill color (default: "white")
 - `border_color` or `stroke_color` (string) - Border color (default: "black")
 - `border_width` or `stroke_width` (number) - Border thickness (default: 1)
-- `border_radius` (number) - Corner radius (default: 0)
+- `border_radius` (number) - Corner radius for rounded corners (default: 0)
 
 **Example:**
 ```json
-{"id":"rect1","type":"rect","width":150,"height":100,"background":"red"}
+{"id":"rect1","type":"rect","width":100,"height":50,"background":"red","border_radius":5}
 ```
 
+## Layout Containers
+
 ### Vertical Stack (`"type": "vstack"`)
-Arranges children vertically.
+Stacks children vertically.
 
 **Required Attributes:**
 - `children` (array) - Array of child element IDs
@@ -98,11 +81,11 @@ Arranges children vertically.
 
 **Example:**
 ```json
-{"id":"stack","type":"vstack","children":["item1","item2","item3"],"h_align":"left"}
+{"id":"stack1","type":"vstack","children":["elem1","elem2"],"h_align":"left"}
 ```
 
 ### Horizontal Stack (`"type": "hstack"`)
-Arranges children horizontally.
+Stacks children horizontally.
 
 **Required Attributes:**
 - `children` (array) - Array of child element IDs
@@ -112,11 +95,11 @@ Arranges children horizontally.
 
 **Example:**
 ```json
-{"id":"row","type":"hstack","children":["col1","col2","col3"],"v_align":"top"}
+{"id":"stack2","type":"hstack","children":["elem1","elem2"],"v_align":"top"}
 ```
 
 ### Group (`"type": "group"`)
-Groups elements together without layout constraints.
+Groups elements without layout constraints.
 
 **Required Attributes:**
 - `children` (array) - Array of child element IDs
@@ -125,123 +108,6 @@ Groups elements together without layout constraints.
 ```json
 {"id":"group1","type":"group","children":["elem1","elem2"]}
 ```
-
-## Shape Types
-
-### Line (`"type": "line"`)
-Draws a straight line between two points.
-
-**Required Attributes:**
-- `start_x` or `x1` (number) - Starting X coordinate
-- `start_y` or `y1` (number) - Starting Y coordinate
-- `end_x` or `x2` (number) - Ending X coordinate
-- `end_y` or `y2` (number) - Ending Y coordinate
-
-**Optional Attributes:**
-- `stroke_color` or `color` (string) - Line color (default: "black")
-- `stroke_width` (number) - Line thickness (default: 1)
-
-**Example:**
-```json
-{"id":"line1","type":"line","start_x":0,"start_y":0,"end_x":100,"end_y":50,"stroke_color":"blue"}
-```
-
-### Ellipse (`"type": "ellipse"`)
-Draws an ellipse or circle.
-
-**Required Attributes:**
-- `cx` or `center_x` (number) - Center X coordinate
-- `cy` or `center_y` (number) - Center Y coordinate
-- `rx` or `radius_x` (number) - Horizontal radius
-- `ry` or `radius_y` (number) - Vertical radius
-
-**Optional Attributes:**
-- `fill`, `fill_color`, or `background` (string) - Fill color (default: "white")
-- `stroke`, `stroke_color`, or `border_color` (string) - Border color (default: "black")
-- `stroke_width` or `border_width` (number) - Border thickness (default: 1)
-
-**Example:**
-```json
-{"id":"circle","type":"ellipse","cx":50,"cy":50,"rx":25,"ry":25,"fill":"yellow"}
-```
-
-### Arc (`"type": "arc"`)
-Draws an arc segment.
-
-**Required Attributes:**
-- `cx` or `center_x` (number) - Center X coordinate
-- `cy` or `center_y` (number) - Center Y coordinate
-- `radius` or `r` (number) - Arc radius
-- `start_angle` or `start` (number) - Start angle in degrees
-- `end_angle` or `end` (number) - End angle in degrees
-
-**Optional Attributes:**
-- `fill` or `fill_color` (string) - Fill color (default: "none")
-- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
-- `stroke_width` (number) - Stroke thickness (default: 1)
-- `filled` (boolean) - Whether to fill the arc sector (default: false)
-
-**Example:**
-```json
-{"id":"arc1","type":"arc","cx":100,"cy":100,"radius":50,"start_angle":0,"end_angle":90,"stroke_color":"red","filled":true}
-```
-
-### Semicircle (`"type": "semicircle"`)
-Draws a semicircle (180° arc).
-
-**Required Attributes:**
-- `cx` or `center_x` (number) - Center X coordinate
-- `cy` or `center_y` (number) - Center Y coordinate
-- `radius` or `r` (number) - Semicircle radius
-
-**Optional Attributes:**
-- `facing_up` or `up` (boolean) - True for top semicircle, false for bottom (default: true)
-- `fill` or `fill_color` (string) - Fill color (default: "none")
-- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
-- `stroke_width` (number) - Stroke thickness (default: 1)
-- `filled` (boolean) - Whether to fill the semicircle (default: false)
-
-**Example:**
-```json
-{"id":"semi1","type":"semicircle","cx":100,"cy":100,"radius":40,"facing_up":false,"fill":"green"}
-```
-
-### Quarter Circle (`"type": "quarter_circle"`)
-Draws a quarter circle (90° arc).
-
-**Required Attributes:**
-- `cx` or `center_x` (number) - Center X coordinate
-- `cy` or `center_y` (number) - Center Y coordinate
-- `radius` or `r` (number) - Quarter circle radius
-- `quadrant` (number) - Quadrant: 1=top-right, 2=top-left, 3=bottom-left, 4=bottom-right
-
-**Optional Attributes:**
-- `fill` or `fill_color` (string) - Fill color (default: "none")
-- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
-- `stroke_width` (number) - Stroke thickness (default: 1)
-- `filled` (boolean) - Whether to fill the quarter circle (default: false)
-
-**Example:**
-```json
-{"id":"quarter1","type":"quarter_circle","cx":50,"cy":50,"radius":30,"quadrant":1,"fill":"orange"}
-```
-
-### Polyline (`"type": "polyline"`)
-Draws connected line segments.
-
-**Required Attributes:**
-- `points` (array) - Array of [x, y] coordinate pairs
-
-**Optional Attributes:**
-- `stroke_color` or `color` (string) - Line color (default: "black")
-- `stroke_width` (number) - Line thickness (default: 1)
-
-**Example:**
-```json
-{"id":"poly1","type":"polyline","points":[[0,0],[50,25],[100,0],[150,50]],"stroke_color":"purple"}
-```
-
-## Container Types
 
 ### Table (`"type": "table"`)
 Arranges children in a grid layout.
@@ -285,6 +151,131 @@ Each child element should have `x` and `y` attributes for positioning within the
 {"id":"item2","type":"rect","width":60,"height":40,"background":"blue","x":200,"y":150}
 ```
 
+## Shape Types
+
+### Line (`"type": "line"`)
+Draws a straight line between two points.
+
+**Required Attributes:**
+- `start_x` or `x1` (number) - Starting X coordinate
+- `start_y` or `y1` (number) - Starting Y coordinate
+- `end_x` or `x2` (number) - Ending X coordinate
+- `end_y` or `y2` (number) - Ending Y coordinate
+
+**Optional Attributes:**
+- `stroke_color` or `color` (string) - Line color (default: "black")
+- `stroke_width` (number) - Line thickness (default: 1)
+
+**Example:**
+```json
+{"id":"line1","type":"line","start_x":0,"start_y":0,"end_x":100,"end_y":50,"stroke_color":"blue"}
+```
+
+### Ellipse (`"type": "ellipse"`)
+Draws an ellipse or circle.
+
+**Required Attributes:**
+- `rx` or `radius_x` (number) - Horizontal radius
+- `ry` or `radius_y` (number) - Vertical radius
+
+**Optional Attributes:**
+- `fill`, `fill_color`, or `background` (string) - Fill color (default: "white")
+- `stroke`, `stroke_color`, or `border_color` (string) - Border color (default: "black")
+- `stroke_width` or `border_width` (number) - Border thickness (default: 1)
+
+**Example:**
+```json
+{"id":"circle","type":"ellipse","rx":25,"ry":25,"fill":"yellow"}
+```
+
+### Arc (`"type": "arc"`)
+Draws an arc segment. Arcs work like ellipses - they are positioned by the layout system and centered within their bounding box.
+
+**Required Attributes:**
+- `radius` or `r` (number) - Arc radius
+- `start_angle` or `start` (number) - Start angle in degrees
+- `end_angle` or `end` (number) - End angle in degrees
+
+**Optional Attributes:**
+- `fill` or `fill_color` (string) - Fill color (default: "none")
+- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
+- `stroke_width` (number) - Stroke thickness (default: 1)
+- `filled` (boolean) - Whether to fill the arc sector (default: false)
+
+**Positioning:**
+- Arcs are positioned using `x`, `y` attributes (for free containers) like other shapes
+- The `cx`, `cy` attributes are ignored - positioning is handled by the layout system
+- Arc size is always `diameter = radius * 2` regardless of arc sweep
+- The arc is automatically centered within its bounding box
+
+**Special Cases:**
+- 360° arcs (full circles) render as proper circles
+- Filled arcs create pie-slice shapes with lines to the center
+- Unfilled arcs draw only the arc curve
+
+**Examples:**
+```json
+{"id":"quarter","type":"arc","radius":40,"start_angle":0,"end_angle":90,"stroke_color":"red","x":50,"y":50}
+{"id":"semicircle","type":"arc","radius":30,"start_angle":0,"end_angle":180,"filled":true,"fill_color":"blue","x":150,"y":50}
+{"id":"full_circle","type":"arc","radius":25,"start_angle":0,"end_angle":360,"filled":true,"fill_color":"green","x":250,"y":50}
+```
+
+### Semicircle (`"type": "semicircle"`)
+Draws a semicircle (180° arc).
+
+**Required Attributes:**
+- `cx` or `center_x` (number) - Center X coordinate
+- `cy` or `center_y` (number) - Center Y coordinate
+- `radius` or `r` (number) - Semicircle radius
+
+**Optional Attributes:**
+- `facing_up` or `up` (boolean) - True for top semicircle, false for bottom (default: true)
+- `fill` or `fill_color` (string) - Fill color (default: "none")
+- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
+- `stroke_width` (number) - Stroke thickness (default: 1)
+- `filled` (boolean) - Whether to fill the semicircle (default: false)
+
+**Example:**
+```json
+{"id":"semi1","type":"semicircle","cx":100,"cy":100,"radius":40,"facing_up":false,"fill":"green"}
+```
+
+### Quarter Circle (`"type": "quarter_circle"`)
+Draws a quarter circle (90° arc).
+
+**Required Attributes:**
+- `cx` or `center_x` (number) - Center X coordinate
+- `cy` or `center_y` (number) - Center Y coordinate
+- `radius` or `r` (number) - Quarter circle radius
+- `quadrant` (number) - Quadrant: 1=top-right, 2=top-left, 3=bottom-left, 4=bottom-right
+
+**Optional Attributes:**
+- `fill` or `fill_color` (string) - Fill color (default: "none")
+- `stroke` or `stroke_color` (string) - Stroke color (default: "black")
+- `stroke_width` (number) - Stroke thickness (default: 1)
+- `filled` (boolean) - Whether to fill the quarter circle (default: false)
+
+**Example:**
+```json
+{"id":"quarter1","type":"quarter_circle","cx":50,"cy":50,"radius":30,"quadrant":1,"fill":"orange"}
+```
+
+
+### Polyline (`"type": "polyline"`)
+Draws connected line segments.
+
+**Required Attributes:**
+- `points` (array) - Array of [x, y] coordinate pairs
+
+**Optional Attributes:**
+- `stroke_color` or `color` (string) - Line color (default: "black")
+- `stroke_width` (number) - Line thickness (default: 1)
+
+**Example:**
+```json
+{"id":"poly1","type":"polyline","points":[[0,0],[50,25],[100,0],[150,50]],"stroke_color":"purple"}
+```
+
 ## Media Types
 
 ### Image (`"type": "image"`)
@@ -301,6 +292,26 @@ Displays an image from file or base64 data.
 **Example:**
 ```json
 {"id":"img1","type":"image","file_path":"assets/logo.png","width":200,"height":150}
+```
+
+## Transform and Positioning Attributes
+
+All entities support the following positioning and transform attributes:
+
+### Positioning (for Free Container children)
+- `x` (number) - X position relative to container
+- `y` (number) - Y position relative to container
+
+### Transforms
+- `rotation` or `rotate` (number) - Rotation angle in degrees
+- `scale` (number or array) - Uniform scale (number) or [scaleX, scaleY] (array)
+- `transform` (string) - CSS-style transform string (experimental)
+
+**Transform Examples:**
+```json
+{"id":"rotated_rect","type":"rect","width":50,"height":30,"background":"blue","rotation":45}
+{"id":"scaled_text","type":"text","content":"Big Text","scale":2.0}
+{"id":"complex_shape","type":"rect","width":40,"height":40,"scale":[1.5,0.8],"rotation":30}
 ```
 
 ## Size Behaviors
@@ -322,7 +333,14 @@ Colors can be specified as:
 
 ## Custom Components
 
-The system supports custom components registered by the application. These components can accept any attributes defined by their implementation.
+The system supports custom components registered by the application. These components can accept any attributes defined by their implementation. Examples from the codebase include:
+
+- `badge` - Creates a styled badge with text
+- `alert` - Creates alert boxes with different types
+- `progress_bar` - Creates progress indicators
+- `button` - Creates interactive buttons
+
+Custom components are registered via `builder.register_custom_component()` and can have any attributes their implementation supports.
 
 ## Complete Example
 
@@ -342,15 +360,10 @@ The system supports custom components registered by the application. These compo
 
 This creates a document layout with header, sidebar navigation, main content area, and footer.
 
-## Best Practices
+## Implementation Notes
 
-### Text Layout
-- **Use fixed-width boxes** for consistent layouts - text will automatically wrap to fit
-- **Let height be content-based** for boxes containing text to accommodate wrapped content
-- **Use padding** to ensure proper text spacing from box edges
-- **Disable auto-wrapping** only when you need precise control over line breaks
-
-### Responsive Design
-- Fixed-width boxes with auto-wrapping text create predictable, responsive layouts
-- Combine with different padding values for various spacing needs
-- Stack multiple auto-wrapping boxes for article-like layouts
+- The parser supports flexible attribute naming (e.g., `background`, `background_color`, and `fill` all work for background colors)
+- Transform attributes are parsed and applied during entity building
+- Container-relative positioning (`x`, `y`) is handled separately from transforms
+- Size behaviors allow for responsive layouts with content-based or fixed sizing
+- All supported entity types are handled in the `build_entity` match statement in parser.rs

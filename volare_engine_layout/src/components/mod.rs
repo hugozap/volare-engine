@@ -1189,7 +1189,6 @@ impl ArcOptions {
 // Arc shape structure
 pub struct ShapeArc {
     pub entity: EntityID,
-    pub center: (Float, Float), // Center point of the arc
     pub radius: Float,          // Radius of the arc
     pub start_angle: Float,     // Start angle in degrees
     pub end_angle: Float,       // End angle in degrees
@@ -1200,7 +1199,6 @@ impl Clone for ShapeArc {
     fn clone(&self) -> Self {
         ShapeArc {
             entity: self.entity.clone(),
-            center: self.center,
             radius: self.radius,
             start_angle: self.start_angle,
             end_angle: self.end_angle,
@@ -1212,7 +1210,6 @@ impl Clone for ShapeArc {
 impl ShapeArc {
     pub fn new(
         entity: EntityID,
-        center: (Float, Float),
         radius: Float,
         start_angle: Float,
         end_angle: Float,
@@ -1220,7 +1217,6 @@ impl ShapeArc {
     ) -> ShapeArc {
         ShapeArc {
             entity,
-            center,
             radius,
             start_angle,
             end_angle,

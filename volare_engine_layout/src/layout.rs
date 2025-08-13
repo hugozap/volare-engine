@@ -56,12 +56,8 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     // Calculate the box height (after potential text wrapping)
     let box_height = match shape_box.box_options.height_behavior {
         SizeBehavior::Fixed(height) => height,
-        SizeBehavior::Content => {
-            wrapped_elem_bounds.height + shape_box.box_options.padding * 2.0
-        }
-        SizeBehavior::Grow => {
-            wrapped_elem_bounds.height + shape_box.box_options.padding * 2.0
-        }
+        SizeBehavior::Content => wrapped_elem_bounds.height + shape_box.box_options.padding * 2.0,
+        SizeBehavior::Grow => wrapped_elem_bounds.height + shape_box.box_options.padding * 2.0,
     };
 
     // Calculate where we want the wrapped element's bounding box to be positioned
@@ -87,7 +83,8 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
             let available_height = fixed_height - shape_box.box_options.padding * 2.0;
             if wrapped_elem_bounds.height <= available_height {
                 // Center the content bounding box
-                shape_box.box_options.padding + (available_height - wrapped_elem_bounds.height) / 2.0
+                shape_box.box_options.padding
+                    + (available_height - wrapped_elem_bounds.height) / 2.0
             } else {
                 // Content is larger than available space, align bounding box to top edge
                 shape_box.box_options.padding
@@ -102,18 +99,22 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     // FIXED: Apply bounding box compensation when positioning the wrapped element
     let transform_x = desired_content_x - wrapped_elem_bounds.x;
     let transform_y = desired_content_y - wrapped_elem_bounds.y;
-    
+
     session.set_position(shape_box.wrapped_entity.clone(), transform_x, transform_y);
 
     println!(
         "Box: {}, width: {}, height: {}, padding: {}, content positioned at: ({}, {})",
-        shape_box.entity, box_width, box_height, shape_box.box_options.padding, transform_x, transform_y
+        shape_box.entity,
+        box_width,
+        box_height,
+        shape_box.box_options.padding,
+        transform_x,
+        transform_y
     );
 
     // Set the box dimensions
     session.set_size(shape_box.entity.clone(), box_width, box_height);
 }
-
 
 fn calculate_optimal_line_width(
     session: &DiagramBuilder,
@@ -275,7 +276,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
 }
 
 // WHY this function doesn't need the bounding box compensation:
-// 
+//
 // 1. Text lines don't have individual rotations - they're just positioned within the text entity
 // 2. The rotation transform is applied to the parent text entity as a whole
 // 3. Individual lines are positioned relative to (0,0) within the text entity
@@ -284,7 +285,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
 // Transform hierarchy:
 // Text Entity (has rotation transform)
 //   └── Line 1 (positioned at 0, 0 relative to text entity)
-//   └── Line 2 (positioned at 0, 16 relative to text entity)  
+//   └── Line 2 (positioned at 0, 16 relative to text entity)
 //   └── Line 3 (positioned at 0, 32 relative to text entity)
 pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
     let mut y = 0.0;
@@ -413,7 +414,7 @@ pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
 pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &VerticalStack) {
     let mut logical_y = 0.0; // Where we want each element's bounding box to start
     let mut width = 0.0;
-    
+
     for elem in vertical_stack.elements.iter() {
         println!("DEBUG:::y: {}", logical_y);
         let elem_bounds = session.get_effective_bounds(elem.clone());
@@ -421,15 +422,15 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
         // FIXED: Position the element so its bounding box starts at logical_y
         let transform_y = logical_y - elem_bounds.y;
         session.set_position(elem.clone(), 0.0, transform_y);
-        
+
         // FIXED: Add the effective height to logical_y for next element
         logical_y += elem_bounds.height;
-        
+
         if elem_bounds.width > width {
             width = elem_bounds.width;
         }
     }
-    
+
     // Set the stack size to the total logical height
     session.set_size(vertical_stack.entity.clone(), width, logical_y);
 
@@ -438,37 +439,36 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
         // FIXED: Use effective bounds consistently for alignment calculations
         let elem_bounds = session.get_effective_bounds(elem.clone());
         let current_pos = session.get_position(elem.clone());
-        
+
         let x = match vertical_stack.horizontal_alignment {
             HorizontalAlignment::Left => -elem_bounds.x, // Compensate for bounding box offset
             HorizontalAlignment::Center => (width - elem_bounds.width) / 2.0 - elem_bounds.x,
             HorizontalAlignment::Right => width - elem_bounds.width - elem_bounds.x,
         };
-        
+
         session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y
     }
 }
 
-
 pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
     let mut logical_x = 0.0; // Where we want each element's bounding box to start
     let mut height = 0.0;
-    
+
     for elem in horizontal_stack.elements.iter() {
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        
+
         // FIXED: Position the element so its bounding box starts at logical_x
         let transform_x = logical_x - elem_bounds.x;
         session.set_position(elem.clone(), transform_x, 0.0);
-        
+
         // FIXED: Add the effective width to logical_x for next element
         logical_x += elem_bounds.width;
-        
+
         if elem_bounds.height > height {
             height = elem_bounds.height;
         }
     }
-    
+
     // Set the stack size to the total logical width
     session.set_size(horizontal_stack.entity.clone(), logical_x, height);
 
@@ -477,13 +477,13 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
         // FIXED: Use effective bounds consistently for alignment calculations
         let elem_bounds = session.get_effective_bounds(elem.clone());
         let current_pos = session.get_position(elem.clone());
-        
+
         let y = match horizontal_stack.vertical_alignment {
             VerticalAlignment::Top => -elem_bounds.y, // Compensate for bounding box offset
             VerticalAlignment::Center => (height - elem_bounds.height) / 2.0 - elem_bounds.y,
             VerticalAlignment::Bottom => height - elem_bounds.height - elem_bounds.y,
         };
-        
+
         session.set_position(elem.clone(), current_pos.0, y);
     }
 }
@@ -548,21 +548,24 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     for (i, col) in cols.iter().enumerate() {
         let mut logical_y = 0.0;
         for (j, elem) in col.iter().enumerate() {
-            // FIXED: Apply bounding box compensation for cell positioning
             let elem_bounds = session.get_effective_bounds(elem.clone());
-            
+
             // Calculate where we want the element's bounding box to be (with padding)
             let desired_x = logical_x + table.table_options.cell_padding as Float;
             let desired_y = logical_y + table.table_options.cell_padding as Float;
-            
+
             // Compensate for the element's bounding box offset
             let transform_x = desired_x - elem_bounds.x;
             let transform_y = desired_y - elem_bounds.y;
-            
-            session.set_position(elem.clone(), transform_x, transform_y);
+
+            // FIXED: Instead of overwriting position, add translation to existing transform
+            let current_transform = session.get_transform(elem.clone());
+            let position_transform = Transform::translation(transform_x, transform_y);
+            let new_transform = current_transform.combine(&position_transform);
+            session.set_transform(elem.clone(), new_transform);
+
             logical_y += row_heights[j];
         }
-
         logical_x += col_widths[i];
     }
 
@@ -616,7 +619,6 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     }
 }
 
-
 pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
     if polyline.points.is_empty() {
         session.set_size(polyline.entity.clone(), 0.0, 0.0);
@@ -653,15 +655,18 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     let mut max_height = 0.0;
 
     for (child_id, desired_position) in &container.children {
-        println!("🔧 Positioning {} at ({}, {})", child_id, desired_position.0, desired_position.1);
-        
+        println!(
+            "🔧 Positioning {} at ({}, {})",
+            child_id, desired_position.0, desired_position.1
+        );
+
         // Simply position the element at the desired location
         // No bounding box compensation needed with the new system
         session.set_position(child_id.clone(), desired_position.0, desired_position.1);
-        
+
         // Get the size to calculate container bounds
         let child_size = session.get_size(child_id.clone());
-        
+
         // Calculate the extent based on position + size
         let right = desired_position.0 + child_size.0;
         let bottom = desired_position.1 + child_size.1;
@@ -680,81 +685,10 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
 
 // BETTER FIX: Adjust the arc layout to work with existing renderer expectations
 
-/**
- * Updates the size of the arc entity based on the radius and angle sweep
- * Sets position to (0,0) since arcs use their cx,cy for center positioning
- * The size represents the full space needed for the arc
- */
 pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
-    use std::f32::consts::PI;
-
-    let radius = shape_arc.radius;
-    let (start_angle, end_angle) = shape_arc.normalize_angles();
-
-    // Convert degrees to radians
-    let start_rad = start_angle * PI / 180.0;
-    let end_rad = end_angle * PI / 180.0;
-
-    // Calculate the points at start and end angles relative to center
-    let start_x = shape_arc.center.0 + radius * start_rad.cos();
-    let start_y = shape_arc.center.1 + radius * start_rad.sin();
-    let end_x = shape_arc.center.0 + radius * end_rad.cos();
-    let end_y = shape_arc.center.1 + radius * end_rad.sin();
-
-    // For a more accurate bounding box, we need to consider if the arc crosses
-    // the cardinal directions (0°, 90°, 180°, 270°)
-    let mut min_x = start_x.min(end_x);
-    let mut max_x = start_x.max(end_x);
-    let mut min_y = start_y.min(end_y);
-    let mut max_y = start_y.max(end_y);
-
-    // Check if arc crosses cardinal directions and expand bounding box accordingly
-    let sweep = shape_arc.angle_sweep();
-    let angles_to_check = if end_angle > start_angle {
-        vec![0.0, 90.0, 180.0, 270.0]
-    } else {
-        // Arc crosses 0° (wraps around)
-        vec![0.0, 90.0, 180.0, 270.0, 360.0]
-    };
-
-    for angle in angles_to_check {
-        let normalized_angle = angle % 360.0;
-
-        // Check if this cardinal angle is within our arc
-        let angle_in_arc = if end_angle > start_angle {
-            normalized_angle >= start_angle && normalized_angle <= end_angle
-        } else {
-            normalized_angle >= start_angle || normalized_angle <= end_angle
-        };
-
-        if angle_in_arc {
-            let rad = normalized_angle * PI / 180.0;
-            let x = shape_arc.center.0 + radius * rad.cos();
-            let y = shape_arc.center.1 + radius * rad.sin();
-
-            min_x = min_x.min(x);
-            max_x = max_x.max(x);
-            min_y = min_y.min(y);
-            max_y = max_y.max(y);
-        }
-    }
-
-    // Calculate width and height from bounding box
-    let width = max_x - min_x;
-    let height = max_y - min_y;
-
-    // FIXED: Set position to (0,0) and let the arc use its cx,cy for positioning
-    // This matches how other shapes work - they render relative to their position
-    session.set_position(shape_arc.entity.clone(), 0.0, 0.0);
-
-    // The size should be large enough to contain the entire arc
-    // Add padding to ensure the arc fits regardless of center position
-    let total_width = (shape_arc.center.0 + radius).max(width);
-    let total_height = (shape_arc.center.1 + radius).max(height);
-
-    session.set_size(shape_arc.entity.clone(), total_width, total_height);
+    let diameter = shape_arc.radius * 2.0;
+    session.set_size(shape_arc.entity.clone(), diameter, diameter);
 }
-// Add this to your BoundingBox definition in src/transform.rs or wherever it's defined:
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoundingBox {
@@ -763,8 +697,6 @@ pub struct BoundingBox {
     pub width: Float,
     pub height: Float,
 }
-
-
 
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {

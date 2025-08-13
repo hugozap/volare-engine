@@ -1,0 +1,61 @@
+{"id":"root","type":"vstack","children":["title","subtitle","shapes_table"],"h_align":"center"}
+{"id":"title","type":"text","content":"🎨 Complete Shape Reference","font_size":28,"color":"darkblue"}
+{"id":"subtitle","type":"text","content":"All supported shapes with examples - Renderer Reference","font_size":16,"color":"gray"}
+{"id":"shapes_table","type":"table","cols":3,"children":["header1","header2","header3","text_name","text_demo","text_desc","rect_name","rect_demo","rect_desc","ellipse_name","ellipse_demo","ellipse_desc","arc_name","arc_demo","arc_desc","line_name","line_demo","line_desc","polyline_name","polyline_demo","polyline_desc","box_name","box_demo","box_desc","image_name","image_demo","image_desc","vstack_name","vstack_demo","vstack_desc","hstack_name","hstack_demo","hstack_desc","table_name","table_demo","table_desc","group_name","group_demo","group_desc","container_name","container_demo","container_desc"],"header_fill_color":"lightblue","border_color":"darkblue","border_width":2,"cell_padding":15}
+{"id":"header1","type":"text","content":"Shape Type","font_size":16,"color":"darkblue"}
+{"id":"header2","type":"text","content":"Example","font_size":16,"color":"darkblue"}
+{"id":"header3","type":"text","content":"Description","font_size":16,"color":"darkblue"}
+{"id":"text_name","type":"text","content":"Text","font_size":14,"color":"black"}
+{"id":"text_demo","type":"text","content":"Hello World!\nMultiline text\nsupported","font_size":12,"color":"darkgreen"}
+{"id":"text_desc","type":"text","content":"Renders text with font styling, wrapping, and line spacing","font_size":11,"color":"gray"}
+{"id":"rect_name","type":"text","content":"Rectangle","font_size":14,"color":"black"}
+{"id":"rect_demo","type":"rect","width":60,"height":40,"background":"lightcoral","border_color":"darkred","border_width":2,"border_radius":5}
+{"id":"rect_desc","type":"text","content":"Rectangular shapes with optional rounded corners","font_size":11,"color":"gray"}
+{"id":"ellipse_name","type":"text","content":"Ellipse","font_size":14,"color":"black"}
+{"id":"ellipse_demo","type":"ellipse","rx":30,"ry":20,"fill":"lightblue","stroke":"darkblue","stroke_width":2}
+{"id":"ellipse_desc","type":"text","content":"Ellipses and circles with customizable radii","font_size":11,"color":"gray"}
+{"id":"arc_name","type":"text","content":"Arc","font_size":14,"color":"black"}
+{"id":"arc_demo","type":"arc","radius":25,"start_angle":0,"end_angle":270,"stroke_color":"purple","stroke_width":3,"filled":true,"fill_color":"lavender"}
+{"id":"arc_desc","type":"text","content":"Arc segments, semicircles, and pie slices","font_size":11,"color":"gray"}
+{"id":"line_name","type":"text","content":"Line","font_size":14,"color":"black"}
+{"id":"line_demo","type":"line","start_x":0,"start_y":0,"end_x":50,"end_y":30,"stroke_color":"red","stroke_width":3}
+{"id":"line_desc","type":"text","content":"Straight lines between two points","font_size":11,"color":"gray"}
+{"id":"polyline_name","type":"text","content":"Polyline","font_size":14,"color":"black"}
+{"id":"polyline_demo","type":"polyline","points":[[0,20],[15,0],[30,20],[45,5],[60,25]],"stroke_color":"orange","stroke_width":2}
+{"id":"polyline_desc","type":"text","content":"Connected line segments forming complex paths","font_size":11,"color":"gray"}
+{"id":"box_name","type":"text","content":"Box","font_size":14,"color":"black"}
+{"id":"box_demo","type":"box","padding":8,"background":"lightyellow","border_color":"gold","border_width":2,"children":["box_child"]}
+{"id":"box_child","type":"text","content":"Boxed","font_size":10,"color":"darkorange"}
+{"id":"box_desc","type":"text","content":"Container with padding, background, and border","font_size":11,"color":"gray"}
+{"id":"image_name","type":"text","content":"Image","font_size":14,"color":"black"}
+{"id":"image_demo","type":"rect","width":50,"height":30,"background":"lightgray","border_color":"gray","border_width":1}
+{"id":"image_desc","type":"text","content":"Images from files or base64 data (placeholder shown)","font_size":11,"color":"gray"}
+{"id":"vstack_name","type":"text","content":"VStack","font_size":14,"color":"black"}
+{"id":"vstack_demo","type":"vstack","children":["vs1","vs2","vs3"],"h_align":"center"}
+{"id":"vs1","type":"rect","width":15,"height":8,"background":"red"}
+{"id":"vs2","type":"rect","width":20,"height":8,"background":"green"}
+{"id":"vs3","type":"rect","width":12,"height":8,"background":"blue"}
+{"id":"vstack_desc","type":"text","content":"Vertical layout container for stacking elements","font_size":11,"color":"gray"}
+{"id":"hstack_name","type":"text","content":"HStack","font_size":14,"color":"black"}
+{"id":"hstack_demo","type":"hstack","children":["hs1","hs2","hs3"],"v_align":"center"}
+{"id":"hs1","type":"rect","width":8,"height":15,"background":"red"}
+{"id":"hs2","type":"rect","width":8,"height":20,"background":"green"}
+{"id":"hs3","type":"rect","width":8,"height":12,"background":"blue"}
+{"id":"hstack_desc","type":"text","content":"Horizontal layout container for side-by-side elements","font_size":11,"color":"gray"}
+{"id":"table_name","type":"text","content":"Table","font_size":14,"color":"black"}
+{"id":"table_demo","type":"table","cols":2,"children":["t1","t2","t3","t4"],"border_color":"black","border_width":1,"cell_padding":3}
+{"id":"t1","type":"text","content":"A","font_size":10}
+{"id":"t2","type":"text","content":"B","font_size":10}
+{"id":"t3","type":"text","content":"C","font_size":10}
+{"id":"t4","type":"text","content":"D","font_size":10}
+{"id":"table_desc","type":"text","content":"Grid layout with configurable rows and columns","font_size":11,"color":"gray"}
+{"id":"group_name","type":"text","content":"Group","font_size":14,"color":"black"}
+{"id":"group_demo","type":"group","children":["g1","g2"]}
+{"id":"g1","type":"rect","width":20,"height":15,"background":"pink"}
+{"id":"g2","type":"rect","width":15,"height":20,"background":"lightgreen"}
+{"id":"group_desc","type":"text","content":"Groups elements without layout constraints","font_size":11,"color":"gray"}
+{"id":"container_name","type":"text","content":"Free Container","font_size":14,"color":"black"}
+{"id":"container_demo","type":"free_container","width":60,"height":40,"children":["fc1","fc2"]}
+{"id":"fc1","type":"rect","width":15,"height":10,"background":"cyan","x":5,"y":5}
+{"id":"fc2","type":"rect","width":10,"height":15,"background":"magenta","x":35,"y":20}
+{"id":"container_desc","type":"text","content":"Absolute positioning container using x,y coordinates","font_size":11,"color":"gray"}

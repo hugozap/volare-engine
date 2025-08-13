@@ -617,12 +617,6 @@ impl JsonLinesParser {
             }
 
             "arc" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (0.0, 0.0),
-                );
                 let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
                 let start_angle =
                     get_float_attr(&entity.attributes, &["start_angle", "start"], 0.0);
@@ -648,7 +642,6 @@ impl JsonLinesParser {
 
                 Ok(builder.new_arc(
                     entity_id.to_string(),
-                    center,
                     radius,
                     start_angle,
                     end_angle,
@@ -658,12 +651,6 @@ impl JsonLinesParser {
 
             // Complete fixed semicircle section for parser.rs
             "semicircle" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (0.0, 0.0),
-                );
                 let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
                 let facing_up = get_bool_attr(&entity.attributes, &["facing_up", "up"], true);
 
@@ -691,16 +678,10 @@ impl JsonLinesParser {
                   // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_arc(entity_id.to_string(), center, radius, start, end, options))
+                Ok(builder.new_arc(entity_id.to_string(),radius, start, end, options))
             }
 
             "quarter_circle" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (0.0, 0.0),
-                );
                 let radius = get_float_attr(&entity.attributes, &["radius", "r"], 50.0);
                 let quadrant = get_int_attr(&entity.attributes, &["quadrant"], 1) as u8;
 
@@ -724,7 +705,6 @@ impl JsonLinesParser {
 
                 Ok(builder.new_quarter_circle(
                     entity_id.to_string(),
-                    center,
                     radius,
                     quadrant,
                     options,

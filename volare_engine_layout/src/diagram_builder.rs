@@ -289,6 +289,7 @@ impl DiagramBuilder {
         self.set_transform(entity_id, transform);
     }
 
+
     pub fn set_scale(&mut self, entity_id: EntityID, sx: Float, sy: Float) {
         let current = self.get_transform(entity_id.clone()).clone();
         let scale = Transform::scale(sx, sy);
@@ -352,7 +353,6 @@ impl DiagramBuilder {
     pub fn new_arc(
         &mut self,
         id: EntityID,
-        center: (Float, Float),
         radius: Float,
         start_angle: Float,
         end_angle: Float,
@@ -361,7 +361,6 @@ impl DiagramBuilder {
         let arc_id = self.new_entity(id, EntityType::ArcShape);
         let arc = ShapeArc::new(
             arc_id.clone(),
-            center,
             radius,
             start_angle,
             end_angle,
@@ -375,19 +374,17 @@ impl DiagramBuilder {
     pub fn new_arc_degrees(
         &mut self,
         id: EntityID,
-        center: (Float, Float),
         radius: Float,
         start_degrees: Float,
         end_degrees: Float,
         options: ArcOptions,
     ) -> DiagramTreeNode {
-        self.new_arc(id, center, radius, start_degrees, end_degrees, options)
+        self.new_arc(id, radius, start_degrees, end_degrees, options)
     }
 
     pub fn new_semicircle(
         &mut self,
         id: EntityID,
-        center: (Float, Float),
         radius: Float,
         facing_up: bool,
         options: ArcOptions,
@@ -397,13 +394,12 @@ impl DiagramBuilder {
         } else {
             (180.0, 360.0) // Bottom semicircle
         };
-        self.new_arc(id, center, radius, start, end, options)
+        self.new_arc(id, radius, start, end, options)
     }
 
     pub fn new_quarter_circle(
         &mut self,
         id: EntityID,
-        center: (Float, Float),
         radius: Float,
         quadrant: u8, // 1=top-right, 2=top-left, 3=bottom-left, 4=bottom-right
         options: ArcOptions,
@@ -415,7 +411,7 @@ impl DiagramBuilder {
             4 => (270.0, 360.0), // Bottom-right
             _ => (0.0, 90.0),    // Default to top-right
         };
-        self.new_arc(id, center, radius, start, end, options)
+        self.new_arc(id, radius, start, end, options)
     }
 
     // Creates a new Vertical stack.

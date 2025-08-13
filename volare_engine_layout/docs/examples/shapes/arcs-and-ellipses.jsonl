@@ -1,0 +1,15 @@
+{"id":"root","type":"vstack","children":["title","shape_stack","spacing","rotated_stack"],"h_align":"center"}
+{"id":"title","type":"text","content":"📦 VStack Bounding Box Test","font_size":24,"color":"darkgreen"}
+{"id":"shape_stack","type":"vstack","children":["ellipse1","arc1","ellipse2","arc2","ellipse3"],"h_align":"center"}
+{"id":"ellipse1","type":"ellipse","rx":30,"ry":20,"fill":"lightblue","stroke":"blue","stroke_width":2}
+{"id":"arc1","type":"arc","radius":25,"start_angle":0,"end_angle":180,"stroke_color":"red","stroke_width":3,"filled":true,"fill_color":"pink"}
+{"id":"ellipse2","type":"ellipse","rx":40,"ry":15,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"arc2","type":"arc","radius":30,"start_angle":0,"end_angle":270,"stroke_color":"purple","stroke_width":3,"filled":false}
+{"id":"ellipse3","type":"ellipse","rx":25,"ry":25,"fill":"yellow","stroke":"orange","stroke_width":2}
+{"id":"spacing","type":"text","content":"---","font_size":16,"color":"gray"}
+{"id":"rotated_stack","type":"vstack","children":["rot_ellipse1","rot_arc1","rot_ellipse2","rot_arc2","rot_circle"],"h_align":"center"}
+{"id":"rot_ellipse1","type":"ellipse","rx":35,"ry":20,"fill":"lightcoral","stroke":"darkred","stroke_width":2,"rotation":45}
+{"id":"rot_arc1","type":"arc","radius":28,"start_angle":0,"end_angle":120,"stroke_color":"darkblue","stroke_width":4,"filled":true,"fill_color":"lightsteelblue","rotation":30}
+{"id":"rot_ellipse2","type":"ellipse","rx":20,"ry":40,"fill":"lightpink","stroke":"deeppink","stroke_width":2,"rotation":-30}
+{"id":"rot_arc2","type":"arc","radius":35,"start_angle":45,"end_angle":315,"stroke_color":"darkorange","stroke_width":3,"filled":false,"rotation":60}
+{"id":"rot_circle","type":"arc","radius":20,"start_angle":0,"end_angle":360,"stroke_color":"darkviolet","stroke_width":2,"filled":true,"fill_color":"mediumpurple","rotation":90}

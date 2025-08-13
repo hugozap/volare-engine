@@ -1,0 +1,17 @@
+{"id":"root","type":"vstack","children":["title","demo_container"],"h_align":"center"}
+{"id":"title","type":"text","content":"📈 Polyline Test & Examples","font_size":24,"color":"darkblue"}
+{"id":"demo_container","type":"free_container","width":700,"height":500,"children":["simple_line","zigzag","triangle","star","graph","house","labels"]}
+{"id":"simple_line","type":"polyline","points":[[0,0],[100,0],[100,50],[0,50]],"stroke_color":"red","stroke_width":3,"x":50,"y":50}
+{"id":"zigzag","type":"polyline","points":[[0,0],[30,20],[60,0],[90,20],[120,0],[150,20]],"stroke_color":"green","stroke_width":2,"x":200,"y":50}
+{"id":"triangle","type":"polyline","points":[[0,40],[40,0],[80,40],[0,40]],"stroke_color":"blue","stroke_width":3,"x":400,"y":50}
+{"id":"star","type":"polyline","points":[[25,0],[30,15],[45,15],[35,25],[40,40],[25,30],[10,40],[15,25],[5,15],[20,15],[25,0]],"stroke_color":"gold","stroke_width":2,"x":550,"y":50}
+{"id":"graph","type":"polyline","points":[[0,80],[20,60],[40,70],[60,30],[80,40],[100,10],[120,20],[140,5]],"stroke_color":"purple","stroke_width":3,"x":50,"y":150}
+{"id":"house","type":"polyline","points":[[0,40],[0,10],[20,0],[40,10],[40,40],[30,40],[30,25],[10,25],[10,40],[0,40]],"stroke_color":"brown","stroke_width":2,"x":250,"y":150}
+{"id":"labels","type":"vstack","children":["label1","label2","label3","label4","label5","label6","positioning_note"],"h_align":"left","x":50,"y":300}
+{"id":"label1","type":"text","content":"• Red: Simple rectangle path","font_size":12,"color":"red"}
+{"id":"label2","type":"text","content":"• Green: Zigzag line pattern","font_size":12,"color":"green"}
+{"id":"label3","type":"text","content":"• Blue: Closed triangle shape","font_size":12,"color":"blue"}
+{"id":"label4","type":"text","content":"• Gold: 5-pointed star","font_size":12,"color":"gold"}
+{"id":"label5","type":"text","content":"• Purple: Data graph line","font_size":12,"color":"purple"}
+{"id":"label6","type":"text","content":"• Brown: House outline","font_size":12,"color":"brown"}
+{"id":"positioning_note","type":"text","content":"All polylines positioned using x,y coordinates","font_size":10,"color":"gray"}

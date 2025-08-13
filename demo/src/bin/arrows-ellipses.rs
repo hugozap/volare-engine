@@ -48,6 +48,7 @@ fn generate_basic_arrows_demo(output_dir: &Path) -> Result<(), Box<dyn std::erro
 }
 
 // Demo 2: Basic Ellipses in Different Layouts
+//TODO: remove "cx" and "cy"
 fn generate_basic_ellipses_demo(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let jsonl_input = r##"
 {"id":"root","type":"vstack","children":["title","ellipses_hstack","ellipses_free"],"h_align":"center"}
