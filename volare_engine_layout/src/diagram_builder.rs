@@ -13,13 +13,14 @@ use std::{collections::HashMap, sync::Arc};
  *
  */
 //use TextOptions
-use crate::components::*;
+use crate::{components::*, transform::Transform, BoundingBox};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
     pub entities: Vec<EntityID>,
     pub positions: HashMap<EntityID, Point>,
     pub sizes: HashMap<EntityID, Size>,
+    pub transforms: HashMap<EntityID, Transform>,
     pub entityTypes: HashMap<EntityID, EntityType>,
 
     // Components
@@ -82,6 +83,7 @@ impl DiagramBuilder {
             entities: Vec::new(),
             positions: HashMap::new(),
             sizes: HashMap::new(),
+            transforms: HashMap::new(),
             boxes: HashMap::new(),
             rectangles: HashMap::new(),
             groups: HashMap::new(),
@@ -191,6 +193,9 @@ impl DiagramBuilder {
         self.positions.insert(id.clone(), Point::new(0.0, 0.0));
         self.sizes.insert(id.clone(), Size::new(0.0, 0.0));
         self.entityTypes.insert(id.clone(), entity_type.clone());
+        if !self.transforms.contains_key(&id) {
+            self.transforms.insert(id.clone(), Transform::identity());
+        }
         id
     }
 
@@ -200,17 +205,86 @@ impl DiagramBuilder {
         self.measure_text = Option::Some(measure_text);
     }
 
-    //get the position of an entity
-    pub fn get_position(&self, entity_id: EntityID) -> (Float, Float) {
-        let pos = self.positions.get(&entity_id).unwrap();
-        (pos.x, pos.y)
+    // Replace position methods with transform methods
+    pub fn get_transform(&self, entity_id: EntityID) -> Transform {
+        self.transforms
+            .get(&entity_id)
+            .cloned()
+            .unwrap_or_else(Transform::identity)
     }
 
+    pub fn set_transform(&mut self, entity_id: EntityID, transform: Transform) {
+        self.transforms.insert(entity_id, transform);
+    }
+
+    // Convenience methods for common operations
+    pub fn get_position(&self, entity_id: EntityID) -> (Float, Float) {
+        let transform = self.get_transform(entity_id);
+        (transform.matrix[4], transform.matrix[5]) // e, f components
+    }
+
+    // pub fn set_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
+    //     let current = self.get_transform(entity_id.clone()).clone();
+    //     let translation = Transform::translation(x, y);
+    //     // Preserve existing transform but update translation
+    //     let mut new_transform = current;
+    //     new_transform.matrix[4] = x; // e
+    //     new_transform.matrix[5] = y; // f
+    //     self.set_transform(entity_id, new_transform);
+    // }
+
     pub fn set_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
-        println!("Setting position of entity {} to ({}, {})", entity_id, x, y);
-        let pos = self.positions.get_mut(&entity_id).unwrap();
-        pos.x = x;
-        pos.y = y;
+        let current = self.get_transform(entity_id.clone());
+        println!(
+            "📍 set_position called for {} - pos: ({}, {}) - before: {:?}",
+            entity_id, x, y, current
+        );
+
+        // Preserve existing rotation/scale, just update translation
+        let mut new_transform = current;
+        new_transform.matrix[4] = x; // e - translation X
+        new_transform.matrix[5] = y; // f - translation Y
+
+        println!(
+            "📍 set_position result for {} - after: {:?}",
+            entity_id, new_transform
+        );
+        self.set_transform(entity_id, new_transform);
+    }
+
+    pub fn set_rotation(&mut self, entity_id: EntityID, angle_degrees: Float) {
+        let pos = self.get_position(entity_id.clone());
+        let size = self.get_size(entity_id.clone());
+
+        // Rotate around center of element
+        let center_x = size.0 / 2.0;
+        let center_y = size.1 / 2.0;
+
+        let translate_to_origin = Transform::translation(-center_x, -center_y);
+        let rotation = Transform::rotation(angle_degrees);
+        let translate_back = Transform::translation(center_x, center_y);
+        let position = Transform::translation(pos.0, pos.1);
+
+        // FIXED: Correct order - center operations first, then position
+        let transform = translate_to_origin
+            .combine(&rotation)
+            .combine(&translate_back)
+            .combine(&position);
+
+        self.set_transform(entity_id, transform);
+    }
+
+    pub fn set_scale(&mut self, entity_id: EntityID, sx: Float, sy: Float) {
+        let current = self.get_transform(entity_id.clone()).clone();
+        let scale = Transform::scale(sx, sy);
+        self.set_transform(entity_id, current.combine(&scale));
+    }
+
+    // Get effective bounding box considering transform
+    pub fn get_effective_bounds(&self, entity_id: EntityID) -> BoundingBox {
+        let transform = self.get_transform(entity_id.clone());
+        let size = self.get_size(entity_id);
+        transform.transform_rect(0.0, 0.0, size.0, size.1)
     }
 
     //get the size of an entity

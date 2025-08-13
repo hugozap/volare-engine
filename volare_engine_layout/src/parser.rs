@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 
+use crate::transform::Transform;
 use crate::{components::*, diagram_builder::*, DiagramBuilder};
 
 /// Simplified JSON Lines entity with only essential fields
@@ -147,6 +148,76 @@ fn parse_unified_dimension(attrs: &Map<String, Value>, keys: &[&str]) -> SizeBeh
         }
     }
     SizeBehavior::Content // Default
+}
+fn parse_transform_attributes(
+    obj: &Map<String, Value>,
+    session: &mut DiagramBuilder,
+    entity_id: EntityID,
+) {
+    println!("🔍 Parsing transforms for entity: {}", entity_id);
+    println!("🔍 Available attributes: {:?}", obj.keys().collect::<Vec<_>>());
+    
+    let mut transform = Transform::identity();
+
+    // Parse individual transform properties
+    if let Some(x) = obj.get("x").and_then(|v| v.as_f64()) {
+        if let Some(y) = obj.get("y").and_then(|v| v.as_f64()) {
+            println!("✅ Found x,y: {}, {}", x, y);
+            transform = transform.combine(&Transform::translation(x as Float, y as Float));
+        }
+    }
+
+    if let Some(rotation) = obj
+        .get("rotation")
+        .or_else(|| obj.get("rotate"))
+        .and_then(|v| v.as_f64())
+    {
+        println!("🔄 Found rotation: {} degrees for entity {}", rotation, entity_id);
+        transform = transform.combine(&Transform::rotation(rotation as Float));
+    } else {
+        println!("❌ No rotation found for entity {}", entity_id);
+    }
+
+    if let Some(scale) = obj.get("scale") {
+        match scale {
+            Value::Number(s) => {
+                let s = s.as_f64().unwrap_or(1.0) as Float;
+                println!("📏 Found uniform scale: {}", s);
+                transform = transform.combine(&Transform::scale(s, s));
+            }
+            Value::Array(arr) if arr.len() >= 2 => {
+                let sx = arr[0].as_f64().unwrap_or(1.0) as Float;
+                let sy = arr[1].as_f64().unwrap_or(1.0) as Float;
+                println!("📏 Found scale: [{}, {}]", sx, sy);
+                transform = transform.combine(&Transform::scale(sx, sy));
+            }
+            _ => {}
+        }
+    }
+
+    // Parse CSS-style transform string
+    if let Some(transform_str) = obj.get("transform").and_then(|v| v.as_str()) {
+        if let Ok(parsed_transform) = parse_css_transform(transform_str) {
+            transform = transform.combine(&parsed_transform);
+        }
+    }
+
+    println!("📐 Final transform for {}: {:?}", entity_id, transform);
+    session.set_transform(entity_id, transform);
+}
+
+// Parse CSS-style transform strings like "rotate(45deg) scale(1.5) translate(10px, 20px)"
+fn parse_css_transform(transform_str: &str) -> Result<Transform, String> {
+    // Implementation would parse CSS transform functions
+    // For now, simplified version:
+    let result = Transform::identity();
+
+    // This is a simplified parser - full implementation would be more robust
+    if transform_str.contains("rotate(") {
+        // Extract rotation value...
+    }
+
+    Ok(result)
 }
 
 /// Parser for JSON Lines diagram format
@@ -328,6 +399,9 @@ impl JsonLinesParser {
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
                 };
 
+                // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                 Ok(builder.new_text(entity_id.to_string(), &content, options))
             }
 
@@ -371,6 +445,9 @@ impl JsonLinesParser {
                     height_behavior,
                 };
 
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                 Ok(builder.new_box(entity_id.to_string(), child, options))
             }
 
@@ -395,6 +472,9 @@ impl JsonLinesParser {
                     .iter()
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
+
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_vstack(entity_id.to_string(), child_nodes?, halign))
             }
@@ -421,6 +501,9 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                 Ok(builder.new_hstack(entity_id.to_string(), child_nodes?, valign))
             }
 
@@ -432,6 +515,8 @@ impl JsonLinesParser {
                     .iter()
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_group(entity_id.to_string(), child_nodes?))
             }
@@ -463,6 +548,8 @@ impl JsonLinesParser {
                     ),
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                 };
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_rectangle(entity_id.to_string(), options))
             }
@@ -489,6 +576,9 @@ impl JsonLinesParser {
                     ),
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
+
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_line(entity_id.to_string(), start_point, end_point, options))
             }
@@ -525,6 +615,9 @@ impl JsonLinesParser {
                     ),
                 };
 
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                 Ok(builder.new_elipse(entity_id.to_string(), center, radius, options))
             }
 
@@ -554,6 +647,9 @@ impl JsonLinesParser {
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                     filled: get_bool_attr(&entity.attributes, &["filled"], false),
                 };
+
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_arc(
                     entity_id.to_string(),
@@ -597,6 +693,9 @@ impl JsonLinesParser {
                     filled: get_bool_attr(&entity.attributes, &["filled"], false),
                 };
 
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                 Ok(builder.new_arc(entity_id.to_string(), center, radius, start, end, options))
             }
 
@@ -625,6 +724,9 @@ impl JsonLinesParser {
                     filled: get_bool_attr(&entity.attributes, &["filled"], false),
                 };
 
+                  // Parse and apply transforms
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                 Ok(builder.new_quarter_circle(
                     entity_id.to_string(),
                     center,
@@ -642,12 +744,15 @@ impl JsonLinesParser {
                 let file_path = get_string_attr(&entity.attributes, &["file_path"], "");
 
                 if !src.is_empty() {
+                    parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
                     Ok(builder.new_image(
                         entity_id.to_string(),
                         &src,
                         (width_behavior, height_behavior),
                     ))
                 } else if !file_path.is_empty() {
+                     parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
                     Ok(builder.new_image_from_file(
                         entity_id.to_string(),
                         &file_path,
@@ -687,6 +792,8 @@ impl JsonLinesParser {
                         as usize,
                 };
 
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+                
                 Ok(builder.new_table(entity_id.to_string(), child_nodes?, cols, options))
             }
 
@@ -702,6 +809,7 @@ impl JsonLinesParser {
                     ),
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_polyline(entity_id.to_string(), points, options))
             }
@@ -722,6 +830,7 @@ impl JsonLinesParser {
                         get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
                     positioned_children.push((child_node, position));
                 }
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_free_container(entity_id.to_string(), positioned_children))
             }
@@ -1124,4 +1233,99 @@ pub fn example_llm_generated_jsonl() -> &'static str {
 {"id":"article_title","type":"text","content":"Article Title","font_size":18}
 {"id":"article_body","type":"text","content":"This is the main content of the article..."}
 {"id":"footer","type":"text","content":"Copyright 2024","font_size":10,"color":"gray"}"#
+}
+
+
+
+#[cfg(test)]
+mod transform_debug_tests {
+    use super::*;
+    use crate::DiagramBuilder;
+    
+    #[test]
+    fn test_transform_parsing_debug() {
+        println!("🧪 Testing transform parsing...");
+        
+        let mut builder = DiagramBuilder::new();
+        builder.set_measure_text_fn(|text, _| (text.len() as f32 * 8.0, 16.0));
+        
+        // Create a simple JSON object with rotation
+        let mut attributes = serde_json::Map::new();
+        attributes.insert("rotation".to_string(), serde_json::Value::Number(serde_json::Number::from(45)));
+        attributes.insert("width".to_string(), serde_json::Value::Number(serde_json::Number::from(60)));
+        attributes.insert("height".to_string(), serde_json::Value::Number(serde_json::Number::from(40)));
+        
+        println!("🔍 Attributes: {:?}", attributes);
+        
+        // Test the function directly
+        parse_transform_attributes(&attributes, &mut builder, "test_entity".to_string());
+        
+        // Check if the transform was applied
+        let transform = builder.get_transform("test_entity".to_string());
+        println!("📐 Result transform: {:?}", transform);
+        
+        // Check if it's not just identity
+        let is_identity = transform.matrix[0] == 1.0 && 
+                         transform.matrix[1] == 0.0 && 
+                         transform.matrix[2] == 0.0 && 
+                         transform.matrix[3] == 1.0 &&
+                         transform.matrix[4] == 0.0 && 
+                         transform.matrix[5] == 0.0;
+        
+        println!("❓ Is identity transform: {}", is_identity);
+        assert!(!is_identity, "Transform should not be identity - rotation should be applied!");
+    }
+    
+    #[test]
+    fn test_full_parser_with_rotation() {
+        println!("🧪 Testing full parser with rotation...");
+        
+        let input = r#"{"id":"test_rect","type":"rect","width":60,"height":40,"background":"red","rotation":45}"#;
+        
+        let mut parser = JsonLinesParser::new();
+        let root_id = parser.parse_string(input).unwrap();
+        
+        let mut builder = DiagramBuilder::new();
+        builder.set_measure_text_fn(|text, _| (text.len() as f32 * 8.0, 16.0));
+        
+        let diagram = parser.build(&root_id, &mut builder).unwrap();
+        
+        // Check the transform
+        let transform = builder.get_transform("test_rect".to_string());
+        println!("📐 Full parser result transform: {:?}", transform);
+        
+        let is_identity = transform.matrix[0] == 1.0 && 
+                         transform.matrix[1] == 0.0 && 
+                         transform.matrix[2] == 0.0 && 
+                         transform.matrix[3] == 1.0 &&
+                         transform.matrix[4] == 0.0 && 
+                         transform.matrix[5] == 0.0;
+        
+        println!("❓ Full parser - Is identity transform: {}", is_identity);
+        assert!(!is_identity, "Full parser should apply rotation!");
+    }
+}
+
+// Also add this debug function to see what's happening during build_entity calls:
+impl JsonLinesParser {
+    // Add this method to your existing JsonLinesParser impl
+    pub fn debug_build_entity(&mut self, entity_id: &str, builder: &mut DiagramBuilder) -> Result<DiagramTreeNode, JsonLinesError> {
+        println!("🏗️ Building entity: {}", entity_id);
+        
+        let entity = self.entities.get(entity_id)
+            .ok_or_else(|| JsonLinesError::EntityNotFound(entity_id.to_string()))?;
+        
+        println!("🏗️ Entity type: {}", entity.entity_type);
+        println!("🏗️ Entity attributes: {:?}", entity.attributes.keys().collect::<Vec<_>>());
+        
+        // Check if rotation attribute exists
+        if let Some(rotation_value) = entity.attributes.get("rotation") {
+            println!("🔄 Found rotation attribute: {:?}", rotation_value);
+        } else {
+            println!("❌ No rotation attribute found");
+        }
+        
+        // Call the original build_entity
+        self.build_entity(entity_id, builder)
+    }
 }

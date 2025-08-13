@@ -11,4 +11,7 @@ pub mod components;
 pub mod layout;
 pub mod renderer_base;
 pub mod parser;
+pub mod transform;
 
+#[cfg(test)]
+mod tests;

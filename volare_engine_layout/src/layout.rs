@@ -11,6 +11,8 @@ use crate::{
     VerticalAlignment,
 };
 
+use crate::transform::Transform;
+
 /* The box layout includes the padding and the dimensions
 of the wrapped element
 The wrapped element position and size should be updated before calling this function
@@ -21,139 +23,135 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     println!("Box: {:?}", shape_box);
 
     // Get the wrapped element dimensions
-    let mut wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone().clone());
-    println!("Box Wrapped elem size: {:?}", wrapped_elem_size);
+    let mut wrapped_elem_bounds = session.get_effective_bounds(shape_box.wrapped_entity.clone());
 
     // Calculate the box dimensions based on size behavior
     let box_width = match shape_box.box_options.width_behavior {
         SizeBehavior::Fixed(width) => {
             // For fixed width, use the specified width
-            // The wrapped element should be positioned within this fixed width
             width
         }
         SizeBehavior::Content => {
-            // Content sizing - size based on wrapped element + padding (current behavior)
-            wrapped_elem_size.0 + shape_box.box_options.padding * 2.0
+            // Content sizing - size based on wrapped element + padding
+            wrapped_elem_bounds.width + shape_box.box_options.padding * 2.0
         }
         SizeBehavior::Grow => {
             // TODO: Implement grow behavior in future iterations
             // For now, fall back to content behavior
-            wrapped_elem_size.0 + shape_box.box_options.padding * 2.0
+            wrapped_elem_bounds.width + shape_box.box_options.padding * 2.0
         }
     };
 
-    // Position the wrapped element within the box
-    // For fixed sizing, we might want to center or align the content
-    let content_x = match shape_box.box_options.width_behavior {
-        SizeBehavior::Fixed(fixed_width) => {
-            // Center the content horizontally within the fixed width
-            let available_width = fixed_width - shape_box.box_options.padding * 2.0;
-            if wrapped_elem_size.0 <= available_width {
-                // Center the content
-                shape_box.box_options.padding + (available_width - wrapped_elem_size.0) / 2.0
-            } else {
-                // Content is larger than available space, align to left with padding
-                shape_box.box_options.padding
-            }
-        }
-        _ => {
-            // For content and grow behaviors, use standard padding
-            shape_box.box_options.padding
-        }
-    };
-
-    let content_y = match shape_box.box_options.height_behavior {
-        SizeBehavior::Fixed(fixed_height) => {
-            // Center the content vertically within the fixed height
-            let available_height = fixed_height - shape_box.box_options.padding * 2.0;
-            if wrapped_elem_size.1 <= available_height {
-                // Center the content
-                shape_box.box_options.padding + (available_height - wrapped_elem_size.1) / 2.0
-            } else {
-                // Content is larger than available space, align to top with padding
-                shape_box.box_options.padding
-            }
-        }
-        _ => {
-            // For content and grow behaviors, use standard padding
-            shape_box.box_options.padding
-        }
-    };
-
-    // Update the wrapped element position
-    session.set_position(shape_box.wrapped_entity.clone(), content_x, content_y);
-
-    // Auto - wrap text if box has fixed width
+    // Auto-wrap text if box has fixed width (do this BEFORE positioning)
     if let SizeBehavior::Fixed(fixed_width) = shape_box.box_options.width_behavior {
         let wrapped_entity_type = session.entityTypes.get(&shape_box.wrapped_entity);
         if let Some(EntityType::TextShape) = wrapped_entity_type {
             let available_width = fixed_width - shape_box.box_options.padding * 2.0;
             auto_wrap_text_in_box(session, &shape_box.wrapped_entity, available_width);
-            wrapped_elem_size = session.get_size(shape_box.wrapped_entity.clone());
+            // Re-get bounds after text wrapping
+            wrapped_elem_bounds = session.get_effective_bounds(shape_box.wrapped_entity.clone());
         }
     }
 
-    // Now that the wrapped element size is set, we can set the box size
-    // this is needed in case the SizeBehavior is set to Content
+    // Calculate the box height (after potential text wrapping)
     let box_height = match shape_box.box_options.height_behavior {
-        SizeBehavior::Fixed(height) => {
-            // For fixed height, use the specified height
-            height
-        }
+        SizeBehavior::Fixed(height) => height,
         SizeBehavior::Content => {
-            // Content sizing - size based on wrapped element + padding (current behavior)
-            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+            wrapped_elem_bounds.height + shape_box.box_options.padding * 2.0
         }
         SizeBehavior::Grow => {
-            // TODO: Implement grow behavior in future iterations
-            // For now, fall back to content behavior
-            wrapped_elem_size.1 + shape_box.box_options.padding * 2.0
+            wrapped_elem_bounds.height + shape_box.box_options.padding * 2.0
         }
     };
 
+    // Calculate where we want the wrapped element's bounding box to be positioned
+    let desired_content_x = match shape_box.box_options.width_behavior {
+        SizeBehavior::Fixed(fixed_width) => {
+            let available_width = fixed_width - shape_box.box_options.padding * 2.0;
+            if wrapped_elem_bounds.width <= available_width {
+                // Center the content bounding box
+                shape_box.box_options.padding + (available_width - wrapped_elem_bounds.width) / 2.0
+            } else {
+                // Content is larger than available space, align bounding box to left edge
+                shape_box.box_options.padding
+            }
+        }
+        _ => {
+            // For content and grow behaviors, position bounding box at padding
+            shape_box.box_options.padding
+        }
+    };
+
+    let desired_content_y = match shape_box.box_options.height_behavior {
+        SizeBehavior::Fixed(fixed_height) => {
+            let available_height = fixed_height - shape_box.box_options.padding * 2.0;
+            if wrapped_elem_bounds.height <= available_height {
+                // Center the content bounding box
+                shape_box.box_options.padding + (available_height - wrapped_elem_bounds.height) / 2.0
+            } else {
+                // Content is larger than available space, align bounding box to top edge
+                shape_box.box_options.padding
+            }
+        }
+        _ => {
+            // For content and grow behaviors, position bounding box at padding
+            shape_box.box_options.padding
+        }
+    };
+
+    // FIXED: Apply bounding box compensation when positioning the wrapped element
+    let transform_x = desired_content_x - wrapped_elem_bounds.x;
+    let transform_y = desired_content_y - wrapped_elem_bounds.y;
+    
+    session.set_position(shape_box.wrapped_entity.clone(), transform_x, transform_y);
+
     println!(
-        "Box: {}, width: {}, height: {}, padding: {}",
-        shape_box.entity, box_width, box_height, shape_box.box_options.padding
+        "Box: {}, width: {}, height: {}, padding: {}, content positioned at: ({}, {})",
+        shape_box.entity, box_width, box_height, shape_box.box_options.padding, transform_x, transform_y
     );
 
     // Set the box dimensions
     session.set_size(shape_box.entity.clone(), box_width, box_height);
-
 }
+
+
 fn calculate_optimal_line_width(
-    session: &DiagramBuilder, 
-    text: &str, 
-    text_options: &TextOptions, 
-    available_width: Float
+    session: &DiagramBuilder,
+    text: &str,
+    text_options: &TextOptions,
+    available_width: Float,
 ) -> usize {
     // Binary search for optimal line_width
     let mut min_width = 10;
     let mut max_width = text.len();
     let mut best_width = min_width;
-    
+
     while min_width <= max_width {
         let mid_width = (min_width + max_width) / 2;
-        
+
         // Test this line_width
         let mut test_options = text_options.clone();
         test_options.line_width = mid_width;
-        
+
         let wrapped_lines = textwrap::wrap(text, mid_width);
-        if wrapped_lines.is_empty() { break; }
-        
+        if wrapped_lines.is_empty() {
+            break;
+        }
+
         // Measure the widest line
-        let max_line_width = wrapped_lines.iter()
+        let max_line_width = wrapped_lines
+            .iter()
             .map(|line| session.measure_text.unwrap()(line, &test_options).0)
             .fold(0.0f32, |a, b| a.max(b));
-        
+
         if max_line_width <= available_width {
             best_width = mid_width;
-            min_width = mid_width + 1;  // Try wider
+            min_width = mid_width + 1; // Try wider
         } else {
-            max_width = mid_width - 1;  // Try narrower
+            max_width = mid_width - 1; // Try narrower
         }
     }
-    
+
     best_width
 }
 
@@ -166,12 +164,12 @@ fn auto_wrap_text_in_box(
     // Get the current text shape
     let text_shape = session.get_text(text_entity_id.clone()).clone();
 
-     // Calculate optimal line_width using actual text measurement
+    // Calculate optimal line_width using actual text measurement
     let new_line_width = calculate_optimal_line_width(
-        session, 
-        &text_shape.text, 
-        &text_shape.text_options, 
-        available_width
+        session,
+        &text_shape.text,
+        &text_shape.text_options,
+        available_width,
     );
     // Only re-layout if line_width changed significantly
     if (new_line_width as i32 - text_shape.text_options.line_width as i32).abs() > 5 {
@@ -242,46 +240,76 @@ fn estimate_char_width(text_options: &TextOptions) -> Float {
  * Group elements must be positioned before calling this function.
  * (Doesn't update the position of the elements)
  */
+
 pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
-    //update group dimensions
-    let mut width = 0.0;
-    let mut height = 0.0;
+    // Calculate actual bounding box using positions, not just max dimensions
+    let mut min_x = Float::INFINITY;
+    let mut min_y = Float::INFINITY;
+    let mut max_x = Float::NEG_INFINITY;
+    let mut max_y = Float::NEG_INFINITY;
+
     for elem in shape_group.elements.iter() {
-        let elem_size = session.get_size(elem.clone());
-        if elem_size.0 > width {
-            width = elem_size.0;
-        }
-        if elem_size.1 > height {
-            height = elem_size.1;
-        }
+        let elem_bounds = session.get_effective_bounds(elem.clone());
+        let elem_pos = session.get_position(elem.clone()); // Uses transforms behind the scenes
+
+        min_x = min_x.min(elem_pos.0);
+        min_y = min_y.min(elem_pos.1);
+        max_x = max_x.max(elem_pos.0 + elem_bounds.width);
+        max_y = max_y.max(elem_pos.1 + elem_bounds.height);
     }
-    session.set_size(shape_group.entity.clone(), width, height);
+
+    if min_x != Float::INFINITY {
+        let width = max_x - min_x;
+        let height = max_y - min_y;
+        session.set_size(shape_group.entity.clone(), width, height);
+
+        // use bounding box compensation since set_position works with transform origins
+        let group_bounds = session.get_effective_bounds(shape_group.entity.clone());
+        let transform_x = min_x - group_bounds.x;
+        let transform_y = min_y - group_bounds.y;
+        session.set_position(shape_group.entity.clone(), transform_x, transform_y);
+    } else {
+        session.set_size(shape_group.entity.clone(), 0.0, 0.0);
+        session.set_position(shape_group.entity.clone(), 0.0, 0.0);
+    }
 }
 
+// WHY this function doesn't need the bounding box compensation:
+// 
+// 1. Text lines don't have individual rotations - they're just positioned within the text entity
+// 2. The rotation transform is applied to the parent text entity as a whole
+// 3. Individual lines are positioned relative to (0,0) within the text entity
+// 4. When the text entity is rotated, all lines rotate together as one unit
+//
+// Transform hierarchy:
+// Text Entity (has rotation transform)
+//   └── Line 1 (positioned at 0, 0 relative to text entity)
+//   └── Line 2 (positioned at 0, 16 relative to text entity)  
+//   └── Line 3 (positioned at 0, 32 relative to text entity)
 pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
     let mut y = 0.0;
     let mut max_line_width = 0.0;
-    
+
     for (i, line) in shape_text.lines.iter().enumerate() {
         let textLine = session.get_text_line(line.clone());
         let line_size = session.measure_text.unwrap()(&textLine.text, &shape_text.text_options);
-        
+
         if line_size.0 > max_line_width {
             max_line_width = line_size.0;
         }
-        
+
         session.set_position(line.clone(), 0.0, y);
         session.set_size(line.clone(), line_size.0, line_size.1);
-        
+
         // Add line height
         y += line_size.1;
-        
+
         // Add line spacing ONLY between lines (not after the last line)
         if i < shape_text.lines.len() - 1 {
             y += shape_text.text_options.line_spacing;
         }
     }
-    
+
     // No need to subtract line spacing at the end
     session.set_size(shape_text.entity.clone(), max_line_width, y);
 }
@@ -389,64 +417,87 @@ pub fn layout_image(session: &mut DiagramBuilder, shape_image: &ShapeImage) {
 
     session.set_size(shape_image.entity.clone(), width, height);
 }
-
 /**
  * Updates the position of the elements in the vertical stack
  * and the size of the vertical stack
  */
 pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &VerticalStack) {
-    let mut y = 0.0;
+    let mut logical_y = 0.0; // Where we want each element's bounding box to start
     let mut width = 0.0;
+    
     for elem in vertical_stack.elements.iter() {
-        println!("DEBUG:::y: {}", y);
-        let elem_size = session.get_size(elem.clone());
-        session.set_position(elem.clone(), 0.0, y);
-        y += elem_size.1;
-        if elem_size.0 > width {
-            width = elem_size.0;
+        println!("DEBUG:::y: {}", logical_y);
+        let elem_bounds = session.get_effective_bounds(elem.clone());
+
+        // FIXED: Position the element so its bounding box starts at logical_y
+        let transform_y = logical_y - elem_bounds.y;
+        session.set_position(elem.clone(), 0.0, transform_y);
+        
+        // FIXED: Add the effective height to logical_y for next element
+        logical_y += elem_bounds.height;
+        
+        if elem_bounds.width > width {
+            width = elem_bounds.width;
         }
     }
-    session.set_size(vertical_stack.entity.clone(), width, y);
+    
+    // Set the stack size to the total logical height
+    session.set_size(vertical_stack.entity.clone(), width, logical_y);
 
-    // Second pass: only adjust x positions if alignment is specified
+    // Second pass: adjust x positions for horizontal alignment
     for elem in vertical_stack.elements.iter() {
-        let elem_size = session.get_size(elem.clone());
+        // FIXED: Use effective bounds consistently for alignment calculations
+        let elem_bounds = session.get_effective_bounds(elem.clone());
         let current_pos = session.get_position(elem.clone());
+        
         let x = match vertical_stack.horizontal_alignment {
-            HorizontalAlignment::Left => 0.0,
-            HorizontalAlignment::Center => (width - elem_size.0) / 2.0,
-            HorizontalAlignment::Right => width - elem_size.0,
+            HorizontalAlignment::Left => -elem_bounds.x, // Compensate for bounding box offset
+            HorizontalAlignment::Center => (width - elem_bounds.width) / 2.0 - elem_bounds.x,
+            HorizontalAlignment::Right => width - elem_bounds.width - elem_bounds.x,
         };
+        
         session.set_position(elem.clone(), x, current_pos.1); // Update x, keep y
     }
 }
 
+
 pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &HorizontalStack) {
-    let mut x = 0.0;
+    let mut logical_x = 0.0; // Where we want each element's bounding box to start
     let mut height = 0.0;
+    
     for elem in horizontal_stack.elements.iter() {
-        let elem_size = session.get_size(elem.clone());
-        session.set_position(elem.clone(), x, 0.0);
-        x += elem_size.0;
-        if elem_size.1 > height {
-            height = elem_size.1;
+        let elem_bounds = session.get_effective_bounds(elem.clone());
+        
+        // FIXED: Position the element so its bounding box starts at logical_x
+        let transform_x = logical_x - elem_bounds.x;
+        session.set_position(elem.clone(), transform_x, 0.0);
+        
+        // FIXED: Add the effective width to logical_x for next element
+        logical_x += elem_bounds.width;
+        
+        if elem_bounds.height > height {
+            height = elem_bounds.height;
         }
     }
-    session.set_size(horizontal_stack.entity.clone(), x, height);
+    
+    // Set the stack size to the total logical width
+    session.set_size(horizontal_stack.entity.clone(), logical_x, height);
 
-    // Second pass: only adjust y positions, keep existing x positions
+    // Second pass: adjust y positions for vertical alignment
     for elem in horizontal_stack.elements.iter() {
-        let elem_size = session.get_size(elem.clone());
-        let current_pos = session.get_position(elem.clone()); // Get the x we already set
+        // FIXED: Use effective bounds consistently for alignment calculations
+        let elem_bounds = session.get_effective_bounds(elem.clone());
+        let current_pos = session.get_position(elem.clone());
+        
         let y = match horizontal_stack.vertical_alignment {
-            VerticalAlignment::Top => 0.0,
-            VerticalAlignment::Center => (height - elem_size.1) / 2.0,
-            VerticalAlignment::Bottom => height - elem_size.1,
+            VerticalAlignment::Top => -elem_bounds.y, // Compensate for bounding box offset
+            VerticalAlignment::Center => (height - elem_bounds.height) / 2.0 - elem_bounds.y,
+            VerticalAlignment::Bottom => height - elem_bounds.height - elem_bounds.y,
         };
-        session.set_position(elem.clone(), current_pos.0, y); // Keep x, update y
+        
+        session.set_position(elem.clone(), current_pos.0, y);
     }
 }
-
 /**
  * Calculates the layout for each of the cells according to table rules:
  * - Cells in the same column have the same width (eq to the max of widths)
@@ -484,12 +535,14 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         cols[col].push(elem.clone());
 
         //update the row and col sizes
-        let elem_size = session.get_size(elem.clone());
-        if elem_size.0 > col_widths[col] {
-            col_widths[col] = elem_size.0 + table.table_options.cell_padding as Float * 2.0;
+        let elem_bounds = session.get_effective_bounds(elem.clone());
+
+        // ✅ ALREADY FIXED: Use .width and .height properties
+        if elem_bounds.width > col_widths[col] {
+            col_widths[col] = elem_bounds.width + table.table_options.cell_padding as Float * 2.0;
         }
-        if elem_size.1 > row_heights[row] {
-            row_heights[row] = elem_size.1 + table.table_options.cell_padding as Float * 2.0;
+        if elem_bounds.height > row_heights[row] {
+            row_heights[row] = elem_bounds.height + table.table_options.cell_padding as Float * 2.0;
         }
     }
 
@@ -502,19 +555,26 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     //and the size of the table
 
     //iterate through rows and cols and update the position of each element
-    let mut x = 0.0;
+    let mut logical_x = 0.0;
     for (i, col) in cols.iter().enumerate() {
-        let mut y = 0.0;
+        let mut logical_y = 0.0;
         for (j, elem) in col.iter().enumerate() {
-            session.set_position(
-                elem.clone(),
-                x + table.table_options.cell_padding as Float,
-                y + table.table_options.cell_padding as Float,
-            );
-            y += row_heights[j];
+            // FIXED: Apply bounding box compensation for cell positioning
+            let elem_bounds = session.get_effective_bounds(elem.clone());
+            
+            // Calculate where we want the element's bounding box to be (with padding)
+            let desired_x = logical_x + table.table_options.cell_padding as Float;
+            let desired_y = logical_y + table.table_options.cell_padding as Float;
+            
+            // Compensate for the element's bounding box offset
+            let transform_x = desired_x - elem_bounds.x;
+            let transform_y = desired_y - elem_bounds.y;
+            
+            session.set_position(elem.clone(), transform_x, transform_y);
+            logical_y += row_heights[j];
         }
 
-        x += col_widths[i];
+        logical_x += col_widths[i];
     }
 
     //Update the position of the horizontal lines
@@ -532,16 +592,8 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     }
 
     //update the size of the table
-    let mut width = 0.0;
-    let mut height = 0.0;
-
-    for w in col_widths.iter() {
-        width += w;
-    }
-
-    for h in row_heights.iter() {
-        height += h;
-    }
+    let width: Float = col_widths.iter().sum();
+    let height: Float = row_heights.iter().sum();
 
     //Update the size of the table header rect
     session.set_size(table.header_rect.clone(), width, row_heights[0]);
@@ -575,26 +627,30 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     }
 }
 
+
 pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
-    let mut x = 0.0;
-    let mut y = 0.0;
-    let mut width = 0.0;
-    let mut height = 0.0;
-    for (i, point) in polyline.points.iter().enumerate() {
-        if i == 0 {
-            x = point.0;
-            y = point.1;
-        } else {
-            if point.0 < x {
-                width += x - point.0;
-                x = point.0;
-            }
-            if point.1 < y {
-                height += y - point.1;
-                y = point.1;
-            }
-        }
+    if polyline.points.is_empty() {
+        session.set_size(polyline.entity.clone(), 0.0, 0.0);
+        return;
     }
+
+    // Find the actual bounding box of all points
+    let mut min_x = Float::INFINITY;
+    let mut min_y = Float::INFINITY;
+    let mut max_x = Float::NEG_INFINITY;
+    let mut max_y = Float::NEG_INFINITY;
+
+    for point in polyline.points.iter() {
+        min_x = min_x.min(point.0);
+        min_y = min_y.min(point.1);
+        max_x = max_x.max(point.0);
+        max_y = max_y.max(point.1);
+    }
+
+    let width = max_x - min_x;
+    let height = max_y - min_y;
+
+    // Set the polyline size to its actual bounding box
     session.set_size(polyline.entity.clone(), width, height);
 }
 
@@ -609,16 +665,23 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     let mut max_height = 0.0;
 
     // Iterate through all children and find the maximum extent
-    for (child_id, position) in &container.children {
-        // Get the child's size
-        let child_size = session.get_size(child_id.clone());
+    for (child_id, desired_position) in &container.children {
+        // FIXED: Use effective bounds instead of get_size
+        let child_bounds = session.get_effective_bounds(child_id.clone());
 
-        // Set the child's position relative to the container
-        session.set_position(child_id.clone(), position.0, position.1);
+        // FIXED: Apply bounding box compensation when positioning
+        // We want the child's bounding box to start at the desired position
+        let transform_x = desired_position.0 - child_bounds.x;
+        let transform_y = desired_position.1 - child_bounds.y;
+        session.set_position(child_id.clone(), transform_x, transform_y);
 
-        // Calculate the right and bottom edges of this child
-        let right = position.0 + child_size.0;
-        let bottom = position.1 + child_size.1;
+        // FIXED: Calculate the extents using effective bounds
+        // After positioning, get the updated bounds to calculate container size
+        let positioned_bounds = session.get_effective_bounds(child_id.clone());
+        
+        // Calculate the right and bottom edges of this child's bounding box
+        let right = positioned_bounds.x + positioned_bounds.width;
+        let bottom = positioned_bounds.y + positioned_bounds.height;
 
         // Update the maximum extent
         if right > max_width {
@@ -714,13 +777,18 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
 
     session.set_size(shape_arc.entity.clone(), total_width, total_height);
 }
+// Add this to your BoundingBox definition in src/transform.rs or wherever it's defined:
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoundingBox {
-    x: Float,
-    y: Float,
-    width: Float,
-    height: Float,
+    pub x: Float,
+    pub y: Float,
+    pub width: Float,
+    pub height: Float,
 }
+
+
+
 //Calculate the layout for a tree of elements
 pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
     //start with the bottom elements
@@ -823,20 +891,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
     }
 
-    //Return the bounding box for the root element
-    let size = session.get_size(root.entity_id.clone());
-    let position = session.get_position(root.entity_id.clone());
-    BoundingBox {
-        x: position.0,
-        y: position.1,
-        width: size.0,
-        height: size.1,
-    }
+    session.get_effective_bounds(root.entity_id.clone())
 }
 
 //import textoptions defined in src/components/mod.rs
-use crate::components::BoxOptions;
-use crate::components::TextOptions;
+use crate::components::{BoxOptions, TextOptions};
 //Test that a box with a text inside is correctly laid out
 #[test]
 fn test_layout_box_with_text() {
