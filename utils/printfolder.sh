@@ -15,7 +15,10 @@ if [ ! -d "$folder" ]; then
 fi
 
 # get the absolute path of the input folder
-folder="$(cd "$(dirname "$folder")"; pwd)/$(basename "$folder")"
+folder="$(
+  cd "$(dirname "$folder")"
+  pwd
+)/$(basename "$folder")"
 
 # List folders to ignore
 declare -a ignore_folders=(".git" "node_modules" "build" "dist" "temp" "assets" "target" "pkg")
@@ -31,18 +34,16 @@ declare -a ignore_files=(
 
 # Build the find command
 cmd=(find "$folder" -type f)
-for ignore_folder in "${ignore_folders[@]}"
-do
+for ignore_folder in "${ignore_folders[@]}"; do
   cmd=("${cmd[@]}" -not -path "*/$ignore_folder/*")
 done
 
 # Add ignore files
-for ignore_file in "${ignore_files[@]}"
-do
+for ignore_file in "${ignore_files[@]}"; do
   cmd=("${cmd[@]}" -not -name "$ignore_file")
 done
 
-cmd=("${cmd[@]}" -not -path '.*' -print0)  # Exclude hidden files
+cmd=("${cmd[@]}" -not -path '.*' -print0) # Exclude hidden files
 
 # Traverse the folder and concatenate files
 "${cmd[@]}" | while IFS= read -r -d '' file; do
@@ -58,4 +59,3 @@ cmd=("${cmd[@]}" -not -path '.*' -print0)  # Exclude hidden files
     echo ""
   fi
 done
-

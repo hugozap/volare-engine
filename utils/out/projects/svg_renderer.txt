@@ -32,19 +32,12 @@ impl<W: Write> Renderer<W> for SVGRenderer {
         stream: &mut W,
     ) -> Result<(), RendererError> {
         let mut svg = String::new();
-        let root_size = session.get_size(diagram_node.entity_id.clone());
-        let root_pos = session.get_position(diagram_node.entity_id.clone());
-
+        let root_bounds = session.get_effective_bounds(diagram_node.entity_id.clone());
         svg.push_str(&format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
+            r#"<svg width="{}" height="{}" viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
+            root_bounds.width, root_bounds.height,
+            root_bounds.x, root_bounds.y, root_bounds.width, root_bounds.height
         ));
-
-        svg.push_str(&format!(
-        r#"<svg width="{}" height="{}" viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
-        root_size.0, root_size.1,
-        root_pos.0, root_pos.1, root_size.0, root_size.1
-    ));
-
         svg.push_str(render_node(diagram_node, session).as_str());
         //close svg tag
         svg.push_str("</svg>");
@@ -387,10 +380,15 @@ fn render_ellipse(
 ) {
     let ellipse_shape = session.get_ellipse(node.entity_id.clone());
 
+    // Center the ellipse within its own coordinate space
+    // The ellipse should be centered within its bounding box
+    let cx = ellipse_shape.radius.0;  // Center X = radius X
+    let cy = ellipse_shape.radius.1;  // Center Y = radius Y
+
     let ellipse_content = format!(
         r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
-        ellipse_shape.center.0,
-        ellipse_shape.center.1,
+        cx,
+        cy,
         ellipse_shape.radius.0,
         ellipse_shape.radius.1,
         ellipse_shape.ellipse_options.stroke_color,

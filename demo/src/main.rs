@@ -116,7 +116,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         let ellipse = session.new_elipse(
             format!("table_ellipse_{}", i).to_string(),
-            (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
                 fill_color: "red".to_string(),
@@ -148,7 +147,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create an ellipse and wrap it with a box
     let ellipse = session.new_elipse(
         "ellipse1".to_string(),
-        (0.0, 0.0),
         (10.0, 10.0),
         EllipseOptions {
             fill_color: "red".to_string(),
@@ -163,7 +161,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         let ellipse = session.new_elipse(
             format!("ellipse{}", i).to_string(),
-            (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
                 fill_color: "red".to_string(),
@@ -219,7 +216,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let red_circle = session.new_elipse(
         "redcircle".to_string(),
-        (0.0, 0.0),   // center position (will be positioned by container)
         (15.0, 15.0), // radius
         EllipseOptions {
             fill_color: "#FF0000".to_string(), // bright red
@@ -263,7 +259,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let green_ellipse = session.new_elipse(
         "greeneclipse".to_string(),
-        (0.0, 0.0),
         (30.0, 20.0),
         EllipseOptions {
             fill_color: "#00CC00".to_string(),   // green

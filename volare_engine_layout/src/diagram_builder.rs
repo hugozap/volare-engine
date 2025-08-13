@@ -18,8 +18,10 @@ use crate::{components::*, transform::Transform, BoundingBox};
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
     pub entities: Vec<EntityID>,
-    pub positions: HashMap<EntityID, Point>,
+    // Maps entity IDs to their positions in the container (used in free containers)
+    pub container_relative_positions: HashMap<EntityID, Point>,
     pub sizes: HashMap<EntityID, Size>,
+    // Maps entity IDS to their transforms for positioning, rotation, scaling, etc.
     pub transforms: HashMap<EntityID, Transform>,
     pub entityTypes: HashMap<EntityID, EntityType>,
 
@@ -81,7 +83,8 @@ impl DiagramBuilder {
             entityTypes: HashMap::<EntityID, EntityType>::new(),
             measure_text: Some(|_text, _text_options| (0.0, 0.0)),
             entities: Vec::new(),
-            positions: HashMap::new(),
+            // store desired positions relative to the container
+            container_relative_positions: HashMap::new(),
             sizes: HashMap::new(),
             transforms: HashMap::new(),
             boxes: HashMap::new(),
@@ -107,7 +110,7 @@ impl DiagramBuilder {
     pub fn clear_cache(&mut self) {
         // Clear core entity data
         self.entities.clear();
-        self.positions.clear();
+        self.container_relative_positions.clear();
         self.sizes.clear();
         self.entityTypes.clear();
 
@@ -136,9 +139,9 @@ impl DiagramBuilder {
 
     pub fn clear_entities_only(&mut self) {
         self.entities.clear();
-        self.positions.clear();
         self.sizes.clear();
         self.entityTypes.clear();
+        self.container_relative_positions.clear();
         println!("DiagramBuilder entities cleared (components preserved)");
     }
 
@@ -190,7 +193,6 @@ impl DiagramBuilder {
     pub fn new_entity(&mut self, id: EntityID, entity_type: EntityType) -> EntityID {
         println!("Creating new entity with id {}", id);
         self.entities.push(id.clone());
-        self.positions.insert(id.clone(), Point::new(0.0, 0.0));
         self.sizes.insert(id.clone(), Size::new(0.0, 0.0));
         self.entityTypes.insert(id.clone(), entity_type.clone());
         if !self.transforms.contains_key(&id) {
@@ -250,6 +252,19 @@ impl DiagramBuilder {
             entity_id, new_transform
         );
         self.set_transform(entity_id, new_transform);
+    }
+
+    // Set the position relative to the container  (used in free containers)
+    pub fn set_container_relative_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
+        self.container_relative_positions
+            .insert(entity_id, Point::new(x, y));
+    }
+
+    pub fn get_container_relative_position(&self, entity_id: &EntityID) -> Point {
+        self.container_relative_positions
+            .get(entity_id)
+            .cloned()
+            .unwrap_or(Point::new(0.0, 0.0))
     }
 
     pub fn set_rotation(&mut self, entity_id: EntityID, angle_degrees: Float) {
@@ -517,12 +532,11 @@ impl DiagramBuilder {
     pub fn new_elipse(
         &mut self,
         id: EntityID,
-        center: (Float, Float),
         radius: (Float, Float),
         options: EllipseOptions,
     ) -> DiagramTreeNode {
         let ellipse_id = self.new_entity(id, EntityType::EllipseShape);
-        let ellipse = ShapeEllipse::new(ellipse_id.clone(), center, radius, options);
+        let ellipse = ShapeEllipse::new(ellipse_id.clone(),radius, options);
         self.ellipses.insert(ellipse_id.clone(), ellipse);
         DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id.clone())
     }

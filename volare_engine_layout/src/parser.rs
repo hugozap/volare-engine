@@ -160,10 +160,10 @@ fn parse_transform_attributes(
     let mut transform = Transform::identity();
 
     // Parse individual transform properties
+     // Store container-relative position separately
     if let Some(x) = obj.get("x").and_then(|v| v.as_f64()) {
         if let Some(y) = obj.get("y").and_then(|v| v.as_f64()) {
-            println!("✅ Found x,y: {}, {}", x, y);
-            transform = transform.combine(&Transform::translation(x as Float, y as Float));
+            session.set_container_relative_position(entity_id.clone(), x as Float, y as Float);
         }
     }
 
@@ -584,12 +584,7 @@ impl JsonLinesParser {
             }
 
             "ellipse" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (50.0, 50.0),
-                );
+
                 let radius = get_point_attr(
                     &entity.attributes,
                     &["rx", "radius_x"],
@@ -618,7 +613,7 @@ impl JsonLinesParser {
                   // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_elipse(entity_id.to_string(), center, radius, options))
+                Ok(builder.new_elipse(entity_id.to_string(),radius, options))
             }
 
             "arc" => {
@@ -820,15 +815,16 @@ impl JsonLinesParser {
 
                 let mut positioned_children = Vec::new();
                 for child_id in children {
-                    let child_entity = self
+                    let _child_entity = self
                         .entities
                         .get(&child_id)
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
-
+                    
                     let child_node = self.build_entity(&child_id, builder)?;
-                    let position =
-                        get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
-                    positioned_children.push((child_node, position));
+                    let pos = builder.get_container_relative_position(&child_id);
+                    println!("📍 Free container adding child: {} at position: ({}, {})", child_id, pos.x, pos.y);
+
+                    positioned_children.push((child_node, (pos.x, pos.y)));
                 }
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 

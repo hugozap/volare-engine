@@ -364,10 +364,15 @@ fn render_ellipse(
 ) {
     let ellipse_shape = session.get_ellipse(node.entity_id.clone());
 
+    // Center the ellipse within its own coordinate space
+    // The ellipse should be centered within its bounding box
+    let cx = ellipse_shape.radius.0;  // Center X = radius X
+    let cy = ellipse_shape.radius.1;  // Center Y = radius Y
+
     let ellipse_content = format!(
         r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
-        ellipse_shape.center.0,
-        ellipse_shape.center.1,
+        cx,
+        cy,
         ellipse_shape.radius.0,
         ellipse_shape.radius.1,
         ellipse_shape.ellipse_options.stroke_color,

@@ -368,23 +368,12 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
  * The position of the ellipse is the top left corner of the bounding box
  */
 pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
-    // The ellipse size should be the full diameter
+    // Only set the size based on radius
     let width = shape_ellipse.radius.0 * 2.0;
     let height = shape_ellipse.radius.1 * 2.0;
-
-    // Set the size for layout spacing calculations
     session.set_size(shape_ellipse.entity.clone(), width, height);
-
-    // Position at (0,0) - the layout system will position this appropriately
-    session.set_position(shape_ellipse.entity.clone(), 0.0, 0.0);
-
-    // CRITICAL: The ellipse center coordinates (cx, cy) in the JSONL should be
-    // set to (radius_x, radius_y) so the ellipse is centered in its bounding box
-    //
-    // For example:
-    // - rx=20, ry=20 → cx should be 20, cy should be 20 (for a 40x40 box)
-    // - rx=30, ry=15 → cx should be 30, cy should be 15 (for a 60x30 box)
 }
+
 pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
     // If the rect has a fixed size, use that
     let width = match rect.rect_options.width_behavior {
@@ -658,32 +647,25 @@ pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
  * Layout for the FreeContainer
  * Children have absolute positions relative to the container
  * The container size is determined by the maximum extent of its children
- */
+*/
 pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeContainer) {
-    // We need to determine the size of the container based on the positions and sizes of its children
     let mut max_width = 0.0;
     let mut max_height = 0.0;
 
-    // Iterate through all children and find the maximum extent
     for (child_id, desired_position) in &container.children {
-        // FIXED: Use effective bounds instead of get_size
-        let child_bounds = session.get_effective_bounds(child_id.clone());
-
-        // FIXED: Apply bounding box compensation when positioning
-        // We want the child's bounding box to start at the desired position
-        let transform_x = desired_position.0 - child_bounds.x;
-        let transform_y = desired_position.1 - child_bounds.y;
-        session.set_position(child_id.clone(), transform_x, transform_y);
-
-        // FIXED: Calculate the extents using effective bounds
-        // After positioning, get the updated bounds to calculate container size
-        let positioned_bounds = session.get_effective_bounds(child_id.clone());
+        println!("🔧 Positioning {} at ({}, {})", child_id, desired_position.0, desired_position.1);
         
-        // Calculate the right and bottom edges of this child's bounding box
-        let right = positioned_bounds.x + positioned_bounds.width;
-        let bottom = positioned_bounds.y + positioned_bounds.height;
+        // Simply position the element at the desired location
+        // No bounding box compensation needed with the new system
+        session.set_position(child_id.clone(), desired_position.0, desired_position.1);
+        
+        // Get the size to calculate container bounds
+        let child_size = session.get_size(child_id.clone());
+        
+        // Calculate the extent based on position + size
+        let right = desired_position.0 + child_size.0;
+        let bottom = desired_position.1 + child_size.1;
 
-        // Update the maximum extent
         if right > max_width {
             max_width = right;
         }
@@ -691,11 +673,6 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
             max_height = bottom;
         }
     }
-
-    // Add a small margin to ensure we have enough space
-    let margin = 2.0;
-    max_width += margin;
-    max_height += margin;
 
     // Set the container's size
     session.set_size(container.entity.clone(), max_width, max_height);

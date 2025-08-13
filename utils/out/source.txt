@@ -3960,7 +3960,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         let ellipse = session.new_elipse(
             format!("table_ellipse_{}", i).to_string(),
-            (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
                 fill_color: "red".to_string(),
@@ -3992,7 +3991,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create an ellipse and wrap it with a box
     let ellipse = session.new_elipse(
         "ellipse1".to_string(),
-        (0.0, 0.0),
         (10.0, 10.0),
         EllipseOptions {
             fill_color: "red".to_string(),
@@ -4007,7 +4005,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         let ellipse = session.new_elipse(
             format!("ellipse{}", i).to_string(),
-            (0.0, 0.0),
             (10.0, 10.0),
             EllipseOptions {
                 fill_color: "red".to_string(),
@@ -4063,7 +4060,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let red_circle = session.new_elipse(
         "redcircle".to_string(),
-        (0.0, 0.0),   // center position (will be positioned by container)
         (15.0, 15.0), // radius
         EllipseOptions {
             fill_color: "#FF0000".to_string(), // bright red
@@ -4107,7 +4103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let green_ellipse = session.new_elipse(
         "greeneclipse".to_string(),
-        (0.0, 0.0),
         (30.0, 20.0),
         EllipseOptions {
             fill_color: "#00CC00".to_string(),   // green
@@ -5007,23 +5002,12 @@ pub fn layout_arrow(session: &mut DiagramBuilder, shape_arrow: &ShapeArrow) {
  * The position of the ellipse is the top left corner of the bounding box
  */
 pub fn layout_ellipse(session: &mut DiagramBuilder, shape_ellipse: &ShapeEllipse) {
-    // The ellipse size should be the full diameter
+    // Only set the size based on radius
     let width = shape_ellipse.radius.0 * 2.0;
     let height = shape_ellipse.radius.1 * 2.0;
-
-    // Set the size for layout spacing calculations
     session.set_size(shape_ellipse.entity.clone(), width, height);
-
-    // Position at (0,0) - the layout system will position this appropriately
-    session.set_position(shape_ellipse.entity.clone(), 0.0, 0.0);
-
-    // CRITICAL: The ellipse center coordinates (cx, cy) in the JSONL should be
-    // set to (radius_x, radius_y) so the ellipse is centered in its bounding box
-    //
-    // For example:
-    // - rx=20, ry=20 → cx should be 20, cy should be 20 (for a 40x40 box)
-    // - rx=30, ry=15 → cx should be 30, cy should be 15 (for a 60x30 box)
 }
+
 pub fn layout_rect(session: &mut DiagramBuilder, rect: &ShapeRect) {
     // If the rect has a fixed size, use that
     let width = match rect.rect_options.width_behavior {
@@ -5297,32 +5281,25 @@ pub fn layout_polyline(session: &mut DiagramBuilder, polyline: &PolyLine) {
  * Layout for the FreeContainer
  * Children have absolute positions relative to the container
  * The container size is determined by the maximum extent of its children
- */
+*/
 pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeContainer) {
-    // We need to determine the size of the container based on the positions and sizes of its children
     let mut max_width = 0.0;
     let mut max_height = 0.0;
 
-    // Iterate through all children and find the maximum extent
     for (child_id, desired_position) in &container.children {
-        // FIXED: Use effective bounds instead of get_size
-        let child_bounds = session.get_effective_bounds(child_id.clone());
-
-        // FIXED: Apply bounding box compensation when positioning
-        // We want the child's bounding box to start at the desired position
-        let transform_x = desired_position.0 - child_bounds.x;
-        let transform_y = desired_position.1 - child_bounds.y;
-        session.set_position(child_id.clone(), transform_x, transform_y);
-
-        // FIXED: Calculate the extents using effective bounds
-        // After positioning, get the updated bounds to calculate container size
-        let positioned_bounds = session.get_effective_bounds(child_id.clone());
+        println!("🔧 Positioning {} at ({}, {})", child_id, desired_position.0, desired_position.1);
         
-        // Calculate the right and bottom edges of this child's bounding box
-        let right = positioned_bounds.x + positioned_bounds.width;
-        let bottom = positioned_bounds.y + positioned_bounds.height;
+        // Simply position the element at the desired location
+        // No bounding box compensation needed with the new system
+        session.set_position(child_id.clone(), desired_position.0, desired_position.1);
+        
+        // Get the size to calculate container bounds
+        let child_size = session.get_size(child_id.clone());
+        
+        // Calculate the extent based on position + size
+        let right = desired_position.0 + child_size.0;
+        let bottom = desired_position.1 + child_size.1;
 
-        // Update the maximum extent
         if right > max_width {
             max_width = right;
         }
@@ -5330,11 +5307,6 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
             max_height = bottom;
         }
     }
-
-    // Add a small margin to ensure we have enough space
-    let margin = 2.0;
-    max_width += margin;
-    max_height += margin;
 
     // Set the container's size
     session.set_size(container.entity.clone(), max_width, max_height);
@@ -6754,7 +6726,6 @@ impl ArrowOptions {
 
 pub struct ShapeEllipse {
     pub entity: EntityID,
-    pub center: (Float, Float),
     pub radius: (Float, Float),
     pub ellipse_options: EllipseOptions,
 }
@@ -6763,7 +6734,6 @@ impl Clone for ShapeEllipse {
     fn clone(&self) -> Self {
         ShapeEllipse {
             entity: self.entity.clone(),
-            center: self.center,
             radius: self.radius,
             ellipse_options: self.ellipse_options.clone(),
         }
@@ -6773,13 +6743,11 @@ impl Clone for ShapeEllipse {
 impl ShapeEllipse {
     pub fn new(
         entity: EntityID,
-        center: (Float, Float),
         radius: (Float, Float),
         ellipse_options: EllipseOptions,
     ) -> ShapeEllipse {
         ShapeEllipse {
             entity,
-            center,
             radius,
             ellipse_options,
         }
@@ -7681,10 +7649,10 @@ fn parse_transform_attributes(
     let mut transform = Transform::identity();
 
     // Parse individual transform properties
+     // Store container-relative position separately
     if let Some(x) = obj.get("x").and_then(|v| v.as_f64()) {
         if let Some(y) = obj.get("y").and_then(|v| v.as_f64()) {
-            println!("✅ Found x,y: {}, {}", x, y);
-            transform = transform.combine(&Transform::translation(x as Float, y as Float));
+            session.set_container_relative_position(entity_id.clone(), x as Float, y as Float);
         }
     }
 
@@ -8105,12 +8073,7 @@ impl JsonLinesParser {
             }
 
             "ellipse" => {
-                let center = get_point_attr(
-                    &entity.attributes,
-                    &["cx", "center_x"],
-                    &["cy", "center_y"],
-                    (50.0, 50.0),
-                );
+
                 let radius = get_point_attr(
                     &entity.attributes,
                     &["rx", "radius_x"],
@@ -8139,7 +8102,7 @@ impl JsonLinesParser {
                   // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_elipse(entity_id.to_string(), center, radius, options))
+                Ok(builder.new_elipse(entity_id.to_string(),radius, options))
             }
 
             "arc" => {
@@ -8341,15 +8304,16 @@ impl JsonLinesParser {
 
                 let mut positioned_children = Vec::new();
                 for child_id in children {
-                    let child_entity = self
+                    let _child_entity = self
                         .entities
                         .get(&child_id)
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
-
+                    
                     let child_node = self.build_entity(&child_id, builder)?;
-                    let position =
-                        get_point_attr(&child_entity.attributes, &["x"], &["y"], (0.0, 0.0));
-                    positioned_children.push((child_node, position));
+                    let pos = builder.get_container_relative_position(&child_id);
+                    println!("📍 Free container adding child: {} at position: ({}, {})", child_id, pos.x, pos.y);
+
+                    positioned_children.push((child_node, (pos.x, pos.y)));
                 }
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
@@ -8874,8 +8838,10 @@ use crate::{components::*, transform::Transform, BoundingBox};
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
     pub entities: Vec<EntityID>,
-    pub positions: HashMap<EntityID, Point>,
+    // Maps entity IDs to their positions in the container (used in free containers)
+    pub container_relative_positions: HashMap<EntityID, Point>,
     pub sizes: HashMap<EntityID, Size>,
+    // Maps entity IDS to their transforms for positioning, rotation, scaling, etc.
     pub transforms: HashMap<EntityID, Transform>,
     pub entityTypes: HashMap<EntityID, EntityType>,
 
@@ -8937,7 +8903,8 @@ impl DiagramBuilder {
             entityTypes: HashMap::<EntityID, EntityType>::new(),
             measure_text: Some(|_text, _text_options| (0.0, 0.0)),
             entities: Vec::new(),
-            positions: HashMap::new(),
+            // store desired positions relative to the container
+            container_relative_positions: HashMap::new(),
             sizes: HashMap::new(),
             transforms: HashMap::new(),
             boxes: HashMap::new(),
@@ -8963,7 +8930,7 @@ impl DiagramBuilder {
     pub fn clear_cache(&mut self) {
         // Clear core entity data
         self.entities.clear();
-        self.positions.clear();
+        self.container_relative_positions.clear();
         self.sizes.clear();
         self.entityTypes.clear();
 
@@ -8992,9 +8959,9 @@ impl DiagramBuilder {
 
     pub fn clear_entities_only(&mut self) {
         self.entities.clear();
-        self.positions.clear();
         self.sizes.clear();
         self.entityTypes.clear();
+        self.container_relative_positions.clear();
         println!("DiagramBuilder entities cleared (components preserved)");
     }
 
@@ -9046,7 +9013,6 @@ impl DiagramBuilder {
     pub fn new_entity(&mut self, id: EntityID, entity_type: EntityType) -> EntityID {
         println!("Creating new entity with id {}", id);
         self.entities.push(id.clone());
-        self.positions.insert(id.clone(), Point::new(0.0, 0.0));
         self.sizes.insert(id.clone(), Size::new(0.0, 0.0));
         self.entityTypes.insert(id.clone(), entity_type.clone());
         if !self.transforms.contains_key(&id) {
@@ -9106,6 +9072,19 @@ impl DiagramBuilder {
             entity_id, new_transform
         );
         self.set_transform(entity_id, new_transform);
+    }
+
+    // Set the position relative to the container  (used in free containers)
+    pub fn set_container_relative_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
+        self.container_relative_positions
+            .insert(entity_id, Point::new(x, y));
+    }
+
+    pub fn get_container_relative_position(&self, entity_id: &EntityID) -> Point {
+        self.container_relative_positions
+            .get(entity_id)
+            .cloned()
+            .unwrap_or(Point::new(0.0, 0.0))
     }
 
     pub fn set_rotation(&mut self, entity_id: EntityID, angle_degrees: Float) {
@@ -9373,12 +9352,11 @@ impl DiagramBuilder {
     pub fn new_elipse(
         &mut self,
         id: EntityID,
-        center: (Float, Float),
         radius: (Float, Float),
         options: EllipseOptions,
     ) -> DiagramTreeNode {
         let ellipse_id = self.new_entity(id, EntityType::EllipseShape);
-        let ellipse = ShapeEllipse::new(ellipse_id.clone(), center, radius, options);
+        let ellipse = ShapeEllipse::new(ellipse_id.clone(),radius, options);
         self.ellipses.insert(ellipse_id.clone(), ellipse);
         DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id.clone())
     }
@@ -9824,19 +9802,12 @@ impl<W: Write> Renderer<W> for SVGRenderer {
         stream: &mut W,
     ) -> Result<(), RendererError> {
         let mut svg = String::new();
-        let root_size = session.get_size(diagram_node.entity_id.clone());
-        let root_pos = session.get_position(diagram_node.entity_id.clone());
-
+        let root_bounds = session.get_effective_bounds(diagram_node.entity_id.clone());
         svg.push_str(&format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
+            r#"<svg width="{}" height="{}" viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
+            root_bounds.width, root_bounds.height,
+            root_bounds.x, root_bounds.y, root_bounds.width, root_bounds.height
         ));
-
-        svg.push_str(&format!(
-        r#"<svg width="{}" height="{}" viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">"#,
-        root_size.0, root_size.1,
-        root_pos.0, root_pos.1, root_size.0, root_size.1
-    ));
-
         svg.push_str(render_node(diagram_node, session).as_str());
         //close svg tag
         svg.push_str("</svg>");
@@ -10179,10 +10150,15 @@ fn render_ellipse(
 ) {
     let ellipse_shape = session.get_ellipse(node.entity_id.clone());
 
+    // Center the ellipse within its own coordinate space
+    // The ellipse should be centered within its bounding box
+    let cx = ellipse_shape.radius.0;  // Center X = radius X
+    let cy = ellipse_shape.radius.1;  // Center Y = radius Y
+
     let ellipse_content = format!(
         r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
-        ellipse_shape.center.0,
-        ellipse_shape.center.1,
+        cx,
+        cy,
         ellipse_shape.radius.0,
         ellipse_shape.radius.1,
         ellipse_shape.ellipse_options.stroke_color,

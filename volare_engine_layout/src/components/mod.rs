@@ -947,7 +947,6 @@ impl ArrowOptions {
 
 pub struct ShapeEllipse {
     pub entity: EntityID,
-    pub center: (Float, Float),
     pub radius: (Float, Float),
     pub ellipse_options: EllipseOptions,
 }
@@ -956,7 +955,6 @@ impl Clone for ShapeEllipse {
     fn clone(&self) -> Self {
         ShapeEllipse {
             entity: self.entity.clone(),
-            center: self.center,
             radius: self.radius,
             ellipse_options: self.ellipse_options.clone(),
         }
@@ -966,13 +964,11 @@ impl Clone for ShapeEllipse {
 impl ShapeEllipse {
     pub fn new(
         entity: EntityID,
-        center: (Float, Float),
         radius: (Float, Float),
         ellipse_options: EllipseOptions,
     ) -> ShapeEllipse {
         ShapeEllipse {
             entity,
-            center,
             radius,
             ellipse_options,
         }
