@@ -526,12 +526,13 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         //update the row and col sizes
         let elem_bounds = session.get_effective_bounds(elem.clone());
 
-        // ✅ ALREADY FIXED: Use .width and .height properties
-        if elem_bounds.width > col_widths[col] {
-            col_widths[col] = elem_bounds.width + table.table_options.cell_padding as Float * 2.0;
+        let content_width = elem_bounds.width + table.table_options.cell_padding as Float * 2.0;
+        let content_height = elem_bounds.height + table.table_options.cell_padding as Float * 2.0;
+        if content_width > col_widths[col] {
+            col_widths[col] = content_width + table.table_options.cell_padding as Float * 2.0;
         }
-        if elem_bounds.height > row_heights[row] {
-            row_heights[row] = elem_bounds.height + table.table_options.cell_padding as Float * 2.0;
+        if content_height > row_heights[row] {
+            row_heights[row] = content_height + table.table_options.cell_padding as Float * 2.0;
         }
     }
 
@@ -655,21 +656,14 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     let mut max_height = 0.0;
 
     for (child_id, desired_position) in &container.children {
-        println!(
-            "🔧 Positioning {} at ({}, {})",
-            child_id, desired_position.0, desired_position.1
-        );
-
-        // Simply position the element at the desired location
-        // No bounding box compensation needed with the new system
         session.set_position(child_id.clone(), desired_position.0, desired_position.1);
 
-        // Get the size to calculate container bounds
-        let child_size = session.get_size(child_id.clone());
+        // FIX: Use effective bounds instead of raw size
+        let child_bounds = session.get_effective_bounds(child_id.clone());
 
-        // Calculate the extent based on position + size
-        let right = desired_position.0 + child_size.0;
-        let bottom = desired_position.1 + child_size.1;
+        // Calculate the extent based on position + effective bounds dimensions
+        let right = desired_position.0 + child_bounds.width; // Use width from bounds
+        let bottom = desired_position.1 + child_bounds.height; // Use height from bounds
 
         if right > max_width {
             max_width = right;
@@ -679,7 +673,6 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
         }
     }
 
-    // Set the container's size
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 

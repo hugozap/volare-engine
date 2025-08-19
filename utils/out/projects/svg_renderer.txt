@@ -382,8 +382,8 @@ fn render_ellipse(
 
     // Center the ellipse within its own coordinate space
     // The ellipse should be centered within its bounding box
-    let cx = ellipse_shape.radius.0;  // Center X = radius X
-    let cy = ellipse_shape.radius.1;  // Center Y = radius Y
+    let cx = ellipse_shape.radius.0; // Center X = radius X
+    let cy = ellipse_shape.radius.1; // Center Y = radius Y
 
     let ellipse_content = format!(
         r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" stroke="{}" stroke-width="{}" fill="{}" />"#,
@@ -483,7 +483,6 @@ fn render_text(
 
     render_with_transform(session, svg, entity_id, &text_content);
 }
-
 fn render_arc(
     session: &DiagramBuilder,
     svg: &mut String,
@@ -493,6 +492,11 @@ fn render_arc(
     use std::f32::consts::PI;
 
     let arc_shape = session.get_arc(node.entity_id.clone());
+    let size = session.get_size(entity_id.clone());
+
+    // Center the arc within its bounding box (like ellipses do)
+    let center_x = size.0 / 2.0;  // Same as ellipse: radius
+    let center_y = size.1 / 2.0;  // Same as ellipse: radius
 
     // Get normalized angles
     let (start_angle, end_angle) = arc_shape.normalize_angles();
@@ -502,11 +506,11 @@ fn render_arc(
     let start_rad = start_angle * PI / 180.0;
     let end_rad = end_angle * PI / 180.0;
 
-    // Calculate start and end points RELATIVE TO THE CENTER (not absolute)
-    let start_x = arc_shape.center.0 + arc_shape.radius * start_rad.cos();
-    let start_y = arc_shape.center.1 + arc_shape.radius * start_rad.sin();
-    let end_x = arc_shape.center.0 + arc_shape.radius * end_rad.cos();
-    let end_y = arc_shape.center.1 + arc_shape.radius * end_rad.sin();
+    // Calculate start and end points relative to the centered position
+    let start_x = center_x + arc_shape.radius * start_rad.cos();
+    let start_y = center_y + arc_shape.radius * start_rad.sin();
+    let end_x = center_x + arc_shape.radius * end_rad.cos();
+    let end_y = center_y + arc_shape.radius * end_rad.sin();
 
     // Determine if this is a large arc (> 180 degrees)
     let large_arc_flag = if sweep > 180.0 { 1 } else { 0 };
@@ -514,12 +518,36 @@ fn render_arc(
     // Always sweep in positive direction (clockwise in SVG coordinates)
     let sweep_flag = 1;
 
-    let arc_content = if arc_shape.arc_options.filled {
+    let arc_content = if (sweep - 360.0).abs() < 0.1 {
+        // Special case for full circles (360°)
+        if arc_shape.arc_options.filled {
+            // Filled circle
+            format!(
+                r#"<circle cx="{}" cy="{}" r="{}" fill="{}" stroke="{}" stroke-width="{}" />"#,
+                center_x,
+                center_y,
+                arc_shape.radius,
+                arc_shape.arc_options.fill_color,
+                arc_shape.arc_options.stroke_color,
+                arc_shape.arc_options.stroke_width
+            )
+        } else {
+            // Unfilled circle
+            format!(
+                r#"<circle cx="{}" cy="{}" r="{}" fill="none" stroke="{}" stroke-width="{}" />"#,
+                center_x,
+                center_y,
+                arc_shape.radius,
+                arc_shape.arc_options.stroke_color,
+                arc_shape.arc_options.stroke_width
+            )
+        }
+    } else if arc_shape.arc_options.filled {
         // For filled arcs, create a path that includes the center (pie slice)
         format!(
             r#"<path d="M {} {} L {} {} A {} {} 0 {} {} {} {} Z" fill="{}" stroke="{}" stroke-width="{}" />"#,
-            arc_shape.center.0,
-            arc_shape.center.1, // Move to center
+            center_x,
+            center_y, // Move to center
             start_x,
             start_y, // Line to start point
             arc_shape.radius,
@@ -564,10 +592,9 @@ fn test_render_arc() {
 
     let arc = session.new_arc(
         "arc".to_string(),
-        (50.0, 50.0), // center
-        30.0,         // radius
-        0.0,          // start angle
-        90.0,         // end angle
+        30.0, // radius
+        0.0,  // start angle
+        90.0, // end angle
         options,
     );
 

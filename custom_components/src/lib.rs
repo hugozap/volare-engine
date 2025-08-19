@@ -6,7 +6,6 @@ pub use volare_engine_layout::*;
 
 // Component modules
 pub mod infographics;
-
 // You can add more component domains here as you create them:
 // pub mod business_process;
 // pub mod technical_diagrams;
