@@ -529,10 +529,10 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         let content_width = elem_bounds.width + table.table_options.cell_padding as Float * 2.0;
         let content_height = elem_bounds.height + table.table_options.cell_padding as Float * 2.0;
         if content_width > col_widths[col] {
-            col_widths[col] = content_width + table.table_options.cell_padding as Float * 2.0;
+            col_widths[col] = content_width;
         }
         if content_height > row_heights[row] {
-            row_heights[row] = content_height + table.table_options.cell_padding as Float * 2.0;
+            row_heights[row] = content_height;
         }
     }
 

@@ -10,6 +10,10 @@ Each entity follows this format:
 {"id": "unique_id", "type": "entity_type", "attribute1": "value1", "attribute2": "value2"}
 ```
 
+## The first element must be the root container
+
+The first element needs to be the root container with children for the layout to work correctly.
+
 ## Core Entity Types
 
 ### Text (`"type": "text"`)
