@@ -2,7 +2,7 @@
 // This file demonstrates the differences in text positioning and spacing
 // between the SVG and PNG renderers
 
-use image_renderer::PNGRenderer;
+// use image_renderer::PNGRenderer;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{
     renderer_base::Renderer,

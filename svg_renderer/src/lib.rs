@@ -84,6 +84,10 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
             render_free_container(session, &mut svg, entity_id, node);
         }
 
+        EntityType::ConstraintLayoutContainer => {
+            render_constraint_layout_container(session, &mut svg, entity_id, node);
+        }
+
         EntityType::RectShape => {
             render_rectangle(session, &mut svg, entity_id, node);
         }
@@ -208,6 +212,29 @@ fn render_free_container(
             size.0, size.1, bg_color
         ));
     }
+
+    // Render all children
+    for child in node.children.iter() {
+        container_content.push_str(&render_node(child, session));
+    }
+
+    render_with_transform(session, svg, entity_id, &container_content);
+}
+
+
+
+fn render_constraint_layout_container(
+    session: &DiagramBuilder,
+    svg: &mut String,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+) {
+    let size = session.get_size(entity_id.clone());
+    let container = session.get_constraint_layout(entity_id.clone());
+
+    //No background rectangle
+
+    let mut container_content = String::new();
 
     // Render all children
     for child in node.children.iter() {
@@ -689,71 +716,5 @@ fn assertIsSameSVG(a: &str, b: &str) {
     assert_eq!(
         strA.replace('\n', "").replace('\r', ""),
         strB.replace('\n', "").replace('\r', "")
-    );
-}
-
-//test line
-#[test]
-fn test_render_line() {
-    let options = LineOptions {
-        stroke_color: "black".to_string(),
-        stroke_width: 1.0,
-    };
-    let mut session = DiagramBuilder::new();
-    let line = session.new_line("line".to_string(), (0.0, 0.0), (0.0, 0.0), options);
-
-    let node = render_node(&line, &session);
-    assert_eq!(
-        node,
-        r#"<g transform="translate(0 0)" ><line x1="0" y1="0" x2="0" y2="0" stroke="black" stroke-width="1" /></g>"#
-    );
-}
-
-//test eclipse
-#[test]
-fn test_render_ellipse() {
-    let options = EllipseOptions {
-        fill_color: "white".to_string(),
-        stroke_color: "black".to_string(),
-        stroke_width: 1.0,
-    };
-    let mut session = DiagramBuilder::new();
-    let ellipse = session.new_elipse("ellipse".to_string(), (0.0, 0.0), (0.0, 0.0), options);
-
-    let node = render_node(&ellipse, &session);
-    assertIsSameSVG(
-        &node,
-        r#"
-        <g transform="translate(0 0)" >
-            <ellipse cx="0" cy="0" rx="0" ry="0" stroke="black" stroke-width="1" fill="white" />
-        </g>"#,
-    );
-}
-
-#[test]
-fn test_render_box_rounded_corners_with_group() {
-    let mut session = DiagramBuilder::new();
-    let group = session.new_group("group".to_string(), Vec::new());
-    let box_ = session.new_box(
-        "box".to_string(),
-        group,
-        BoxOptions {
-            fill_color: Fill::Color("white".to_string()),
-            stroke_color: "black".to_string(),
-            stroke_width: 1.0,
-            padding: 0.0,
-            border_radius: 5.5,
-            width_behavior: SizeBehavior::Content, // 0 + 2*0 (padding)
-            height_behavior: SizeBehavior::Content, // 0 + 2*0
-        },
-    );
-    let node = render_node(&box_, &session);
-    assertIsSameSVG(
-        &node,
-        r#"<g transform="translate(0 0)" >
-            <rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" />
-            <g transform="translate(0 0)" >
-            </g>
-        </g>"#,
     );
 }

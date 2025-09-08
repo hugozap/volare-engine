@@ -1,7 +1,7 @@
 // Create an SVG file with all supported elements
 
 //import svg_renderer
-use image_renderer::PNGRenderer;
+// use image_renderer::PNGRenderer;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
 use demo::measure_text::{ measure_text_ultra_tight};
@@ -96,16 +96,16 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     
 
     // Render PNG
-    let mut png_path = temp_dir.clone();
-    png_path.push("png-render-test.png");
-    let png_renderer = PNGRenderer {};
-    let mut png_file = File::create(&png_path).unwrap();
-    let png_res = png_renderer.render(&session, &table, &mut png_file);
-    if png_res.is_err() {
-        println!("PNG Render Error: {}", png_res.err().unwrap());
-        std::process::exit(1);
-    }
-    println!("PNG file written to: {}", png_path.to_str().unwrap());
+    // let mut png_path = temp_dir.clone();
+    // png_path.push("png-render-test.png");
+    // let png_renderer = PNGRenderer {};
+    // let mut png_file = File::create(&png_path).unwrap();
+    // let png_res = png_renderer.render(&session, &table, &mut png_file);
+    // if png_res.is_err() {
+    //     println!("PNG Render Error: {}", png_res.err().unwrap());
+    //     std::process::exit(1);
+    // }
+    // println!("PNG file written to: {}", png_path.to_str().unwrap());
 
     Ok(())
 }

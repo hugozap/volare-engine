@@ -1085,7 +1085,6 @@ impl ShapeImage {
 pub struct ConstraintLayoutContainer {
     pub entity: EntityID,
     pub children: Vec<EntityID>,
-    pub constraints: Vec<SimpleConstraint>,
 }
 
 impl Clone for ConstraintLayoutContainer {
@@ -1093,7 +1092,6 @@ impl Clone for ConstraintLayoutContainer {
         ConstraintLayoutContainer {
             entity: self.entity.clone(),
             children: self.children.clone(),
-            constraints: self.constraints.clone(),
         }
     }
 }
@@ -1118,16 +1116,7 @@ impl ConstraintLayoutContainer {
         ConstraintLayoutContainer{
             entity: entity,
             children: Vec::new(),
-            constraints: Vec::new(),
         }
-    }
-
-    pub fn add_constraint(&mut self, constraint: SimpleConstraint){
-        self.constraints.push(constraint);
-    }
-
-    pub fn add_constraints(&mut self, constraints: Vec<SimpleConstraint>) {
-        self.constraints.extend(constraints);
     }
 }
 

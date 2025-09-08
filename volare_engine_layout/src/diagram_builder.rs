@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 /**
  * This object encapsulates diagram creation logic.
@@ -13,7 +13,7 @@ use std::{collections::HashMap, sync::Arc};
  *
  */
 //use TextOptions
-use crate::{components::*, transform::Transform, BoundingBox};
+use crate::{components::*, transform::Transform, BoundingBox, ConstraintSystem, SimpleConstraint};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
@@ -41,6 +41,7 @@ pub struct DiagramBuilder {
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
     constrained_layout_containers: HashMap<EntityID, ConstraintLayoutContainer>,
+    constraint_systems: HashMap<EntityID, ConstraintSystem>,
     arcs: HashMap<EntityID, ShapeArc>,
     spacers: HashMap<EntityID, ShapeSpacer>,
     pub custom_components: CustomComponentRegistry,
@@ -103,6 +104,7 @@ impl DiagramBuilder {
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
             constrained_layout_containers: HashMap::new(),
+            constraint_systems: HashMap::new(),
             arcs: HashMap::new(),
             spacers: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
@@ -291,7 +293,6 @@ impl DiagramBuilder {
         self.set_transform(entity_id, transform);
     }
 
-
     pub fn set_scale(&mut self, entity_id: EntityID, sx: Float, sy: Float) {
         let current = self.get_transform(entity_id.clone()).clone();
         let scale = Transform::scale(sx, sy);
@@ -361,13 +362,7 @@ impl DiagramBuilder {
         options: ArcOptions,
     ) -> DiagramTreeNode {
         let arc_id = self.new_entity(id, EntityType::ArcShape);
-        let arc = ShapeArc::new(
-            arc_id.clone(),
-            radius,
-            start_angle,
-            end_angle,
-            options,
-        );
+        let arc = ShapeArc::new(arc_id.clone(), radius, start_angle, end_angle, options);
         self.arcs.insert(arc_id.clone(), arc);
         DiagramTreeNode::new(EntityType::ArcShape, arc_id)
     }
@@ -534,7 +529,7 @@ impl DiagramBuilder {
         options: EllipseOptions,
     ) -> DiagramTreeNode {
         let ellipse_id = self.new_entity(id, EntityType::EllipseShape);
-        let ellipse = ShapeEllipse::new(ellipse_id.clone(),radius, options);
+        let ellipse = ShapeEllipse::new(ellipse_id.clone(), radius, options);
         self.ellipses.insert(ellipse_id.clone(), ellipse);
         DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id.clone())
     }
@@ -712,6 +707,54 @@ impl DiagramBuilder {
 
         node
     }
+
+    pub fn new_constraint_layout_container(
+        &mut self,
+        id: EntityID,
+        children: Vec<DiagramTreeNode>,
+        constraints: Vec<crate::SimpleConstraint>,
+    ) -> DiagramTreeNode {
+        let container_id = self.new_entity(id.clone(), EntityType::ConstraintLayoutContainer);
+
+        // Create the free container
+        let mut container = ConstraintLayoutContainer::new(container_id.clone());
+        let mut constraint_system = ConstraintSystem::new();
+
+        if let Err(e) = constraint_system.add_entity(id.clone()) {
+            eprintln!("Failed to add container to entity: {}", id.clone());
+        }
+
+        for child in &children {
+            if let Err(e) = constraint_system.add_entity(child.entity_id.clone()) {
+                eprintln!("Failed to add child entity {}: {}", child.entity_id.clone(), e);
+            }
+        }
+
+
+        // Add constraints to system
+        for constraint in constraints {
+            constraint_system.add_constraint(constraint);
+        }
+
+                // store the constraint system for this container
+        self.constraint_systems.insert(id.clone(), constraint_system);
+        self.constrained_layout_containers.insert(id.clone(), container);
+
+
+
+        // Create the node for the tree
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::ConstraintLayoutContainer,
+            entity_id: container_id.clone(),
+            children: Vec::new(),
+        };
+
+        for child_node in children {
+            node.add_child(child_node);
+        }
+
+        node
+    }
 }
 
 // element list accessors
@@ -786,7 +829,7 @@ impl DiagramBuilder {
         self.free_containers.get_mut(&id).unwrap()
     }
 
-    pub fn get_constraint_layout(&mut self, id: EntityID) -> &ConstraintLayoutContainer {
+    pub fn get_constraint_layout(&self, id: EntityID) -> &ConstraintLayoutContainer {
         &self.constrained_layout_containers[&id]
     }
 

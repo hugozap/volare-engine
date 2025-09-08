@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "./volare_engine_layout",
     "./svg_renderer",
-    "./image_renderer",
     "./demo",
     "./wasm_bindings",
     "./custom_components",

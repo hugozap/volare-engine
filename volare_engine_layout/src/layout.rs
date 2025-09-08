@@ -680,6 +680,8 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
 }
 
+//TODO: Hay que cambiar, layout no debe crear el constraint system
+// el constraint system se registra en el builder
 pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
     let mut constraint_system = ConstraintSystem::new();
     constraint_system.add_entity(container.entity.clone());
@@ -694,11 +696,6 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
             constraint_system.suggest_size(&child_id, size.w, size.h)
             .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
         }
-    }
-
-    // Apply all constraints
-    for constraint in &container.constraints {
-        constraint_system.add_constraint(constraint.clone())?;
     }
 
     // Solve constraints
