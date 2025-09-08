@@ -1,5 +1,6 @@
 pub mod table;
 
+use crate::constraints::{ConstraintSystem, SimpleConstraint};
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
@@ -82,6 +83,7 @@ pub enum EntityType {
     FreeContainer,
     ArcShape,
     SpacerShape,
+    ConstraintLayoutContainer,
 }
 
 #[derive(Debug, Copy, PartialEq)]
@@ -1079,6 +1081,56 @@ impl ShapeImage {
     }
 }
 
+// A container that uses constraints to position its children
+pub struct ConstraintLayoutContainer {
+    pub entity: EntityID,
+    pub children: Vec<EntityID>,
+    pub constraints: Vec<SimpleConstraint>,
+}
+
+impl Clone for ConstraintLayoutContainer {
+    fn clone(&self) -> Self {
+        ConstraintLayoutContainer {
+            entity: self.entity.clone(),
+            children: self.children.clone(),
+            constraints: self.constraints.clone(),
+        }
+    }
+}
+
+
+impl Entity for ConstraintLayoutContainer {
+    fn get_id(&self) -> EntityID {
+        self.entity.clone()
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ConstraintLayoutContainer
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ConstraintLayoutContainer {
+    pub fn new(entity: EntityID)->Self{
+        ConstraintLayoutContainer{
+            entity: entity,
+            children: Vec::new(),
+            constraints: Vec::new(),
+        }
+    }
+
+    pub fn add_constraint(&mut self, constraint: SimpleConstraint){
+        self.constraints.push(constraint);
+    }
+
+    pub fn add_constraints(&mut self, constraints: Vec<SimpleConstraint>) {
+        self.constraints.extend(constraints);
+    }
+}
+
 /// A container that allows children to be positioned with absolute coordinates
 /// Children's positions are relative to the container's top-left corner
 pub struct FreeContainer {
@@ -1189,9 +1241,9 @@ impl ArcOptions {
 // Arc shape structure
 pub struct ShapeArc {
     pub entity: EntityID,
-    pub radius: Float,          // Radius of the arc
-    pub start_angle: Float,     // Start angle in degrees
-    pub end_angle: Float,       // End angle in degrees
+    pub radius: Float,      // Radius of the arc
+    pub start_angle: Float, // Start angle in degrees
+    pub end_angle: Float,   // End angle in degrees
     pub arc_options: ArcOptions,
 }
 

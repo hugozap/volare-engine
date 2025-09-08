@@ -7,8 +7,7 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
-    VerticalAlignment,
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
 };
 
 use crate::transform::Transform;
@@ -676,11 +675,61 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 
-// BETTER FIX: Adjust the arc layout to work with existing renderer expectations
-
 pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     let diameter = shape_arc.radius * 2.0;
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
+}
+
+pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
+    let mut constraint_system = ConstraintSystem::new();
+    constraint_system.add_entity(container.entity.clone());
+    for child_id in &container.children {
+        constraint_system.add_entity(child_id.clone())
+            .map_err(|e| anyhow::anyhow!("Failed to add entity to constraint system: {:?}", e))?;
+    }
+
+    // Use existing sizes as suggestions
+    for child_id in &container.children {
+        if let Some(size) = session.sizes.get(child_id) {
+            constraint_system.suggest_size(&child_id, size.w, size.h)
+            .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
+        }
+    }
+
+    // Apply all constraints
+    for constraint in &container.constraints {
+        constraint_system.add_constraint(constraint.clone())?;
+    }
+
+    // Solve constraints
+    let results = constraint_system.solve()?;
+
+    // Apply results
+    let mut container_width = 0.0;
+    let mut container_height = 0.0;
+
+    for (entity_id, (x,y,width,height)) in results {
+        session.container_relative_positions.insert(
+            entity_id.clone(),
+            Point::new(x, y)
+        );
+        session.set_size(entity_id.clone(), width, height);
+
+        //Calculate container bounds
+
+        let right = x + width;
+        let bottom = y + height;
+        if right > container_width {
+            container_width = right;
+        }
+
+        if bottom > container_height {
+            container_height = bottom;
+        }
+    }
+
+    session.set_size(container.entity.clone(), container_width, container_height);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -782,6 +831,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::FreeContainer => {
             let container = session.get_free_container(root.entity_id.clone()).clone();
             layout_free_container(session, &container);
+        }
+
+        EntityType::ConstraintLayoutContainer => {
+            let container = session.get_constraint_layout(root.entity_id.clone()).clone();
+            layout_constraint_container(session, &container);
         }
 
         EntityType::ArcShape => {

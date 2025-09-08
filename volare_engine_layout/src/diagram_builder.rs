@@ -40,6 +40,7 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
+    constrained_layout_containers: HashMap<EntityID, ConstraintLayoutContainer>,
     arcs: HashMap<EntityID, ShapeArc>,
     spacers: HashMap<EntityID, ShapeSpacer>,
     pub custom_components: CustomComponentRegistry,
@@ -101,6 +102,7 @@ impl DiagramBuilder {
             images: HashMap::new(),
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
+            constrained_layout_containers: HashMap::new(),
             arcs: HashMap::new(),
             spacers: HashMap::new(),
             custom_components: CustomComponentRegistry::new(),
@@ -782,6 +784,14 @@ impl DiagramBuilder {
 
     pub fn get_free_container_mut(&mut self, id: EntityID) -> &mut FreeContainer {
         self.free_containers.get_mut(&id).unwrap()
+    }
+
+    pub fn get_constraint_layout(&mut self, id: EntityID) -> &ConstraintLayoutContainer {
+        &self.constrained_layout_containers[&id]
+    }
+
+    pub fn get_constraint_layout_mut(&mut self, id: EntityID) -> &mut ConstraintLayoutContainer {
+        self.constrained_layout_containers.get_mut(&id).unwrap()
     }
 
     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
