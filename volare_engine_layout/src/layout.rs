@@ -683,23 +683,22 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
 //TODO: Hay que cambiar, layout no debe crear el constraint system
 // el constraint system se registra en el builder
 pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
-    let mut constraint_system = ConstraintSystem::new();
-    constraint_system.add_entity(container.entity.clone());
-    for child_id in &container.children {
-        constraint_system.add_entity(child_id.clone())
-            .map_err(|e| anyhow::anyhow!("Failed to add entity to constraint system: {:?}", e))?;
-    }
+    
+    let child_sizes:Vec<(String, (Float,Float))> = container.children
+        .iter()
+        .filter_map(|child_id| {
+            Some((child_id.clone(), session.get_size(child_id.clone()).clone()))
+        }).collect();
+    
+    let mut system = session.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
-    for child_id in &container.children {
-        if let Some(size) = session.sizes.get(child_id) {
-            constraint_system.suggest_size(&child_id, size.w, size.h)
-            .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
-        }
+    for (child_id, (w,h)) in child_sizes{
+            system.suggest_size(child_id.as_str(), w, h).map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
 
     // Solve constraints
-    let results = constraint_system.solve()?;
+    let results = system.solve()?;
 
     // Apply results
     let mut container_width = 0.0;

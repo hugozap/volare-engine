@@ -40,7 +40,7 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
-    constrained_layout_containers: HashMap<EntityID, ConstraintLayoutContainer>,
+    constraint_layout_containers: HashMap<EntityID, ConstraintLayoutContainer>,
     constraint_systems: HashMap<EntityID, ConstraintSystem>,
     arcs: HashMap<EntityID, ShapeArc>,
     spacers: HashMap<EntityID, ShapeSpacer>,
@@ -103,10 +103,11 @@ impl DiagramBuilder {
             images: HashMap::new(),
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
-            constrained_layout_containers: HashMap::new(),
+            constraint_layout_containers: HashMap::new(),
             constraint_systems: HashMap::new(),
             arcs: HashMap::new(),
             spacers: HashMap::new(),
+
             custom_components: CustomComponentRegistry::new(),
         }
     }
@@ -718,6 +719,7 @@ impl DiagramBuilder {
 
         // Create the free container
         let mut container = ConstraintLayoutContainer::new(container_id.clone());
+        // Create the constraint system
         let mut constraint_system = ConstraintSystem::new();
 
         if let Err(e) = constraint_system.add_entity(id.clone()) {
@@ -738,7 +740,7 @@ impl DiagramBuilder {
 
                 // store the constraint system for this container
         self.constraint_systems.insert(id.clone(), constraint_system);
-        self.constrained_layout_containers.insert(id.clone(), container);
+        self.constraint_layout_containers.insert(id.clone(), container);
 
 
 
@@ -830,11 +832,19 @@ impl DiagramBuilder {
     }
 
     pub fn get_constraint_layout(&self, id: EntityID) -> &ConstraintLayoutContainer {
-        &self.constrained_layout_containers[&id]
+        &self.constraint_layout_containers[&id]
     }
 
     pub fn get_constraint_layout_mut(&mut self, id: EntityID) -> &mut ConstraintLayoutContainer {
-        self.constrained_layout_containers.get_mut(&id).unwrap()
+        self.constraint_layout_containers.get_mut(&id).unwrap()
+    }
+
+    pub fn get_constraint_system(&mut self, id: EntityID) -> &ConstraintSystem {
+        self.constraint_systems.get(&id).unwrap()
+    }
+
+     pub fn get_constraint_system_mut(&mut self, id: EntityID) -> &mut ConstraintSystem {
+        self.constraint_systems.get_mut(&id).unwrap()
     }
 
     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
