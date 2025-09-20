@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{collections::HashMap, hash::Hash, rc::Rc, sync::Arc};
 
 /**
  * This object encapsulates diagram creation logic.
@@ -709,53 +709,63 @@ impl DiagramBuilder {
         node
     }
 
+    /**
+     * A constraint layout uses cassowary constraints to calculate some
+     * of the positions and sizes of elements.
+     * Some elements may contain initial coordinates while others
+     * will get their positions from the constrain system solution
+     */
     pub fn new_constraint_layout_container(
         &mut self,
         id: EntityID,
-        children: Vec<DiagramTreeNode>,
+        // The children may have relative coordinates set, but may not (when calculated by constraints)
+        children: Vec<(DiagramTreeNode, Option<Point>)>,
         constraints: Vec<crate::SimpleConstraint>,
     ) -> DiagramTreeNode {
-        let container_id = self.new_entity(id.clone(), EntityType::ConstraintLayoutContainer);
+        // Create container elem
+        let id = self.new_entity(id.clone(), EntityType::ConstraintLayoutContainer);
+        let children = Rc::new(children);
 
-        // Create the free container
-        let mut container = ConstraintLayoutContainer::new(container_id.clone());
-        // Create the constraint system
-        let mut constraint_system = ConstraintSystem::new();
+        let children_ids = children.clone().iter().map(|(node, _) | {
+            node.entity_id.clone()
+        }).collect::<Vec<String>>();
 
-        if let Err(e) = constraint_system.add_entity(id.clone()) {
-            eprintln!("Failed to add container to entity: {}", id.clone());
-        }
+        let children_nodes = children.clone().iter().map(|(node,_) | {
+            Box::new(node.clone())
+        }).collect::<Vec<Box<DiagramTreeNode>>>();
 
-        for child in &children {
-            if let Err(e) = constraint_system.add_entity(child.entity_id.clone()) {
-                eprintln!("Failed to add child entity {}: {}", child.entity_id.clone(), e);
+        let container = ConstraintLayoutContainer::new(id.clone(),children_ids.clone().to_vec());
+
+        // Setup constraint system
+        
+        // register entities in the constrain system and suggest positions
+        let mut cs = ConstraintSystem::new();
+        for (node, pos) in children.clone().to_vec() {
+            if let Err(e) = cs.add_entity(node.entity_id.clone()) {
+                eprintln!("Failed to add entity to constrain system: {}", node.entity_id.clone());
+            }
+            // suggest position if there's one
+            if let Some(p) = pos {
+                 let _ = cs.suggest_position(&node.entity_id.clone(), p.x, p.y);
             }
         }
 
-
-        // Add constraints to system
+        // register constraints
         for constraint in constraints {
-            constraint_system.add_constraint(constraint);
+            let _ = cs.add_constraint(constraint);
         }
 
-                // store the constraint system for this container
-        self.constraint_systems.insert(id.clone(), constraint_system);
+        // Store the constraint system
+        self.constraint_systems.insert(id.clone(), cs);
         self.constraint_layout_containers.insert(id.clone(), container);
 
-
-
-        // Create the node for the tree
-        let mut node = DiagramTreeNode {
+        // Add children to system
+        DiagramTreeNode {
             entity_type: EntityType::ConstraintLayoutContainer,
-            entity_id: container_id.clone(),
-            children: Vec::new(),
-        };
+            entity_id: id.clone(),
+            children: children_nodes,
 
-        for child_node in children {
-            node.add_child(child_node);
-        }
-
-        node
+         }
     }
 }
 

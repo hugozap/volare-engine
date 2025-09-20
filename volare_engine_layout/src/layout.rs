@@ -683,14 +683,14 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
 //TODO: Hay que cambiar, layout no debe crear el constraint system
 // el constraint system se registra en el builder
 pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
-    
+    println!("layout_constraint_container called");
     let child_sizes:Vec<(String, (Float,Float))> = container.children
         .iter()
         .filter_map(|child_id| {
             Some((child_id.clone(), session.get_size(child_id.clone()).clone()))
         }).collect();
-    
-    let mut system = session.get_constraint_system_mut(container.entity.clone());
+        
+    let system = session.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
     for (child_id, (w,h)) in child_sizes{

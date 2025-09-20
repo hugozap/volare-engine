@@ -1112,10 +1112,10 @@ impl Entity for ConstraintLayoutContainer {
 }
 
 impl ConstraintLayoutContainer {
-    pub fn new(entity: EntityID)->Self{
+    pub fn new(entity: EntityID, children: Vec<String>)->Self{
         ConstraintLayoutContainer{
             entity: entity,
-            children: Vec::new(),
+            children: children,
         }
     }
 }

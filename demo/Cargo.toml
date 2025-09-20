@@ -28,3 +28,7 @@ path = "src/main.rs"
 name = "patterns"
 path = "src/bin/patterns.rs"
 
+[[bin]]
+name = "constraints"
+path = "src/bin/constraints.rs"
+
