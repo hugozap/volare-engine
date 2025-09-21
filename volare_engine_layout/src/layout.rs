@@ -655,6 +655,7 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     let mut max_height = 0.0;
 
     for (child_id, desired_position) in &container.children {
+        // TODO: This can be set on creation time
         session.set_position(child_id.clone(), desired_position.0, desired_position.1);
 
         // FIX: Use effective bounds instead of raw size
@@ -693,6 +694,7 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
     let system = session.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
+    // at this point children already have their sizes calculated
     for (child_id, (w,h)) in child_sizes{
             system.suggest_size(child_id.as_str(), w, h).map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
@@ -704,12 +706,12 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
     let mut container_width = 0.0;
     let mut container_height = 0.0;
 
+    // Set final position and size for children
     for (entity_id, (x,y,width,height)) in results {
-        session.container_relative_positions.insert(
-            entity_id.clone(),
-            Point::new(x, y)
-        );
+        session.set_position(entity_id.clone(), x, y);
         session.set_size(entity_id.clone(), width, height);
+
+        println!("Position set for entity {} {},{}", entity_id, x, y);
 
         //Calculate container bounds
 

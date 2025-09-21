@@ -4,6 +4,7 @@
 use demo::measure_text::measure_text_svg_character_advance;
 use resvg::usvg::roxmltree::Children;
 use uuid::fmt::Simple;
+use volare_engine_layout::diagram_builder::DiagramTreeNode;
 use std::fs::File;
 use std::path::Path;
 use volare_engine_layout::*;
@@ -38,11 +39,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )];
 
+    let mut children_with_pos: Vec<(DiagramTreeNode, Option<Point>)>= children.iter().map(|c| {
+        (c.clone(), None)
+    }).collect();
+
+     if let Some(elem) = children_with_pos.get_mut(0) {
+        elem.1  = Some(Point::new(0.0, 0.0))
+     }
+
     builder.set_position("r1".to_string(), 50.0, 50.0);
 
     let mut constraints = Vec::<SimpleConstraint>::new();
-    constraints.push(SimpleConstraint::AlignLeft("r1".into(), "r2".into()));
-    let root = builder.new_constraint_layout_container("container".to_string(), children, constraints);
+    // R1 should be set to the right of r2
+    constraints.push(SimpleConstraint::RightOf("r1".into(), "r2".into()));
+    let root = builder.new_constraint_layout_container("container".to_string(), children_with_pos, constraints);
     layout_tree_node(&mut builder, &root);
     let svg_renderer = svg_renderer::SVGRenderer {};
     let mut svg_file = File::create(&output_path)?;

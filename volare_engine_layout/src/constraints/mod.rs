@@ -7,6 +7,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum SimpleConstraint {
     AlignLeft(String, String),
+    RightOf(String, String),
 }
 
 pub struct ConstraintSystem {
@@ -73,6 +74,13 @@ impl ConstraintSystem {
                     .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x)
                     .map_err(|e| anyhow::anyhow!("Failed to add align left constraint: {:?}", e))?;
             }
+            SimpleConstraint::RightOf(id1, id2 ) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.x | EQ(REQUIRED) |  vars2.x + vars2.width)
+                    .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
+            }
         }
         Ok(())
     }
@@ -98,10 +106,10 @@ impl ConstraintSystem {
     ) -> Result<(), cassowary::SuggestValueError> {
         println!("Suggest_size called {} {} {}", id, width, height);
         if let Some(vars) = self.variables.get(id) {
-             self.solver
+             let _ = self.solver
                 .add_constraint(vars.width | EQ(STRONG) | (width as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested width constraint: {:?}", e));
-            self.solver
+            let _ = self.solver
                 .add_constraint(vars.height | EQ(STRONG) | (height as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested height constraint: {:?}", e));
         }
@@ -116,10 +124,10 @@ impl ConstraintSystem {
         y: f32,
     ) -> Result<(), cassowary::SuggestValueError> {
         if let Some(vars) = self.variables.get(id) {
-             self.solver
+             let _ = self.solver
                 .add_constraint(vars.x | EQ(MEDIUM) | (x as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested x constraint: {:?}", e));
-            self.solver
+            let _ = self.solver
                 .add_constraint(vars.y | EQ(MEDIUM) | (y as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested y constraint: {:?}", e));
         }
