@@ -37,7 +37,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             stroke_width: 1.0,
             border_radius: 0.0,
         },
-    )];
+    ),
+    builder.new_rectangle(
+        "r3".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("green".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    ),
+      builder.new_rectangle(
+        "r4".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("purple".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    )
+    ];
 
     let mut children_with_pos: Vec<(DiagramTreeNode, Option<Point>)>= children.iter().map(|c| {
         (c.clone(), None)
@@ -52,6 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut constraints = Vec::<SimpleConstraint>::new();
     // R1 should be set to the right of r2
     constraints.push(SimpleConstraint::RightOf("r1".into(), "r2".into()));
+    constraints.push(SimpleConstraint::BottomOf("r3".into(), "r2".into()));
+    constraints.push(SimpleConstraint::TopOf("r4".into(), "r1".into()));
+    constraints.push(SimpleConstraint::RightOf("r1".into(), "r4".into()));
     let root = builder.new_constraint_layout_container("container".to_string(), children_with_pos, constraints);
     layout_tree_node(&mut builder, &root);
     let svg_renderer = svg_renderer::SVGRenderer {};

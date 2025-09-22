@@ -686,8 +686,10 @@ fn render_with_transform(
     entity_id: EntityID,
     content: &str,
 ) {
-    let transform = session.get_transform(entity_id);
+    let transform = session.get_transform(entity_id.clone());
     let transform_str = transform.to_svg_string();
+    println!("transform for entity {} {}", entity_id.clone(), transform_str);
+
 
     if transform_str.is_empty() {
         // No transform, use simple group

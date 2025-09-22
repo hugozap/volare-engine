@@ -1,5 +1,7 @@
 /* Layout calculation for each type of entity */
 
+use std::f32::{INFINITY, NEG_INFINITY};
+
 use crate::components::Float;
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
@@ -706,17 +708,40 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
     let mut container_width = 0.0;
     let mut container_height = 0.0;
 
+    // Negative positions for children are problematic, we compensate by adding an offset
+    // if the element that's most to the left has -10, all elements will be added 10 to x
+
+    let mut min_x:Float = INFINITY;
+    let mut min_y:Float = INFINITY;
+
+    for(_, (x,y,_,_)) in results.clone() {
+        min_x = min_x.min(x);
+        min_y = min_y.min(y)
+    }
+
+    let offset_x = if min_x < 0.0 {
+        min_x.abs()
+    } else {
+        0.0
+    };
+
+    let offset_y = if min_y < 0.0 {
+        min_y.abs()
+    } else {
+        0.0
+    };
+
+    println!("offset_x: {}", offset_x);
+    println!("offset_y: {}", offset_y);
+
     // Set final position and size for children
     for (entity_id, (x,y,width,height)) in results {
-        session.set_position(entity_id.clone(), x, y);
+        println!("constraint variable: {}, x:{}, y:{}, w:{}, h:{}", entity_id.clone(), x, y, width, height);
+        session.set_position(entity_id.clone(), x + offset_x, y+ offset_y);
         session.set_size(entity_id.clone(), width, height);
-
-        println!("Position set for entity {} {},{}", entity_id, x, y);
-
-        //Calculate container bounds
-
-        let right = x + width;
-        let bottom = y + height;
+    
+        let right = x + offset_x + width;
+        let bottom = y + offset_y + height;
         if right > container_width {
             container_width = right;
         }
@@ -726,6 +751,7 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
         }
     }
 
+    println!("container size calculated: {},{}", container_width, container_height);
     session.set_size(container.entity.clone(), container_width, container_height);
     Ok(())
 }

@@ -8,6 +8,8 @@ use std::collections::HashMap;
 pub enum SimpleConstraint {
     AlignLeft(String, String),
     RightOf(String, String),
+    BottomOf(String, String),
+    TopOf(String, String),
 }
 
 pub struct ConstraintSystem {
@@ -80,6 +82,20 @@ impl ConstraintSystem {
                 self.solver
                     .add_constraint(vars1.x | EQ(REQUIRED) |  vars2.x + vars2.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
+            }
+            SimpleConstraint::BottomOf(id1, id2 ) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.y | EQ(REQUIRED) |  vars2.y + vars2.height)
+                    .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
+            }
+            SimpleConstraint::TopOf(id1, id2 ) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.y | EQ(REQUIRED) |  vars2.y - vars2.height)
+                    .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
         }
         Ok(())
