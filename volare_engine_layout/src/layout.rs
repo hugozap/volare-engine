@@ -1,5 +1,7 @@
 /* Layout calculation for each type of entity */
 
+use std::f32::{INFINITY, NEG_INFINITY};
+
 use crate::components::Float;
 use crate::{
     diagram_builder::DiagramTreeNode, DiagramBuilder, EntityID, EntityType, FreeContainer,
@@ -7,8 +9,7 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
-    VerticalAlignment,
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
 };
 
 use crate::transform::Transform;
@@ -656,6 +657,7 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     let mut max_height = 0.0;
 
     for (child_id, desired_position) in &container.children {
+        // TODO: This can be set on creation time
         session.set_position(child_id.clone(), desired_position.0, desired_position.1);
 
         // FIX: Use effective bounds instead of raw size
@@ -676,11 +678,82 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 
-// BETTER FIX: Adjust the arc layout to work with existing renderer expectations
-
 pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     let diameter = shape_arc.radius * 2.0;
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
+}
+
+//TODO: Hay que cambiar, layout no debe crear el constraint system
+// el constraint system se registra en el builder
+pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
+    println!("layout_constraint_container called");
+    let child_sizes:Vec<(String, (Float,Float))> = container.children
+        .iter()
+        .filter_map(|child_id| {
+            Some((child_id.clone(), session.get_size(child_id.clone()).clone()))
+        }).collect();
+        
+    let system = session.get_constraint_system_mut(container.entity.clone());
+
+    // Use existing sizes as suggestions
+    // at this point children already have their sizes calculated
+    for (child_id, (w,h)) in child_sizes{
+            system.suggest_size(child_id.as_str(), w, h).map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
+    }
+
+    // Solve constraints
+    let results = system.solve()?;
+
+    // Apply results
+    let mut container_width = 0.0;
+    let mut container_height = 0.0;
+
+    // Negative positions for children are problematic, we compensate by adding an offset
+    // if the element that's most to the left has -10, all elements will be added 10 to x
+
+    let mut min_x:Float = INFINITY;
+    let mut min_y:Float = INFINITY;
+
+    for(_, (x,y,_,_)) in results.clone() {
+        min_x = min_x.min(x);
+        min_y = min_y.min(y)
+    }
+
+    let offset_x = if min_x < 0.0 {
+        min_x.abs()
+    } else {
+        0.0
+    };
+
+    let offset_y = if min_y < 0.0 {
+        min_y.abs()
+    } else {
+        0.0
+    };
+
+    println!("offset_x: {}", offset_x);
+    println!("offset_y: {}", offset_y);
+
+    // Set final position and size for children
+    for (entity_id, (x,y,width,height)) in results {
+        println!("constraint variable: {}, x:{}, y:{}, w:{}, h:{}", entity_id.clone(), x, y, width, height);
+        session.set_position(entity_id.clone(), x + offset_x, y+ offset_y);
+        session.set_size(entity_id.clone(), width, height);
+    
+        let right = x + offset_x + width;
+        let bottom = y + offset_y + height;
+        if right > container_width {
+            container_width = right;
+        }
+
+        if bottom > container_height {
+            container_height = bottom;
+        }
+    }
+
+    println!("container size calculated: {},{}", container_width, container_height);
+    session.set_size(container.entity.clone(), container_width, container_height);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -782,6 +855,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::FreeContainer => {
             let container = session.get_free_container(root.entity_id.clone()).clone();
             layout_free_container(session, &container);
+        }
+
+        EntityType::ConstraintLayoutContainer => {
+            let container = session.get_constraint_layout(root.entity_id.clone()).clone();
+            layout_constraint_container(session, &container);
         }
 
         EntityType::ArcShape => {

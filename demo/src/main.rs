@@ -3,10 +3,10 @@
 pub mod measure_text;
 
 //import svg_renderer
-use image_renderer::PNGRenderer;
+// use image_renderer::PNGRenderer;
 use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{RectOptions, SizeBehavior};
+use volare_engine_layout::{RectOptions, SimpleConstraint, SizeBehavior};
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
 
 //import layout
@@ -294,8 +294,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
 
+
     // Add the FreeContainer to the table
     table_items.push(container_with_elements);
+
+
+    // Create constraint layout and elements
+    let elem1 = session.new_rectangle("constrained1".to_string(), RectOptions{
+        width_behavior: SizeBehavior::Fixed(50.0),
+        height_behavior: SizeBehavior::Fixed(50.0),
+        fill_color: Fill::Color("red".to_string()),
+        stroke_color: "yellow".to_string(),
+        ..Default::default()
+    });
+    let elem2 = session.new_rectangle("constrained2".to_string(), RectOptions{
+        width_behavior: SizeBehavior::Fixed(50.0),
+        height_behavior: SizeBehavior::Fixed(50.0),
+        fill_color: Fill::Color("black".to_string()),
+        ..Default::default()
+    });
+
+    let constraints = vec![SimpleConstraint::AlignLeft("constrained1".to_string(), "constrained2".to_string())];
+    let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![elem1,elem2], constraints);
+    table_items.push(constraint_container);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();

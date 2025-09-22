@@ -1484,7 +1484,6 @@ edition = "2021"
 #add dep to crate in local workspace
 volare_engine_layout = { path = "../volare_engine_layout" }
 svg_renderer = { path = "../svg_renderer" }
-image_renderer = { path = "../image_renderer" }
 resvg = "0.25.0"
 rusttype = "0.9.3"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -1502,6 +1501,10 @@ path = "src/main.rs"
 [[bin]]
 name = "patterns"
 path = "src/bin/patterns.rs"
+
+[[bin]]
+name = "constraints"
+path = "src/bin/constraints.rs"
 
 
 ===/.gitignore===
@@ -2763,6 +2766,61 @@ fn generate_svg_from_jsonl(
 
     Ok(())
 }
+===/src/bin/constraints.rs===
+// src/bin/intricate_city.rs
+// Demo program that generates an intricate city using only polylines, rects, and free containers
+
+use demo::measure_text::measure_text_svg_character_advance;
+use resvg::usvg::roxmltree::Children;
+use uuid::fmt::Simple;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Cassowary constraints demo...\n");
+    let mut builder = DiagramBuilder::new();
+    let output_dir = std::env::temp_dir().join("constraints_demo");
+    std::fs::create_dir_all(&output_dir)?;
+    let output_path = output_dir.join("constraints1.svg");
+    builder.set_measure_text_fn(measure_text_svg_character_advance);
+    let children = vec![builder.new_rectangle(
+        "r1".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("red".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    ),
+    builder.new_rectangle(
+        "r2".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("blue".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    )];
+
+    let mut constraints = Vec::<SimpleConstraint>::new();
+    constraints.push(SimpleConstraint::AlignLeft("r1".into(), "r2".into()));
+    let root = builder.new_constraint_layout_container("container".to_string(), children, constraints);
+    layout_tree_node(&mut builder, &root);
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&builder, &root, &mut svg_file)?;
+
+    println!("    ✅ Guardado: {}",output_path.to_str().unwrap());
+  
+
+    Ok(())
+}
+
 ===/src/bin/sample_components.rs===
 // src/bin/useful_components_demo.rs
 // A library of practical custom components for real-world usage
@@ -3688,7 +3746,7 @@ pub mod measure_text;
 // This file demonstrates the differences in text positioning and spacing
 // between the SVG and PNG renderers
 
-use image_renderer::PNGRenderer;
+// use image_renderer::PNGRenderer;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{
     renderer_base::Renderer,
@@ -3848,10 +3906,10 @@ pub fn run_comparison_test() -> Result<(), Box<dyn std::error::Error>> {
 pub mod measure_text;
 
 //import svg_renderer
-use image_renderer::PNGRenderer;
+// use image_renderer::PNGRenderer;
 use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{RectOptions, SizeBehavior};
+use volare_engine_layout::{RectOptions, SimpleConstraint, SizeBehavior};
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
 
 //import layout
@@ -4139,8 +4197,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
 
+
     // Add the FreeContainer to the table
     table_items.push(container_with_elements);
+
+
+    // Create constraint layout and elements
+    let elem1 = session.new_rectangle("constrained1".to_string(), RectOptions{
+        width_behavior: SizeBehavior::Fixed(50.0),
+        height_behavior: SizeBehavior::Fixed(50.0),
+        fill_color: Fill::Color("red".to_string()),
+        stroke_color: "yellow".to_string(),
+        ..Default::default()
+    });
+    let elem2 = session.new_rectangle("constrained2".to_string(), RectOptions{
+        width_behavior: SizeBehavior::Fixed(50.0),
+        height_behavior: SizeBehavior::Fixed(50.0),
+        fill_color: Fill::Color("black".to_string()),
+        ..Default::default()
+    });
+
+    let constraints = vec![SimpleConstraint::AlignLeft("constrained1".to_string(), "constrained2".to_string())];
+    let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![elem1,elem2], constraints);
+    table_items.push(constraint_container);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
@@ -4231,6 +4310,8 @@ edition = "2021"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 textwrap = "0.16.2"
+cassowary = "0.3"
+anyhow = "1.0.99"
 
 ===/Cargo.lock===
 # This file is automatically @generated by Cargo.
@@ -4253,6 +4334,10 @@ Each entity follows this format:
 ```json
 {"id": "unique_id", "type": "entity_type", "attribute1": "value1", "attribute2": "value2"}
 ```
+
+## The first element must be the root container
+
+The first element needs to be the root container with children for the layout to work correctly.
 
 ## Core Entity Types
 
@@ -4655,8 +4740,7 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    HorizontalAlignment, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
-    VerticalAlignment,
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
 };
 
 use crate::transform::Transform;
@@ -5177,10 +5261,10 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         let content_width = elem_bounds.width + table.table_options.cell_padding as Float * 2.0;
         let content_height = elem_bounds.height + table.table_options.cell_padding as Float * 2.0;
         if content_width > col_widths[col] {
-            col_widths[col] = content_width + table.table_options.cell_padding as Float * 2.0;
+            col_widths[col] = content_width;
         }
         if content_height > row_heights[row] {
-            row_heights[row] = content_height + table.table_options.cell_padding as Float * 2.0;
+            row_heights[row] = content_height;
         }
     }
 
@@ -5324,11 +5408,57 @@ pub fn layout_free_container(session: &mut DiagramBuilder, container: &FreeConta
     session.set_size(container.entity.clone(), max_width, max_height);
 }
 
-// BETTER FIX: Adjust the arc layout to work with existing renderer expectations
-
 pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     let diameter = shape_arc.radius * 2.0;
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
+}
+
+//TODO: Hay que cambiar, layout no debe crear el constraint system
+// el constraint system se registra en el builder
+pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
+    println!("layout_constraint_container called");
+    let child_sizes:Vec<(String, (Float,Float))> = container.children
+        .iter()
+        .filter_map(|child_id| {
+            Some((child_id.clone(), session.get_size(child_id.clone()).clone()))
+        }).collect();
+    
+    let system = session.get_constraint_system_mut(container.entity.clone());
+
+    // Use existing sizes as suggestions
+    for (child_id, (w,h)) in child_sizes{
+            system.suggest_size(child_id.as_str(), w, h).map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
+    }
+
+    // Solve constraints
+    let results = system.solve()?;
+
+    // Apply results
+    let mut container_width = 0.0;
+    let mut container_height = 0.0;
+
+    for (entity_id, (x,y,width,height)) in results {
+        session.container_relative_positions.insert(
+            entity_id.clone(),
+            Point::new(x, y)
+        );
+        session.set_size(entity_id.clone(), width, height);
+
+        //Calculate container bounds
+
+        let right = x + width;
+        let bottom = y + height;
+        if right > container_width {
+            container_width = right;
+        }
+
+        if bottom > container_height {
+            container_height = bottom;
+        }
+    }
+
+    session.set_size(container.entity.clone(), container_width, container_height);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -5430,6 +5560,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         EntityType::FreeContainer => {
             let container = session.get_free_container(root.entity_id.clone()).clone();
             layout_free_container(session, &container);
+        }
+
+        EntityType::ConstraintLayoutContainer => {
+            let container = session.get_constraint_layout(root.entity_id.clone()).clone();
+            layout_constraint_container(session, &container);
         }
 
         EntityType::ArcShape => {
@@ -5547,6 +5682,7 @@ fn test_box_fixed_size() {
 
 pub use crate::diagram_builder::{DiagramBuilder};
 pub use crate::components::*;
+pub use crate::constraints::*;
 pub use crate::layout::*;
 pub use crate::utils::*;
 pub use crate::renderer_base::*;
@@ -5554,6 +5690,7 @@ pub use crate::renderer_base::*;
 pub mod diagram_builder;
 pub mod utils;
 pub mod components;
+pub mod constraints;
 pub mod layout;
 pub mod renderer_base;
 pub mod parser;
@@ -5718,6 +5855,7 @@ pub mod rotation_tests;
 ===/src/components/mod.rs===
 pub mod table;
 
+use crate::constraints::{ConstraintSystem, SimpleConstraint};
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
@@ -5800,6 +5938,7 @@ pub enum EntityType {
     FreeContainer,
     ArcShape,
     SpacerShape,
+    ConstraintLayoutContainer,
 }
 
 #[derive(Debug, Copy, PartialEq)]
@@ -6797,6 +6936,45 @@ impl ShapeImage {
     }
 }
 
+// A container that uses constraints to position its children
+pub struct ConstraintLayoutContainer {
+    pub entity: EntityID,
+    pub children: Vec<EntityID>,
+}
+
+impl Clone for ConstraintLayoutContainer {
+    fn clone(&self) -> Self {
+        ConstraintLayoutContainer {
+            entity: self.entity.clone(),
+            children: self.children.clone(),
+        }
+    }
+}
+
+
+impl Entity for ConstraintLayoutContainer {
+    fn get_id(&self) -> EntityID {
+        self.entity.clone()
+    }
+
+    fn get_type(&self) -> EntityType {
+        EntityType::ConstraintLayoutContainer
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ConstraintLayoutContainer {
+    pub fn new(entity: EntityID)->Self{
+        ConstraintLayoutContainer{
+            entity: entity,
+            children: Vec::new(),
+        }
+    }
+}
+
 /// A container that allows children to be positioned with absolute coordinates
 /// Children's positions are relative to the container's top-left corner
 pub struct FreeContainer {
@@ -6907,9 +7085,9 @@ impl ArcOptions {
 // Arc shape structure
 pub struct ShapeArc {
     pub entity: EntityID,
-    pub radius: Float,          // Radius of the arc
-    pub start_angle: Float,     // Start angle in degrees
-    pub end_angle: Float,       // End angle in degrees
+    pub radius: Float,      // Radius of the arc
+    pub start_angle: Float, // Start angle in degrees
+    pub end_angle: Float,   // End angle in degrees
     pub arc_options: ArcOptions,
 }
 
@@ -8733,7 +8911,7 @@ impl JsonLinesParser {
 use crate::components::*;
 
 ===/src/diagram_builder.rs===
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 /**
  * This object encapsulates diagram creation logic.
@@ -8748,7 +8926,7 @@ use std::{collections::HashMap, sync::Arc};
  *
  */
 //use TextOptions
-use crate::{components::*, transform::Transform, BoundingBox};
+use crate::{components::*, transform::Transform, BoundingBox, ConstraintSystem, SimpleConstraint};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
@@ -8775,6 +8953,8 @@ pub struct DiagramBuilder {
     images: HashMap<EntityID, ShapeImage>,
     polylines: HashMap<EntityID, PolyLine>,
     free_containers: HashMap<EntityID, FreeContainer>,
+    constraint_layout_containers: HashMap<EntityID, ConstraintLayoutContainer>,
+    constraint_systems: HashMap<EntityID, ConstraintSystem>,
     arcs: HashMap<EntityID, ShapeArc>,
     spacers: HashMap<EntityID, ShapeSpacer>,
     pub custom_components: CustomComponentRegistry,
@@ -8836,8 +9016,11 @@ impl DiagramBuilder {
             images: HashMap::new(),
             polylines: HashMap::new(),
             free_containers: HashMap::new(),
+            constraint_layout_containers: HashMap::new(),
+            constraint_systems: HashMap::new(),
             arcs: HashMap::new(),
             spacers: HashMap::new(),
+
             custom_components: CustomComponentRegistry::new(),
         }
     }
@@ -9024,7 +9207,6 @@ impl DiagramBuilder {
         self.set_transform(entity_id, transform);
     }
 
-
     pub fn set_scale(&mut self, entity_id: EntityID, sx: Float, sy: Float) {
         let current = self.get_transform(entity_id.clone()).clone();
         let scale = Transform::scale(sx, sy);
@@ -9094,13 +9276,7 @@ impl DiagramBuilder {
         options: ArcOptions,
     ) -> DiagramTreeNode {
         let arc_id = self.new_entity(id, EntityType::ArcShape);
-        let arc = ShapeArc::new(
-            arc_id.clone(),
-            radius,
-            start_angle,
-            end_angle,
-            options,
-        );
+        let arc = ShapeArc::new(arc_id.clone(), radius, start_angle, end_angle, options);
         self.arcs.insert(arc_id.clone(), arc);
         DiagramTreeNode::new(EntityType::ArcShape, arc_id)
     }
@@ -9267,7 +9443,7 @@ impl DiagramBuilder {
         options: EllipseOptions,
     ) -> DiagramTreeNode {
         let ellipse_id = self.new_entity(id, EntityType::EllipseShape);
-        let ellipse = ShapeEllipse::new(ellipse_id.clone(),radius, options);
+        let ellipse = ShapeEllipse::new(ellipse_id.clone(), radius, options);
         self.ellipses.insert(ellipse_id.clone(), ellipse);
         DiagramTreeNode::new(EntityType::EllipseShape, ellipse_id.clone())
     }
@@ -9445,6 +9621,55 @@ impl DiagramBuilder {
 
         node
     }
+
+    pub fn new_constraint_layout_container(
+        &mut self,
+        id: EntityID,
+        children: Vec<DiagramTreeNode>,
+        constraints: Vec<crate::SimpleConstraint>,
+    ) -> DiagramTreeNode {
+        let container_id = self.new_entity(id.clone(), EntityType::ConstraintLayoutContainer);
+
+        // Create the free container
+        let mut container = ConstraintLayoutContainer::new(container_id.clone());
+        // Create the constraint system
+        let mut constraint_system = ConstraintSystem::new();
+
+        if let Err(e) = constraint_system.add_entity(id.clone()) {
+            eprintln!("Failed to add container to entity: {}", id.clone());
+        }
+
+        for child in &children {
+            if let Err(e) = constraint_system.add_entity(child.entity_id.clone()) {
+                eprintln!("Failed to add child entity {}: {}", child.entity_id.clone(), e);
+            }
+        }
+
+
+        // Add constraints to system
+        for constraint in constraints {
+            constraint_system.add_constraint(constraint);
+        }
+
+                // store the constraint system for this container
+        self.constraint_systems.insert(id.clone(), constraint_system);
+        self.constraint_layout_containers.insert(id.clone(), container);
+
+
+
+        // Create the node for the tree
+        let mut node = DiagramTreeNode {
+            entity_type: EntityType::ConstraintLayoutContainer,
+            entity_id: container_id.clone(),
+            children: Vec::new(),
+        };
+
+        for child_node in children {
+            node.add_child(child_node);
+        }
+
+        node
+    }
 }
 
 // element list accessors
@@ -9517,6 +9742,22 @@ impl DiagramBuilder {
 
     pub fn get_free_container_mut(&mut self, id: EntityID) -> &mut FreeContainer {
         self.free_containers.get_mut(&id).unwrap()
+    }
+
+    pub fn get_constraint_layout(&self, id: EntityID) -> &ConstraintLayoutContainer {
+        &self.constraint_layout_containers[&id]
+    }
+
+    pub fn get_constraint_layout_mut(&mut self, id: EntityID) -> &mut ConstraintLayoutContainer {
+        self.constraint_layout_containers.get_mut(&id).unwrap()
+    }
+
+    pub fn get_constraint_system(&mut self, id: EntityID) -> &ConstraintSystem {
+        self.constraint_systems.get(&id).unwrap()
+    }
+
+     pub fn get_constraint_system_mut(&mut self, id: EntityID) -> &mut ConstraintSystem {
+        self.constraint_systems.get_mut(&id).unwrap()
     }
 
     pub fn get_arc(&self, id: EntityID) -> &ShapeArc {
@@ -9781,6 +10022,10 @@ fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
             render_free_container(session, &mut svg, entity_id, node);
         }
 
+        EntityType::ConstraintLayoutContainer => {
+            render_constraint_layout_container(session, &mut svg, entity_id, node);
+        }
+
         EntityType::RectShape => {
             render_rectangle(session, &mut svg, entity_id, node);
         }
@@ -9905,6 +10150,29 @@ fn render_free_container(
             size.0, size.1, bg_color
         ));
     }
+
+    // Render all children
+    for child in node.children.iter() {
+        container_content.push_str(&render_node(child, session));
+    }
+
+    render_with_transform(session, svg, entity_id, &container_content);
+}
+
+
+
+fn render_constraint_layout_container(
+    session: &DiagramBuilder,
+    svg: &mut String,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+) {
+    let size = session.get_size(entity_id.clone());
+    let container = session.get_constraint_layout(entity_id.clone());
+
+    //No background rectangle
+
+    let mut container_content = String::new();
 
     // Render all children
     for child in node.children.iter() {
@@ -10386,72 +10654,6 @@ fn assertIsSameSVG(a: &str, b: &str) {
     assert_eq!(
         strA.replace('\n', "").replace('\r', ""),
         strB.replace('\n', "").replace('\r', "")
-    );
-}
-
-//test line
-#[test]
-fn test_render_line() {
-    let options = LineOptions {
-        stroke_color: "black".to_string(),
-        stroke_width: 1.0,
-    };
-    let mut session = DiagramBuilder::new();
-    let line = session.new_line("line".to_string(), (0.0, 0.0), (0.0, 0.0), options);
-
-    let node = render_node(&line, &session);
-    assert_eq!(
-        node,
-        r#"<g transform="translate(0 0)" ><line x1="0" y1="0" x2="0" y2="0" stroke="black" stroke-width="1" /></g>"#
-    );
-}
-
-//test eclipse
-#[test]
-fn test_render_ellipse() {
-    let options = EllipseOptions {
-        fill_color: "white".to_string(),
-        stroke_color: "black".to_string(),
-        stroke_width: 1.0,
-    };
-    let mut session = DiagramBuilder::new();
-    let ellipse = session.new_elipse("ellipse".to_string(), (0.0, 0.0), (0.0, 0.0), options);
-
-    let node = render_node(&ellipse, &session);
-    assertIsSameSVG(
-        &node,
-        r#"
-        <g transform="translate(0 0)" >
-            <ellipse cx="0" cy="0" rx="0" ry="0" stroke="black" stroke-width="1" fill="white" />
-        </g>"#,
-    );
-}
-
-#[test]
-fn test_render_box_rounded_corners_with_group() {
-    let mut session = DiagramBuilder::new();
-    let group = session.new_group("group".to_string(), Vec::new());
-    let box_ = session.new_box(
-        "box".to_string(),
-        group,
-        BoxOptions {
-            fill_color: Fill::Color("white".to_string()),
-            stroke_color: "black".to_string(),
-            stroke_width: 1.0,
-            padding: 0.0,
-            border_radius: 5.5,
-            width_behavior: SizeBehavior::Content, // 0 + 2*0 (padding)
-            height_behavior: SizeBehavior::Content, // 0 + 2*0
-        },
-    );
-    let node = render_node(&box_, &session);
-    assertIsSameSVG(
-        &node,
-        r#"<g transform="translate(0 0)" >
-            <rect x="0" y="0" width="0" height="0" fill="white" stroke="black" stroke-width="1" rx="5.5" ry="5.5" />
-            <g transform="translate(0 0)" >
-            </g>
-        </g>"#,
     );
 }
 
