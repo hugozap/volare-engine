@@ -9,10 +9,11 @@ Each entity follows this format:
 ```json
 {"id": "unique_id", "type": "entity_type", "attribute1": "value1", "attribute2": "value2"}
 ```
+### JSON Format notes:
+- **Don't add formatted json!, every line must contain only one complete element declaration**
+- **The first element needs to be the root container with children for the layout to be valid**
+- **It's ok if the children have not been defined before a container references them**
 
-## The first element must be the root container
-
-The first element needs to be the root container with children for the layout to work correctly.
 
 ## Core Entity Types
 
@@ -383,16 +384,6 @@ The constraint layout container is declared with its children and constraints:
 
 ```jsonl
 {"type": "constraint_container", "id": "layout1", "children": ["rect1", "rect2", "rect3"], "constraints": []}
-```
-
-## Child Entity Declaration Format
-
-Child entities must be declared before the container:
-
-```jsonl
-{"type": "rect", "id": "rect1", "width": 100, "height": 50, "fill": "blue"}
-{"type": "rect", "id": "rect2", "width": 80, "height": 40, "fill": "red"}  
-{"type": "text", "id": "text1", "content": "Hello World", "font_size": 16}
 ```
 
 ## Inline Constraint Declaration
