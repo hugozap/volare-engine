@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 
 use crate::transform::Transform;
-use crate::{components::*, diagram_builder::*, DiagramBuilder};
+use crate::{components::*, diagram_builder::*, DiagramBuilder, SimpleConstraint};
 
 /// Simplified JSON Lines entity with only essential fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +25,321 @@ impl Default for JsonEntity {
             id: String::new(),
             entity_type: String::new(),
             attributes: Map::new(),
+        }
+    }
+}
+
+// Add this enum after JsonEntity struct
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(tag = "type")]
+pub enum ConstraintDeclaration {
+    #[serde(rename = "align_left")]
+    AlignLeft { entities: Vec<String> },
+    #[serde(rename = "align_right")]
+    AlignRight { entities: Vec<String> },
+    #[serde(rename = "align_top")]
+    AlignTop { entities: Vec<String> },
+    #[serde(rename = "align_bottom")]
+    AlignBottom { entities: Vec<String> },
+    #[serde(rename = "align_center_horizontal")]
+    AlignCenterHorizontal { entities: Vec<String> },
+    #[serde(rename = "align_center_vertical")]
+    AlignCenterVertical { entities: Vec<String> },
+    #[serde(rename = "right_of")]
+    RightOf { entities: Vec<String> },
+    #[serde(rename = "left_of")]
+    LeftOf { entities: Vec<String> },
+    #[serde(rename = "above")]
+    Above { entities: Vec<String> },
+    #[serde(rename = "below")]
+    Below { entities: Vec<String> },
+    #[serde(rename = "horizontal_spacing")]
+    HorizontalSpacing {
+        entities: Vec<String>,
+        spacing: Float,
+    },
+    #[serde(rename = "vertical_spacing")]
+    VerticalSpacing {
+        entities: Vec<String>,
+        spacing: Float,
+    },
+    #[serde(rename = "stack_horizontal")]
+    StackHorizontal {
+        entities: Vec<String>,
+        spacing: Float,
+    },
+    #[serde(rename = "stack_vertical")]
+    StackVertical {
+        entities: Vec<String>,
+        spacing: Float,
+    },
+    #[serde(rename = "fixed_distance")]
+    FixedDistance {
+        entities: Vec<String>,
+        distance: Float,
+    },
+    #[serde(rename = "same_width")]
+    SameWidth { entities: Vec<String> },
+    #[serde(rename = "same_height")]
+    SameHeight { entities: Vec<String> },
+    #[serde(rename = "same_size")]
+    SameSize { entities: Vec<String> },
+    #[serde(rename = "proportional_width")]
+    ProportionalWidth { entities: Vec<String>, ratio: Float },
+    #[serde(rename = "proportional_height")]
+    ProportionalHeight { entities: Vec<String>, ratio: Float },
+    #[serde(rename = "aspect_ratio")]
+    AspectRatio { entity: String, ratio: Float },
+    #[serde(rename = "distribute_horizontally")]
+    DistributeHorizontally { entities: Vec<String> },
+    #[serde(rename = "distribute_vertically")]
+    DistributeVertically { entities: Vec<String> },
+}
+
+fn convert_constraint_declaration(
+    decl: &ConstraintDeclaration,
+) -> Result<SimpleConstraint, JsonLinesError> {
+    match decl {
+        ConstraintDeclaration::AlignLeft { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "align_left requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::AlignLeft(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::AlignRight { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "align_right requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::AlignRight(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::AlignTop { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "align_top requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::AlignTop(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::AlignBottom { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "align_bottom requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::AlignBottom(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::AlignCenterHorizontal { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "align_center_horizontal requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::AlignCenterHorizontal(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::AlignCenterVertical { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "align_center_vertical requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::AlignCenterVertical(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::RightOf { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "right_of requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::RightOf(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::LeftOf { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "left_of requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::LeftOf(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::Above { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "above requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::Above(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::Below { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "below requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::Below(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::HorizontalSpacing { entities, spacing } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "horizontal_spacing requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::HorizontalSpacing(
+                entities[0].clone(),
+                entities[1].clone(),
+                *spacing,
+            ))
+        }
+        ConstraintDeclaration::VerticalSpacing { entities, spacing } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "vertical_spacing requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::VerticalSpacing(
+                entities[0].clone(),
+                entities[1].clone(),
+                *spacing,
+            ))
+        }
+        ConstraintDeclaration::StackHorizontal { entities, spacing } => {
+            if entities.len() < 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "stack_horizontal requires at least 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::StackHorizontal(
+                entities.clone(),
+                *spacing,
+            ))
+        }
+        ConstraintDeclaration::StackVertical { entities, spacing } => {
+            if entities.len() < 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "stack_vertical requires at least 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::StackVertical(entities.clone(), *spacing))
+        }
+        ConstraintDeclaration::FixedDistance { entities, distance } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "fixed_distance requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::FixedDistance(
+                entities[0].clone(),
+                entities[1].clone(),
+                *distance,
+            ))
+        }
+        ConstraintDeclaration::SameWidth { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "same_width requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::SameWidth(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::SameHeight { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "same_height requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::SameHeight(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::SameSize { entities } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "same_size requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::SameSize(
+                entities[0].clone(),
+                entities[1].clone(),
+            ))
+        }
+        ConstraintDeclaration::ProportionalWidth { entities, ratio } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "proportional_width requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::ProportionalWidth(
+                entities[0].clone(),
+                entities[1].clone(),
+                *ratio,
+            ))
+        }
+        ConstraintDeclaration::ProportionalHeight { entities, ratio } => {
+            if entities.len() != 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "proportional_height requires exactly 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::ProportionalHeight(
+                entities[0].clone(),
+                entities[1].clone(),
+                *ratio,
+            ))
+        }
+        ConstraintDeclaration::AspectRatio { entity, ratio } => {
+            Ok(SimpleConstraint::AspectRatio(entity.clone(), *ratio))
+        }
+        ConstraintDeclaration::DistributeHorizontally { entities } => {
+            if entities.len() < 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "distribute_horizontally requires at least 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::DistributeHorizontally(entities.clone()))
+        }
+        ConstraintDeclaration::DistributeVertically { entities } => {
+            if entities.len() < 2 {
+                return Err(JsonLinesError::ConstraintError(
+                    "distribute_vertically requires at least 2 entities".to_string(),
+                ));
+            }
+            Ok(SimpleConstraint::DistributeVertically(entities.clone()))
         }
     }
 }
@@ -155,12 +470,15 @@ fn parse_transform_attributes(
     entity_id: EntityID,
 ) {
     println!("🔍 Parsing transforms for entity: {}", entity_id);
-    println!("🔍 Available attributes: {:?}", obj.keys().collect::<Vec<_>>());
-    
+    println!(
+        "🔍 Available attributes: {:?}",
+        obj.keys().collect::<Vec<_>>()
+    );
+
     let mut transform = Transform::identity();
 
     // Parse individual transform properties
-     // Store container-relative position separately
+    // Store container-relative position separately
     if let Some(x) = obj.get("x").and_then(|v| v.as_f64()) {
         if let Some(y) = obj.get("y").and_then(|v| v.as_f64()) {
             session.set_container_relative_position(entity_id.clone(), x as Float, y as Float);
@@ -172,7 +490,10 @@ fn parse_transform_attributes(
         .or_else(|| obj.get("rotate"))
         .and_then(|v| v.as_f64())
     {
-        println!("🔄 Found rotation: {} degrees for entity {}", rotation, entity_id);
+        println!(
+            "🔄 Found rotation: {} degrees for entity {}",
+            rotation, entity_id
+        );
         transform = transform.combine(&Transform::rotation(rotation as Float));
     } else {
         println!("❌ No rotation found for entity {}", entity_id);
@@ -445,7 +766,7 @@ impl JsonLinesParser {
                     height_behavior,
                 };
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_box(entity_id.to_string(), child, options))
@@ -473,7 +794,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_vstack(entity_id.to_string(), child_nodes?, halign))
@@ -501,7 +822,7 @@ impl JsonLinesParser {
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_hstack(entity_id.to_string(), child_nodes?, valign))
@@ -515,7 +836,7 @@ impl JsonLinesParser {
                     .iter()
                     .map(|child_id| self.build_entity(child_id, builder))
                     .collect();
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_group(entity_id.to_string(), child_nodes?))
@@ -548,7 +869,7 @@ impl JsonLinesParser {
                     ),
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                 };
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_rectangle(entity_id.to_string(), options))
@@ -577,14 +898,13 @@ impl JsonLinesParser {
                     stroke_width: get_float_attr(&entity.attributes, &["stroke_width"], 1.0),
                 };
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_line(entity_id.to_string(), start_point, end_point, options))
             }
 
             "ellipse" => {
-
                 let radius = get_point_attr(
                     &entity.attributes,
                     &["rx", "radius_x"],
@@ -610,10 +930,10 @@ impl JsonLinesParser {
                     ),
                 };
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_elipse(entity_id.to_string(),radius, options))
+                Ok(builder.new_elipse(entity_id.to_string(), radius, options))
             }
 
             "arc" => {
@@ -637,7 +957,7 @@ impl JsonLinesParser {
                     filled: get_bool_attr(&entity.attributes, &["filled"], false),
                 };
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
                 Ok(builder.new_arc(
@@ -675,10 +995,10 @@ impl JsonLinesParser {
                     filled: get_bool_attr(&entity.attributes, &["filled"], false),
                 };
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_arc(entity_id.to_string(),radius, start, end, options))
+                Ok(builder.new_arc(entity_id.to_string(), radius, start, end, options))
             }
 
             "quarter_circle" => {
@@ -700,15 +1020,10 @@ impl JsonLinesParser {
                     filled: get_bool_attr(&entity.attributes, &["filled"], false),
                 };
 
-                  // Parse and apply transforms
+                // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_quarter_circle(
-                    entity_id.to_string(),
-                    radius,
-                    quadrant,
-                    options,
-                ))
+                Ok(builder.new_quarter_circle(entity_id.to_string(), radius, quadrant, options))
             }
 
             "image" => {
@@ -727,7 +1042,7 @@ impl JsonLinesParser {
                         (width_behavior, height_behavior),
                     ))
                 } else if !file_path.is_empty() {
-                     parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+                    parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
                     Ok(builder.new_image_from_file(
                         entity_id.to_string(),
                         &file_path,
@@ -768,7 +1083,7 @@ impl JsonLinesParser {
                 };
 
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
-                
+
                 Ok(builder.new_table(entity_id.to_string(), child_nodes?, cols, options))
             }
 
@@ -799,10 +1114,13 @@ impl JsonLinesParser {
                         .entities
                         .get(&child_id)
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
-                    
+
                     let child_node = self.build_entity(&child_id, builder)?;
                     let pos = builder.get_container_relative_position(&child_id);
-                    println!("📍 Free container adding child: {} at position: ({}, {})", child_id, pos.x, pos.y);
+                    println!(
+                        "📍 Free container adding child: {} at position: ({}, {})",
+                        child_id, pos.x, pos.y
+                    );
 
                     positioned_children.push((child_node, (pos.x, pos.y)));
                 }
@@ -811,6 +1129,55 @@ impl JsonLinesParser {
                 Ok(builder.new_free_container(entity_id.to_string(), positioned_children))
             }
 
+            "constraint_container" => {
+                let children = get_array_attr(&entity.attributes, "children").unwrap_or_default();
+
+                // Parse inline constraints if present
+                let mut constraints = Vec::new();
+                if let Some(constraints_attr) = entity.attributes.get("constraints") {
+                    if let Some(constraints_array) = constraints_attr.as_array() {
+                        for constraint_val in constraints_array {
+                            if let Ok(constraint_decl) =
+                                serde_json::from_value::<ConstraintDeclaration>(
+                                    constraint_val.clone(),
+                                )
+                            {
+                                let simple_constraint =
+                                    convert_constraint_declaration(&constraint_decl)?;
+                                constraints.push(simple_constraint);
+                            }
+                        }
+                    }
+                }
+
+                let mut children_with_pos = Vec::new();
+                for child_id in children {
+                    let _child_entity = self
+                        .entities
+                        .get(&child_id)
+                        .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
+
+                    let child_node = self.build_entity(&child_id, builder)?;
+                    let pos = builder.get_container_relative_position(&child_id);
+
+                    // For constraint containers, position is optional (constraints determine positioning)
+                    let suggest_pos = if pos.x != 0.0 || pos.y != 0.0 {
+                        Some(pos)
+                    } else {
+                        None
+                    };
+
+                    children_with_pos.push((child_node, suggest_pos));
+                }
+
+                parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
+
+                Ok(builder.new_constraint_layout_container(
+                    entity_id.to_string(),
+                    children_with_pos,
+                    constraints,
+                ))
+            }
             _ => Err(JsonLinesError::UnknownEntityType(
                 entity.entity_type.clone(),
             )),
@@ -1021,6 +1388,7 @@ pub enum JsonLinesError {
     MissingChild { parent: String, child: String },
     NoEntities,
     IoError(String),
+    ConstraintError(String),
 }
 
 impl std::fmt::Display for JsonLinesError {
@@ -1040,6 +1408,7 @@ impl std::fmt::Display for JsonLinesError {
             }
             JsonLinesError::NoEntities => write!(f, "No entities found"),
             JsonLinesError::IoError(msg) => write!(f, "IO error: {}", msg),
+            JsonLinesError::ConstraintError(msg) => write!(f, "Constraint error: {}", msg),
         }
     }
 }
@@ -1211,72 +1580,82 @@ pub fn example_llm_generated_jsonl() -> &'static str {
 {"id":"footer","type":"text","content":"Copyright 2024","font_size":10,"color":"gray"}"#
 }
 
-
-
 #[cfg(test)]
 mod transform_debug_tests {
     use super::*;
     use crate::DiagramBuilder;
-    
+
     #[test]
     fn test_transform_parsing_debug() {
         println!("🧪 Testing transform parsing...");
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as f32 * 8.0, 16.0));
-        
+
         // Create a simple JSON object with rotation
         let mut attributes = serde_json::Map::new();
-        attributes.insert("rotation".to_string(), serde_json::Value::Number(serde_json::Number::from(45)));
-        attributes.insert("width".to_string(), serde_json::Value::Number(serde_json::Number::from(60)));
-        attributes.insert("height".to_string(), serde_json::Value::Number(serde_json::Number::from(40)));
-        
+        attributes.insert(
+            "rotation".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(45)),
+        );
+        attributes.insert(
+            "width".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(60)),
+        );
+        attributes.insert(
+            "height".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(40)),
+        );
+
         println!("🔍 Attributes: {:?}", attributes);
-        
+
         // Test the function directly
         parse_transform_attributes(&attributes, &mut builder, "test_entity".to_string());
-        
+
         // Check if the transform was applied
         let transform = builder.get_transform("test_entity".to_string());
         println!("📐 Result transform: {:?}", transform);
-        
+
         // Check if it's not just identity
-        let is_identity = transform.matrix[0] == 1.0 && 
-                         transform.matrix[1] == 0.0 && 
-                         transform.matrix[2] == 0.0 && 
-                         transform.matrix[3] == 1.0 &&
-                         transform.matrix[4] == 0.0 && 
-                         transform.matrix[5] == 0.0;
-        
+        let is_identity = transform.matrix[0] == 1.0
+            && transform.matrix[1] == 0.0
+            && transform.matrix[2] == 0.0
+            && transform.matrix[3] == 1.0
+            && transform.matrix[4] == 0.0
+            && transform.matrix[5] == 0.0;
+
         println!("❓ Is identity transform: {}", is_identity);
-        assert!(!is_identity, "Transform should not be identity - rotation should be applied!");
+        assert!(
+            !is_identity,
+            "Transform should not be identity - rotation should be applied!"
+        );
     }
-    
+
     #[test]
     fn test_full_parser_with_rotation() {
         println!("🧪 Testing full parser with rotation...");
-        
+
         let input = r#"{"id":"test_rect","type":"rect","width":60,"height":40,"background":"red","rotation":45}"#;
-        
+
         let mut parser = JsonLinesParser::new();
         let root_id = parser.parse_string(input).unwrap();
-        
+
         let mut builder = DiagramBuilder::new();
         builder.set_measure_text_fn(|text, _| (text.len() as f32 * 8.0, 16.0));
-        
+
         let diagram = parser.build(&root_id, &mut builder).unwrap();
-        
+
         // Check the transform
         let transform = builder.get_transform("test_rect".to_string());
         println!("📐 Full parser result transform: {:?}", transform);
-        
-        let is_identity = transform.matrix[0] == 1.0 && 
-                         transform.matrix[1] == 0.0 && 
-                         transform.matrix[2] == 0.0 && 
-                         transform.matrix[3] == 1.0 &&
-                         transform.matrix[4] == 0.0 && 
-                         transform.matrix[5] == 0.0;
-        
+
+        let is_identity = transform.matrix[0] == 1.0
+            && transform.matrix[1] == 0.0
+            && transform.matrix[2] == 0.0
+            && transform.matrix[3] == 1.0
+            && transform.matrix[4] == 0.0
+            && transform.matrix[5] == 0.0;
+
         println!("❓ Full parser - Is identity transform: {}", is_identity);
         assert!(!is_identity, "Full parser should apply rotation!");
     }
@@ -1285,22 +1664,31 @@ mod transform_debug_tests {
 // Also add this debug function to see what's happening during build_entity calls:
 impl JsonLinesParser {
     // Add this method to your existing JsonLinesParser impl
-    pub fn debug_build_entity(&mut self, entity_id: &str, builder: &mut DiagramBuilder) -> Result<DiagramTreeNode, JsonLinesError> {
+    pub fn debug_build_entity(
+        &mut self,
+        entity_id: &str,
+        builder: &mut DiagramBuilder,
+    ) -> Result<DiagramTreeNode, JsonLinesError> {
         println!("🏗️ Building entity: {}", entity_id);
-        
-        let entity = self.entities.get(entity_id)
+
+        let entity = self
+            .entities
+            .get(entity_id)
             .ok_or_else(|| JsonLinesError::EntityNotFound(entity_id.to_string()))?;
-        
+
         println!("🏗️ Entity type: {}", entity.entity_type);
-        println!("🏗️ Entity attributes: {:?}", entity.attributes.keys().collect::<Vec<_>>());
-        
+        println!(
+            "🏗️ Entity attributes: {:?}",
+            entity.attributes.keys().collect::<Vec<_>>()
+        );
+
         // Check if rotation attribute exists
         if let Some(rotation_value) = entity.attributes.get("rotation") {
             println!("🔄 Found rotation attribute: {:?}", rotation_value);
         } else {
             println!("❌ No rotation attribute found");
         }
-        
+
         // Call the original build_entity
         self.build_entity(entity_id, builder)
     }

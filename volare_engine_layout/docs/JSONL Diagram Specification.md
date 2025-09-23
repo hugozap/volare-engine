@@ -371,3 +371,182 @@ This creates a document layout with header, sidebar navigation, main content are
 - Container-relative positioning (`x`, `y`) is handled separately from transforms
 - Size behaviors allow for responsive layouts with content-based or fixed sizing
 - All supported entity types are handled in the `build_entity` match statement in parser.rs
+
+# JSONL Format for Constraint Layout Container
+
+## Overview
+This JSONL format is designed specifically for declaring constraint layout containers in your system. Since constraints are only supported within constraint layout containers, the format focuses on defining the container and its child entities with their associated constraints.
+
+## Container Declaration Format
+
+The constraint layout container is declared with its children and constraints:
+
+```jsonl
+{"type": "constraint_container", "id": "layout1", "children": ["rect1", "rect2", "rect3"], "constraints": []}
+```
+
+## Child Entity Declaration Format
+
+Child entities must be declared before the container:
+
+```jsonl
+{"type": "rect", "id": "rect1", "width": 100, "height": 50, "fill": "blue"}
+{"type": "rect", "id": "rect2", "width": 80, "height": 40, "fill": "red"}  
+{"type": "text", "id": "text1", "content": "Hello World", "font_size": 16}
+```
+
+## Inline Constraint Declaration
+
+Constraints can be declared inline within the container definition:
+
+```jsonl
+{
+  "type": "constraint_container", 
+  "id": "layout1", 
+  "children": ["rect1", "rect2", "rect3"],
+  "constraints": [
+    {"type": "align_left", "entities": ["rect1", "rect2"]},
+    {"type": "below", "entities": ["rect2", "rect1"]},
+    {"type": "horizontal_spacing", "entities": ["rect1", "rect3"], "spacing": 20.0}
+  ]
+}
+```
+
+## Complete Example
+
+```jsonl
+{"type": "comment", "text": "Dashboard layout with constraint-based positioning"}
+
+{"type": "rect", "id": "header", "width": 400, "height": 60, "fill": "navy"}
+{"type": "rect", "id": "sidebar", "width": 150, "height": 300, "fill": "lightgray"}
+{"type": "rect", "id": "content", "width": 250, "height": 300, "fill": "white"}
+{"type": "rect", "id": "footer", "width": 400, "height": 40, "fill": "darkgray"}
+
+{
+  "type": "constraint_container",
+  "id": "dashboard_layout", 
+  "children": ["header", "sidebar", "content", "footer"],
+  "constraints": [
+    {"type": "align_left", "entities": ["header", "sidebar"]},
+    {"type": "right_of", "entities": ["content", "sidebar"]},
+    {"type": "below", "entities": ["sidebar", "header"]},
+    {"type": "below", "entities": ["content", "header"]},
+    {"type": "below", "entities": ["footer", "content"]},
+    {"type": "align_left", "entities": ["footer", "sidebar"]},
+    {"type": "same_width", "entities": ["header", "footer"]},
+    {"type": "vertical_spacing", "entities": ["header", "sidebar"], "spacing": 10.0},
+    {"type": "horizontal_spacing", "entities": ["sidebar", "content"], "spacing": 20.0}
+  ]
+}
+```
+
+## Constraint Types
+
+### Alignment Constraints
+```jsonl
+{"type": "align_left", "entities": ["rect1", "rect2"]}
+{"type": "align_right", "entities": ["rect1", "rect2"]}
+{"type": "align_top", "entities": ["rect1", "rect2"]}
+{"type": "align_bottom", "entities": ["rect1", "rect2"]}
+{"type": "align_center_horizontal", "entities": ["rect1", "rect2"]}
+{"type": "align_center_vertical", "entities": ["rect1", "rect2"]}
+```
+
+### Directional Positioning
+```jsonl
+{"type": "right_of", "entities": ["rect1", "rect2"]}
+{"type": "left_of", "entities": ["rect1", "rect2"]}
+{"type": "above", "entities": ["rect1", "rect2"]}
+{"type": "below", "entities": ["rect1", "rect2"]}
+```
+
+### Spacing Constraints
+```jsonl
+{"type": "horizontal_spacing", "entities": ["rect1", "rect2"], "spacing": 20.0}
+{"type": "vertical_spacing", "entities": ["rect1", "rect2"], "spacing": 15.0}
+{"type": "fixed_distance", "entities": ["rect1", "rect2"], "distance": 100.0}
+```
+
+### Layout Stacking
+```jsonl
+{"type": "stack_horizontal", "entities": ["rect1", "rect2", "rect3"], "spacing": 10.0}
+{"type": "stack_vertical", "entities": ["rect1", "rect2", "rect3"], "spacing": 8.0}
+```
+
+### Size Relationship Constraints
+```jsonl
+{"type": "same_width", "entities": ["rect1", "rect2"]}
+{"type": "same_height", "entities": ["rect1", "rect2"]}
+{"type": "same_size", "entities": ["rect1", "rect2"]}
+{"type": "proportional_width", "entities": ["rect1", "rect2"], "ratio": 1.5}
+{"type": "proportional_height", "entities": ["rect1", "rect2"], "ratio": 0.8}
+```
+
+### Advanced Layout Constraints
+```jsonl
+{"type": "aspect_ratio", "entity": "rect1", "ratio": 1.618}
+{"type": "distribute_horizontally", "entities": ["rect1", "rect2", "rect3"]}
+{"type": "distribute_vertically", "entities": ["rect1", "rect2", "rect3"]}
+```
+
+## Multiple Constraint Containers
+
+You can define multiple constraint containers in the same JSONL:
+
+```jsonl
+{"type": "rect", "id": "nav1", "width": 100, "height": 30, "fill": "blue"}
+{"type": "rect", "id": "nav2", "width": 100, "height": 30, "fill": "blue"}
+{"type": "rect", "id": "nav3", "width": 100, "height": 30, "fill": "blue"}
+
+{"type": "constraint_container", "id": "navbar", "children": ["nav1", "nav2", "nav3"], "constraints": [
+  {"type": "stack_horizontal", "entities": ["nav1", "nav2", "nav3"], "spacing": 10.0},
+  {"type": "align_center_vertical", "entities": ["nav1", "nav2"]},
+  {"type": "align_center_vertical", "entities": ["nav2", "nav3"]}
+]}
+
+{"type": "rect", "id": "card1", "width": 200, "height": 150, "fill": "lightblue"}
+{"type": "rect", "id": "card2", "width": 200, "height": 150, "fill": "lightgreen"}
+
+{"type": "constraint_container", "id": "card_layout", "children": ["card1", "card2"], "constraints": [
+  {"type": "vertical_spacing", "entities": ["card1", "card2"], "spacing": 20.0},
+  {"type": "align_center_horizontal", "entities": ["card1", "card2"]}
+]}
+```
+
+## Advanced Example with All Constraint Types
+
+```jsonl
+{"type": "rect", "id": "main_rect", "width": 200, "height": 100, "fill": "blue"}
+{"type": "rect", "id": "side_rect", "width": 100, "height": 50, "fill": "red"}
+{"type": "rect", "id": "bottom_rect", "width": 150, "height": 75, "fill": "green"}
+{"type": "rect", "id": "item1", "width": 50, "height": 30, "fill": "yellow"}
+{"type": "rect", "id": "item2", "width": 50, "height": 30, "fill": "orange"}
+{"type": "rect", "id": "item3", "width": 50, "height": 30, "fill": "purple"}
+
+{
+  "type": "constraint_container",
+  "id": "advanced_layout",
+  "children": ["main_rect", "side_rect", "bottom_rect", "item1", "item2", "item3"],
+  "constraints": [
+    {"type": "right_of", "entities": ["side_rect", "main_rect"]},
+    {"type": "below", "entities": ["bottom_rect", "main_rect"]},
+    {"type": "horizontal_spacing", "entities": ["main_rect", "side_rect"], "spacing": 20.0},
+    {"type": "vertical_spacing", "entities": ["main_rect", "bottom_rect"], "spacing": 15.0},
+    {"type": "same_width", "entities": ["side_rect", "bottom_rect"]},
+    {"type": "proportional_height", "entities": ["side_rect", "main_rect"], "ratio": 0.5},
+    {"type": "aspect_ratio", "entity": "main_rect", "ratio": 2.0},
+    {"type": "stack_horizontal", "entities": ["item1", "item2", "item3"], "spacing": 10.0},
+    {"type": "distribute_vertically", "entities": ["main_rect", "bottom_rect"]}
+  ]
+}
+```
+
+## Positioning
+
+Since constraint containers handle positioning through constraints, explicit `x` and `y` positions are generally not needed for children. However, you can still provide initial position suggestions:
+
+```jsonl
+{"type": "rect", "id": "rect1", "width": 100, "height": 50, "fill": "blue", "x": 50, "y": 50}
+```
+
+This would be used as a suggestion in the constraint system, but the final positioning will be determined by the constraints.
