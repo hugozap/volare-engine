@@ -1746,6 +1746,528 @@ fn generate_svg_from_jsonl(
     Ok(())
 }
 
+===/src/bin/city2.rs===
+// src/bin/dense_city.rs
+// Demo program that generates a super dense city using loops
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🏙️ Generando Ciudad Súper Densa con Loops...\n");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("dense_city");
+    std::fs::create_dir_all(&output_dir)?;
+
+    // Generate the dense city
+    generate_dense_city(&output_dir)?;
+
+    println!("\n✅ Ciudad densa generada exitosamente!");
+    println!("📁 Archivo guardado en: {}", output_dir.display());
+
+    Ok(())
+}
+
+fn generate_dense_city(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🏗️ Construyendo ciudad con loops...");
+    
+    let mut jsonl_lines = Vec::new();
+    
+    // Configuración de la ciudad
+    let city_width = 2000;
+    let city_height = 1500;
+    let block_size = 100;
+    let street_width = 8;
+    
+    // Colores para diferentes tipos de edificios
+    let residential_colors = ["#DEB887", "#F4A460", "#CD853F", "#D2691E", "#8B4513", "#A0522D"];
+    let commercial_colors = ["#4169E1", "#32CD32", "#FF6347", "#FFD700", "#9370DB", "#20B2AA"];
+    let office_colors = ["#708090", "#2F4F4F", "#696969", "#778899", "#B0C4DE", "#87CEEB"];
+    let industrial_colors = ["#808080", "#696969", "#A9A9A9", "#778899", "#708090"];
+    
+    // Root container
+    jsonl_lines.push(format!(
+        r##"{{"id":"root","type":"free_container","width":{},"height":{},"background":"#87CEEB","children":["street_grid","districts","labels","transportation","landmarks"]}}"##,
+        city_width, city_height
+    ));
+    
+    // Generar grid de calles
+    let mut street_children = Vec::new();
+    let mut street_id = 0;
+    
+    // Calles horizontales
+    for i in 0..(city_height / block_size + 1) {
+        let y = i * block_size;
+        let id = format!("h_street_{}", street_id);
+        street_children.push(id.clone());
+        jsonl_lines.push(format!(
+            r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"#696969","x":0,"y":{}}}"##,
+            id, city_width, street_width, y
+        ));
+        street_id += 1;
+    }
+    
+    // Calles verticales
+    for i in 0..(city_width / block_size + 1) {
+        let x = i * block_size;
+        let id = format!("v_street_{}", street_id);
+        street_children.push(id.clone());
+        jsonl_lines.push(format!(
+            r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"#696969","x":{},"y":0}}"##,
+            id, street_width, city_height, x
+        ));
+        street_id += 1;
+    }
+    
+    // Container para calles
+    jsonl_lines.push(format!(
+        r##"{{"id":"street_grid","type":"free_container","width":{},"height":{},"children":[{}],"x":0,"y":0}}"##,
+        city_width, city_height,
+        street_children.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    
+    // Generar distritos con loops
+    let mut district_children = Vec::new();
+    
+    // 1. Distrito Residencial (noroeste)
+    let mut residential_buildings = Vec::new();
+    for block_y in 0..6 {
+        for block_x in 0..8 {
+            for house_y in 0..3 {
+                for house_x in 0..4 {
+                    let id = format!("res_{}_{}_{}_{}", block_x, block_y, house_x, house_y);
+                    let x = block_x * block_size + house_x * 22 + 12;
+                    let y = block_y * block_size + house_y * 28 + 12;
+                    let width = 18 + (house_x * 2);
+                    let height = 20 + (house_y * 3);
+                    let color = residential_colors[(house_x + house_y) % residential_colors.len()];
+                    
+                    residential_buildings.push(id.clone());
+                    jsonl_lines.push(format!(
+                        r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"{}","x":{},"y":{}}}"##,
+                        id, width, height, color, x, y
+                    ));
+                }
+            }
+        }
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"residential_district","type":"free_container","width":800,"height":600,"children":[{}],"x":0,"y":0}}"##,
+        residential_buildings.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    district_children.push("residential_district".to_string());
+    
+    // 2. Distrito Comercial (centro)
+    let mut commercial_buildings = Vec::new();
+    for block_y in 0..8 {
+        for block_x in 8..14 {
+            for bldg_y in 0..2 {
+                for bldg_x in 0..3 {
+                    let id = format!("com_{}_{}_{}_{}", block_x, block_y, bldg_x, bldg_y);
+                    let x = block_x * block_size + bldg_x * 30 + 10;
+                    let y = block_y * block_size + bldg_y * 45 + 10;
+                    let width = 25 + (bldg_x * 5);
+                    let height = 35 + (bldg_y * 10) + (block_y * 2);
+                    let color = commercial_colors[(bldg_x + bldg_y + block_y) % commercial_colors.len()];
+                    
+                    commercial_buildings.push(id.clone());
+                    jsonl_lines.push(format!(
+                        r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"{}","x":{},"y":{}}}"##,
+                        id, width, height, color, x, y
+                    ));
+                }
+            }
+        }
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"commercial_district","type":"free_container","width":600,"height":800,"children":[{}],"x":800,"y":0}}"##,
+        commercial_buildings.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    district_children.push("commercial_district".to_string());
+    
+    // 3. Distrito de Oficinas (suroeste)
+    let mut office_buildings = Vec::new();
+    for block_y in 6..12 {
+        for block_x in 0..10 {
+            let id = format!("office_{}_{}", block_x, block_y);
+            let x = block_x * block_size + 15;
+            let y = block_y * block_size + 15;
+            let width = 70;
+            let height = 60 + (block_x * 8) + (block_y * 3);
+            let color = office_colors[(block_x + block_y) % office_colors.len()];
+            
+            office_buildings.push(id.clone());
+            jsonl_lines.push(format!(
+                r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"{}","x":{},"y":{}}}"##,
+                id, width, height, color, x, y
+            ));
+        }
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"office_district","type":"free_container","width":1000,"height":600,"children":[{}],"x":0,"y":600}}"##,
+        office_buildings.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    district_children.push("office_district".to_string());
+    
+    // 4. Zona Industrial (sureste)
+    let mut industrial_buildings = Vec::new();
+    for block_y in 8..15 {
+        for block_x in 10..20 {
+            let id = format!("ind_{}_{}", block_x, block_y);
+            let x = block_x * block_size + 20;
+            let y = block_y * block_size + 20;
+            let width = 60 + (block_x % 3) * 15;
+            let height = 40 + (block_y % 4) * 10;
+            let color = industrial_colors[(block_x + block_y) % industrial_colors.len()];
+            
+            industrial_buildings.push(id.clone());
+            jsonl_lines.push(format!(
+                r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"{}","x":{},"y":{}}}"##,
+                id, width, height, color, x, y
+            ));
+        }
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"industrial_district","type":"free_container","width":1000,"height":700,"children":[{}],"x":1000,"y":800}}"##,
+        industrial_buildings.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    district_children.push("industrial_district".to_string());
+    
+    // 5. Rascacielos en el centro
+    let mut skyscraper_buildings = Vec::new();
+    for i in 0..15 {
+        for j in 0..8 {
+            let id = format!("sky_{}_{}", i, j);
+            let x = 1400 + i * 35;
+            let y = 200 + j * 70;
+            let width = 25 + (i % 3) * 5;
+            let height = 100 + i * 12 + j * 8;
+            let color_idx = (i + j) % office_colors.len();
+            let color = office_colors[color_idx];
+            
+            skyscraper_buildings.push(id.clone());
+            jsonl_lines.push(format!(
+                r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"{}","x":{},"y":{}}}"##,
+                id, width, height, color, x, y
+            ));
+        }
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"skyscraper_district","type":"free_container","width":600,"height":800,"children":[{}],"x":1400,"y":0}}"##,
+        skyscraper_buildings.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    district_children.push("skyscraper_district".to_string());
+    
+    // Container para todos los distritos
+    jsonl_lines.push(format!(
+        r##"{{"id":"districts","type":"free_container","width":{},"height":{},"children":[{}],"x":0,"y":0}}"##,
+        city_width, city_height,
+        district_children.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    
+    // Generar etiquetas para distritos
+    let mut label_children = Vec::new();
+    let labels = [
+        ("Residential Quarter", 400, 50),
+        ("Commercial District", 1100, 50),
+        ("Business Center", 500, 650),
+        ("Industrial Zone", 1500, 850),
+        ("Downtown Core", 1700, 50),
+    ];
+    
+    for (i, (text, x, y)) in labels.iter().enumerate() {
+        let id = format!("label_{}", i);
+        label_children.push(id.clone());
+        jsonl_lines.push(format!(
+            r##"{{"id":"{}","type":"text","content":"{}","font_size":16,"color":"#000080","x":{},"y":{}}}"##,
+            id, text, x, y
+        ));
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"labels","type":"free_container","width":{},"height":{},"children":[{}],"x":0,"y":0}}"##,
+        city_width, city_height,
+        label_children.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    
+    // Generar sistema de transporte con loops
+    let mut transport_children = Vec::new();
+    
+    // Metro lines
+    let metro_lines = [
+        (("#FF0000", 6), vec![(0, 300), (500, 305), (1000, 300), (1500, 305), (2000, 300)]),
+        (("#00FF00", 6), vec![(0, 600), (600, 605), (1200, 600), (1800, 605), (2000, 600)]),
+        (("#0000FF", 6), vec![(300, 0), (305, 400), (300, 800), (305, 1200), (300, 1500)]),
+        (("#FFFF00", 6), vec![(900, 0), (905, 350), (900, 700), (905, 1050), (900, 1500)]),
+    ];
+    
+    for (line_idx, ((color, width), points)) in metro_lines.iter().enumerate() {
+        let id = format!("metro_line_{}", line_idx);
+        transport_children.push(id.clone());
+        let points_str = points.iter()
+            .map(|(x, y)| format!("[{},{}]", x, y))
+            .collect::<Vec<_>>()
+            .join(",");
+        jsonl_lines.push(format!(
+            r##"{{"id":"{}","type":"polyline","points":[{}],"stroke_color":"{}","stroke_width":{},"x":0,"y":0}}"##,
+            id, points_str, color, width
+        ));
+    }
+    
+    // Estaciones de metro con validación
+    for i in 0..20 {
+        for j in 0..15 {
+            if (i * 150) % 300 == 0 && (j * 100) % 300 == 0 {
+                let id = format!("station_{}_{}", i, j);
+                transport_children.push(id.clone());
+                jsonl_lines.push(format!(
+                    r##"{{"id":"{}","type":"rect","width":8,"height":8,"background":"white","stroke_color":"black","x":{},"y":{}}}"##,
+                    id, i * 100 + 296, j * 100 + 296
+                ));
+            }
+        }
+    }
+    
+    // Autopistas con loops
+    let highway_segments = [
+        (0, 900, 2000, 900, 12),
+        (1500, 0, 1500, 1500, 10),
+    ];
+    
+    for (seg_idx, (x1, y1, x2, y2, width)) in highway_segments.iter().enumerate() {
+        let id = format!("highway_{}", seg_idx);
+        transport_children.push(id.clone());
+        jsonl_lines.push(format!(
+            r##"{{"id":"{}","type":"polyline","points":[[{},{}],[{},{}]],"stroke_color":"#2F2F2F","stroke_width":{},"x":0,"y":0}}"##,
+            id, x1, y1, x2, y2, width
+        ));
+    }
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"transportation","type":"free_container","width":{},"height":{},"children":[{}],"x":0,"y":0}}"##,
+        city_width, city_height,
+        transport_children.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    
+    // Generar landmarks importantes
+    let mut landmark_children = Vec::new();
+    
+    // Parques generados con loops
+    let parks = [(400, 400, 150, 100), (1200, 200, 120, 80), (800, 1000, 180, 120)];
+    for (park_idx, (x, y, w, h)) in parks.iter().enumerate() {
+        let park_id = format!("park_{}", park_idx);
+        landmark_children.push(park_id.clone());
+        jsonl_lines.push(format!(
+            r##"{{"id":"{}","type":"rect","width":{},"height":{},"background":"#32CD32","x":{},"y":{}}}"##,
+            park_id, w, h, x, y
+        ));
+        
+        // Árboles en el parque
+        for tree_x in 0..(w / 20) {
+            for tree_y in 0..(h / 20) {
+                let tree_id = format!("tree_{}_{}_{}", park_idx, tree_x, tree_y);
+                landmark_children.push(tree_id.clone());
+                jsonl_lines.push(format!(
+                    r##"{{"id":"{}","type":"rect","width":4,"height":4,"background":"#228B22","x":{},"y":{}}}"##,
+                    tree_id, x + tree_x * 20 + 8, y + tree_y * 20 + 8
+                ));
+            }
+        }
+    }
+    
+    // Río serpenteante
+    let mut river_points = Vec::new();
+    for i in 0..40 {
+        let x = i * 50;
+        let y = 1200.0 + (i as f32 * 0.5).sin() * 100.0;
+        river_points.push(format!("[{},{}]", x, y as i32));
+    }
+    landmark_children.push("river".to_string());
+    jsonl_lines.push(format!(
+        r##"{{"id":"river","type":"polyline","points":[{}],"stroke_color":"#4169E1","stroke_width":20,"x":0,"y":0}}"##,
+        river_points.join(",")
+    ));
+    
+    jsonl_lines.push(format!(
+        r##"{{"id":"landmarks","type":"free_container","width":{},"height":{},"children":[{}],"x":0,"y":0}}"##,
+        city_width, city_height,
+        landmark_children.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(",")
+    ));
+    
+    // Escribir el JSONL generado con validación
+    let jsonl_content = jsonl_lines.join("\n");
+    
+    // Validar JSON antes de continuar
+    println!("🔍 Validando JSONL generado...");
+    let mut parser_test = parser::JsonLinesParser::new();
+    match parser_test.parse_string(&jsonl_content) {
+        Ok(_) => println!("✅ JSONL válido!"),
+        Err(e) => {
+            println!("❌ Error en JSONL: {:?}", e);
+            // Escribir a archivo para debug
+            let debug_path = output_dir.join("debug_jsonl.txt");
+            std::fs::write(&debug_path, &jsonl_content)?;
+            println!("🐛 JSONL escrito a {} para debug", debug_path.display());
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("JSONL inválido: {:?}", e)
+            )));
+        }
+    }
+    
+    println!("📊 Estadísticas de la ciudad:");
+    println!("   🏠 Edificios residenciales: {}", residential_buildings.len());
+    println!("   🏢 Edificios comerciales: {}", commercial_buildings.len());
+    println!("   🏭 Edificios de oficinas: {}", office_buildings.len());
+    println!("   🏗️ Edificios industriales: {}", industrial_buildings.len());
+    println!("   🏙️ Rascacielos: {}", skyscraper_buildings.len());
+    println!("   📏 Total de líneas JSONL: {}", jsonl_lines.len());
+    
+    generate_svg_from_jsonl(&jsonl_content, output_dir.join("dense_city.svg"), "Ciudad Súper Densa")
+}
+
+// Helper function to generate SVG from JSONL
+fn generate_svg_from_jsonl(
+    jsonl_input: &str,
+    output_path: std::path::PathBuf,
+    description: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("  📄 Generando: {}", description);
+
+    // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(jsonl_input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+    println!("    ✅ Guardado: {}", output_path.file_name().unwrap().to_str().unwrap());
+
+    Ok(())
+}
+===/src/bin/patterns.rs===
+// Create an SVG file with all supported elements
+
+//import svg_renderer
+// use image_renderer::PNGRenderer;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions};
+use demo::measure_text::{ measure_text_ultra_tight};
+
+//import layout
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
+    TableOptions, TextOptions, Fill,
+};
+//import io modules to write to file
+use std::fs::File;
+
+struct CardOptions {
+
+}
+
+//componente card
+//la tarjeta tiene contenido y titulo
+fn card_component(id: String, session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
+    
+    session.new_vstack(id.clone(), vec![header,content], HorizontalAlignment::Center)
+
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //create session
+    let mut session = DiagramBuilder::new();
+  
+    session.set_measure_text_fn(measure_text_ultra_tight);
+
+    let mut table_items = Vec::new();
+
+    let cardOptions = CardOptions {
+
+    };
+
+      let textOpts =  TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 16.0,
+            line_width: 100,
+            text_color: "black".to_string(),  // white text
+            line_spacing: 5.0,
+        };
+
+    let cheader = session.new_text("title".to_string(), "card title", textOpts.clone());
+    let ccontent = session.new_text("contents".to_string(), "card contents", textOpts.clone());
+    let card1 = card_component("card".to_string(), &mut session, cheader, ccontent, cardOptions);
+
+
+
+    
+    // Add the FreeContainer to the table
+    // table_items.push(container_with_elements);
+
+    table_items.push(card1);
+    //texts.push(get_test_table(&mut session));
+    //Create a table for the texts with 2 columns
+    let mut toptions = TableOptions::default();
+    toptions.cell_padding = 5;
+    let table = session.new_table("items".to_string(), table_items, 1, toptions);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &table);
+
+    //create writer to file ~/temp/svg-render-test.svg
+    //get path for ~/temp
+    let temp_dir = std::env::temp_dir();
+    //create path for ~/temp/svg-render-test.svg
+    // Render SVG
+  
+    
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("svg-render-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path).unwrap();
+    let svg_res = svg_renderer.render(&session, &table, &mut svg_file);
+    if svg_res.is_err() {
+        println!("SVG Render Error: {}", svg_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+    
+
+    // Render PNG
+    // let mut png_path = temp_dir.clone();
+    // png_path.push("png-render-test.png");
+    // let png_renderer = PNGRenderer {};
+    // let mut png_file = File::create(&png_path).unwrap();
+    // let png_res = png_renderer.render(&session, &table, &mut png_file);
+    // if png_res.is_err() {
+    //     println!("PNG Render Error: {}", png_res.err().unwrap());
+    //     std::process::exit(1);
+    // }
+    // println!("PNG file written to: {}", png_path.to_str().unwrap());
+
+    Ok(())
+}
+
 ===/src/bin/city.rs===
 // src/bin/intricate_city.rs
 // Demo program that generates an intricate city using only polylines, rects, and free containers
@@ -2766,6 +3288,99 @@ fn generate_svg_from_jsonl(
 
     Ok(())
 }
+===/src/bin/constraints.rs===
+// src/bin/intricate_city.rs
+// Demo program that generates an intricate city using only polylines, rects, and free containers
+
+use demo::measure_text::measure_text_svg_character_advance;
+use resvg::usvg::roxmltree::Children;
+use uuid::fmt::Simple;
+use volare_engine_layout::diagram_builder::DiagramTreeNode;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Cassowary constraints demo...\n");
+    let mut builder = DiagramBuilder::new();
+    let output_dir = std::env::temp_dir().join("constraints_demo");
+    std::fs::create_dir_all(&output_dir)?;
+    let output_path = output_dir.join("constraints1.svg");
+    builder.set_measure_text_fn(measure_text_svg_character_advance);
+    let children = vec![builder.new_rectangle(
+        "r1".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("red".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    ),
+    builder.new_rectangle(
+        "r2".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("blue".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    ),
+    builder.new_rectangle(
+        "r3".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("green".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    ),
+      builder.new_rectangle(
+        "r4".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(20.0),
+            fill_color: Fill::Color("purple".to_string()),
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
+        },
+    )
+    ];
+
+    let mut children_with_pos: Vec<(DiagramTreeNode, Option<Point>)>= children.iter().map(|c| {
+        (c.clone(), None)
+    }).collect();
+
+     if let Some(elem) = children_with_pos.get_mut(0) {
+        elem.1  = Some(Point::new(0.0, 0.0))
+     }
+
+    builder.set_position("r1".to_string(), 50.0, 50.0);
+
+    let mut constraints = Vec::<SimpleConstraint>::new();
+    // R1 should be set to the right of r2
+    constraints.push(SimpleConstraint::RightOf("r1".into(), "r2".into()));
+    constraints.push(SimpleConstraint::Below("r3".into(), "r2".into()));
+    constraints.push(SimpleConstraint::Above("r4".into(), "r1".into()));
+    constraints.push(SimpleConstraint::RightOf("r1".into(), "r4".into()));
+    let root = builder.new_constraint_layout_container("container".to_string(), children_with_pos, constraints);
+    layout_tree_node(&mut builder, &root);
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&builder, &root, &mut svg_file)?;
+
+    println!("    ✅ Guardado: {}",output_path.to_str().unwrap());
+  
+
+    Ok(())
+}
+
 ===/src/bin/sample_components.rs===
 // src/bin/useful_components_demo.rs
 // A library of practical custom components for real-world usage
@@ -3457,6 +4072,119 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Dashboard rendered successfully!");
     println!("📄 File saved to: {}", svg_path.to_str().unwrap());
     println!("\n🎉 Useful Components Demo Complete!");
+
+    Ok(())
+}
+
+===/src/bin/text.rs===
+// Create an SVG file with all supported elements
+
+//import svg_renderer
+// use image_renderer::PNGRenderer;
+use svg_renderer::SVGRenderer;
+use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+use demo::measure_text::{ measure_text_ultra_tight};
+
+//import layout
+use volare_engine_layout::{
+    diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
+    TableOptions, TextOptions, Fill,
+};
+//import io modules to write to file
+use std::fs::File;
+
+
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //create session
+    let mut session = DiagramBuilder::new();
+  
+    session.set_measure_text_fn(measure_text_ultra_tight);
+
+    let mut table_items = Vec::new();
+
+    let thetext =  br#""Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+otra linea texto
+otra mas...
+It could also be compensating for the fact that pos includes
+cumulative scaling from parent transforms, 
+and you need to pass down the "base" position to child renderers.
+The comment "Calculate absolute position without any scaling" suggests the goal is to get back to unscaled coordinates that the child rendering pipeline expects.""#;
+
+    let textOpts =  TextOptions {
+            font_family: "AnonymicePro Nerd Font".to_string(),
+            font_size: 16.0,
+            line_width: 100,
+            text_color: "white".to_string(),  // white text
+            line_spacing: 5.0,
+        };
+
+    let blue_text = session.new_text(
+        "blue_text".to_string(),
+        std::str::from_utf8(thetext).unwrap(),
+       textOpts.clone(),
+    );
+
+   // debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
+
+
+    let box_options = BoxOptions {
+        fill_color: Fill::Color("#0000FF".to_string()),  // blue background
+        stroke_color: "#000066".to_string(),  // dark blue border
+        stroke_width: 1.0,
+        //TODO: falta tener en cuenta padding al momento de hacer layout de elementos de box
+        padding: 50.0,
+        border_radius: 0.0,
+        width_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), // fixed width
+        height_behavior: volare_engine_layout::SizeBehavior::Content, // auto height
+    };
+
+    let box1 = session.new_box("box1".to_string(), blue_text, box_options);
+
+    
+    // Add the FreeContainer to the table
+    // table_items.push(container_with_elements);
+
+    table_items.push(box1);
+    //texts.push(get_test_table(&mut session));
+    //Create a table for the texts with 2 columns
+    let mut toptions = TableOptions::default();
+    toptions.cell_padding = 5;
+    let table = session.new_table("text_table".to_string(), table_items, 5, toptions);
+
+    // Calculate layout
+    layout_tree_node(&mut session, &table);
+
+    //create writer to file ~/temp/svg-render-test.svg
+    //get path for ~/temp
+    let temp_dir = std::env::temp_dir();
+    //create path for ~/temp/svg-render-test.svg
+    // Render SVG
+  
+    
+    let mut svg_path = temp_dir.clone();
+    svg_path.push("svg-render-test.svg");
+    let svg_renderer = SVGRenderer {};
+    let mut svg_file = File::create(&svg_path).unwrap();
+    let svg_res = svg_renderer.render(&session, &table, &mut svg_file);
+    if svg_res.is_err() {
+        println!("SVG Render Error: {}", svg_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("SVG file written to: {}", svg_path.to_str().unwrap());
+    
+
+    // Render PNG
+    // let mut png_path = temp_dir.clone();
+    // png_path.push("png-render-test.png");
+    // let png_renderer = PNGRenderer {};
+    // let mut png_file = File::create(&png_path).unwrap();
+    // let png_res = png_renderer.render(&session, &table, &mut png_file);
+    // if png_res.is_err() {
+    //     println!("PNG Render Error: {}", png_res.err().unwrap());
+    //     std::process::exit(1);
+    // }
+    // println!("PNG file written to: {}", png_path.to_str().unwrap());
 
     Ok(())
 }
@@ -4163,7 +4891,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let constraints = vec![SimpleConstraint::AlignLeft("constrained1".to_string(), "constrained2".to_string())];
-    let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![elem1,elem2], constraints);
+    let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![(elem1, None),(elem2, None)], constraints);
     table_items.push(constraint_container);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
@@ -4266,6 +4994,109 @@ version = 3
 [[package]]
 name = "layout-base"
 version = "0.1.0"
+
+===/docs/the-diagram-tree-spec.md===
+# The diagram Tree.
+
+Diagrams are declared as a tree of nodes.
+Each node must contain one of the supported diagram components:
+
+- Box
+- Group
+- Text
+- VerticalStack
+- etc.
+
+Each diagram consists in the logic necessary to create the tree, without regard for the element size or position, that's calculated by the engine.
+
+
+The layout components
+
+Layout components that are containers, expect their children to already exist. So we need an upper layer that creates an abstraction so the user is not concerned with internal details.
+
+Ideally the user defines something like:
+
+VerticalStack({props}, [
+    Box ({props}, elem),
+    HorizontalStack({props}, [
+        elem1,
+        elem2,
+        elem3
+    ]),
+    Table({props}, [
+        [elem1,elem2,elem3],
+        [elem4,elem5,elem6]
+    ])
+])
+
+What we are building is something similar to a virtual representation.
+Like react virtual dom.
+
+
+Each function should return a DiagramNode
+
+
+Another option is to have vectors for each type of node in the parent element,
+and just store the index in DiagramNode
+
+```
+struct DiagramNode {
+    entity_type: EntityType,
+    ix: usize,
+    children: Vec<(ix, EntityType)>
+}
+```
+
+This way we would have a way to retrieve the specific element from a different array.
+
+Where would those arrays live?
+
+Some kind of DiagramBuilder object
+
+## Builder pattern
+
+```rust
+let builder = DiagramBuilder::new();
+
+let root = builder.newVerticalStack()
+root.add(builder.newBox(...))
+.add(builder.newHorizontalStack(...).
+    add(builder.newBox({}, builder.Text("Hey"))))
+
+```
+
+Having a builder api with methods that make it easy to create a diagram
+by adding nodes is useful to create the API
+
+Then, we can pass the DiagramNode object to the render api.
+
+What happens inside newBox method inside the builder?
+
+- The builder populates the BoxShape component and adds it to the boxes list
+- Returns the position of the item in the array **and the entity type**
+- (ix, EntityType)
+
+Inside `add`:
+
+Each children is a pair of (ix, EntityType).
+
+Now we have a space where the properties are stored, and each node store indexes and an identifier
+to have a way to know what array to look for.
+
+Each index is valid only for the lifetime of the builder object.
+
+## Stage 2
+
+We already have a diagram representation, but no entities have been created.
+The properties for each component will be required by the renderer layer (e.g color).
+So they should be passed to the render layer somehow.
+
+The renderer can receive an instance of the builder to have access to the internal details for each element?
+
+The properties do affect layout and are used by rendering.
+
+
+
 
 ===/docs/JSONL Diagram Specification.md===
 # JSONL Diagram Specification
@@ -4641,6 +5472,154 @@ This creates a document layout with header, sidebar navigation, main content are
 - Container-relative positioning (`x`, `y`) is handled separately from transforms
 - Size behaviors allow for responsive layouts with content-based or fixed sizing
 - All supported entity types are handled in the `build_entity` match statement in parser.rs
+===/docs/examples/shapes/polylines.jsonl===
+{"id":"root","type":"vstack","children":["title","demo_container"],"h_align":"center"}
+{"id":"title","type":"text","content":"📈 Polyline Test & Examples","font_size":24,"color":"darkblue"}
+{"id":"demo_container","type":"free_container","width":700,"height":500,"children":["simple_line","zigzag","triangle","star","graph","house","labels"]}
+{"id":"simple_line","type":"polyline","points":[[0,0],[100,0],[100,50],[0,50]],"stroke_color":"red","stroke_width":3,"x":50,"y":50}
+{"id":"zigzag","type":"polyline","points":[[0,0],[30,20],[60,0],[90,20],[120,0],[150,20]],"stroke_color":"green","stroke_width":2,"x":200,"y":50}
+{"id":"triangle","type":"polyline","points":[[0,40],[40,0],[80,40],[0,40]],"stroke_color":"blue","stroke_width":3,"x":400,"y":50}
+{"id":"star","type":"polyline","points":[[25,0],[30,15],[45,15],[35,25],[40,40],[25,30],[10,40],[15,25],[5,15],[20,15],[25,0]],"stroke_color":"gold","stroke_width":2,"x":550,"y":50}
+{"id":"graph","type":"polyline","points":[[0,80],[20,60],[40,70],[60,30],[80,40],[100,10],[120,20],[140,5]],"stroke_color":"purple","stroke_width":3,"x":50,"y":150}
+{"id":"house","type":"polyline","points":[[0,40],[0,10],[20,0],[40,10],[40,40],[30,40],[30,25],[10,25],[10,40],[0,40]],"stroke_color":"brown","stroke_width":2,"x":250,"y":150}
+{"id":"labels","type":"vstack","children":["label1","label2","label3","label4","label5","label6","positioning_note"],"h_align":"left","x":50,"y":300}
+{"id":"label1","type":"text","content":"• Red: Simple rectangle path","font_size":12,"color":"red"}
+{"id":"label2","type":"text","content":"• Green: Zigzag line pattern","font_size":12,"color":"green"}
+{"id":"label3","type":"text","content":"• Blue: Closed triangle shape","font_size":12,"color":"blue"}
+{"id":"label4","type":"text","content":"• Gold: 5-pointed star","font_size":12,"color":"gold"}
+{"id":"label5","type":"text","content":"• Purple: Data graph line","font_size":12,"color":"purple"}
+{"id":"label6","type":"text","content":"• Brown: House outline","font_size":12,"color":"brown"}
+{"id":"positioning_note","type":"text","content":"All polylines positioned using x,y coordinates","font_size":10,"color":"gray"}
+===/docs/examples/shapes/arcs.jsonl===
+{"id":"root","type":"vstack","children":["title","test_container"],"h_align":"center"}
+{"id":"title","type":"text","content":"🌀 Arc Positioning Test","font_size":24,"color":"darkblue"}
+{"id":"test_container","type":"free_container","width":600,"height":400,"children":["arc1","arc2","arc3","arc4","reference_grid","labels"]}
+{"id":"arc1","type":"arc","radius":40,"start_angle":0,"end_angle":90,"stroke_color":"red","stroke_width":3,"filled":false,"x":60,"y":60}
+{"id":"arc2","type":"arc","radius":30,"start_angle":0,"end_angle":180,"stroke_color":"green","stroke_width":3,"filled":true,"fill_color":"lightgreen","x":220,"y":70}
+{"id":"arc3","type":"arc","radius":35,"start_angle":0,"end_angle":270,"stroke_color":"blue","stroke_width":3,"filled":false,"x":365,"y":65}
+{"id":"arc4","type":"arc","radius":25,"start_angle":0,"end_angle":360,"stroke_color":"purple","stroke_width":3,"filled":true,"fill_color":"lavender","x":150,"y":225}
+{"id":"reference_grid","type":"free_container","width":600,"height":400,"children":["ref1","ref2","ref3","ref4"],"x":0,"y":0}
+{"id":"ref1","type":"ellipse","rx":3,"ry":3,"fill":"red","stroke":"darkred","stroke_width":1,"x":97,"y":97}
+{"id":"ref2","type":"ellipse","rx":3,"ry":3,"fill":"green","stroke":"darkgreen","stroke_width":1,"x":247,"y":97}
+{"id":"ref3","type":"ellipse","rx":3,"ry":3,"fill":"blue","stroke":"darkblue","stroke_width":1,"x":397,"y":97}
+{"id":"ref4","type":"ellipse","rx":3,"ry":3,"fill":"purple","stroke":"darkpurple","stroke_width":1,"x":172,"y":247}
+{"id":"labels","type":"vstack","children":["label1","label2","label3","label4","note"],"h_align":"left","x":50,"y":320}
+{"id":"label1","type":"text","content":"• Red: 90° arc at (60,60) with radius 40","font_size":12,"color":"red"}
+{"id":"label2","type":"text","content":"• Green: 180° filled arc at (220,70) with radius 30","font_size":12,"color":"green"}
+{"id":"label3","type":"text","content":"• Blue: 270° arc at (365,65) with radius 35","font_size":12,"color":"blue"}
+{"id":"label4","type":"text","content":"• Purple: 360° filled arc at (150,225) with radius 25","font_size":12,"color":"purple"}
+{"id":"note","type":"text","content":"Small dots mark where arc centers should be","font_size":10,"color":"gray"}
+===/docs/examples/shapes/arcs-and-ellipses.jsonl===
+{"id":"root","type":"vstack","children":["title","shape_stack","spacing","rotated_stack"],"h_align":"center"}
+{"id":"title","type":"text","content":"📦 VStack Bounding Box Test","font_size":24,"color":"darkgreen"}
+{"id":"shape_stack","type":"vstack","children":["ellipse1","arc1","ellipse2","arc2","ellipse3"],"h_align":"center"}
+{"id":"ellipse1","type":"ellipse","rx":30,"ry":20,"fill":"lightblue","stroke":"blue","stroke_width":2}
+{"id":"arc1","type":"arc","radius":25,"start_angle":0,"end_angle":180,"stroke_color":"red","stroke_width":3,"filled":true,"fill_color":"pink"}
+{"id":"ellipse2","type":"ellipse","rx":40,"ry":15,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"arc2","type":"arc","radius":30,"start_angle":0,"end_angle":270,"stroke_color":"purple","stroke_width":3,"filled":false}
+{"id":"ellipse3","type":"ellipse","rx":25,"ry":25,"fill":"yellow","stroke":"orange","stroke_width":2}
+{"id":"spacing","type":"text","content":"---","font_size":16,"color":"gray"}
+{"id":"rotated_stack","type":"vstack","children":["rot_ellipse1","rot_arc1","rot_ellipse2","rot_arc2","rot_circle"],"h_align":"center"}
+{"id":"rot_ellipse1","type":"ellipse","rx":35,"ry":20,"fill":"lightcoral","stroke":"darkred","stroke_width":2,"rotation":45}
+{"id":"rot_arc1","type":"arc","radius":28,"start_angle":0,"end_angle":120,"stroke_color":"darkblue","stroke_width":4,"filled":true,"fill_color":"lightsteelblue","rotation":30}
+{"id":"rot_ellipse2","type":"ellipse","rx":20,"ry":40,"fill":"lightpink","stroke":"deeppink","stroke_width":2,"rotation":-30}
+{"id":"rot_arc2","type":"arc","radius":35,"start_angle":45,"end_angle":315,"stroke_color":"darkorange","stroke_width":3,"filled":false,"rotation":60}
+{"id":"rot_circle","type":"arc","radius":20,"start_angle":0,"end_angle":360,"stroke_color":"darkviolet","stroke_width":2,"filled":true,"fill_color":"mediumpurple","rotation":90}
+===/docs/examples/shapes/shapes-reference.jsonl===
+{"id":"root","type":"vstack","children":["title","subtitle","shapes_table"],"h_align":"center"}
+{"id":"title","type":"text","content":"🎨 Complete Shape Reference","font_size":28,"color":"darkblue"}
+{"id":"subtitle","type":"text","content":"All supported shapes with examples - Renderer Reference","font_size":16,"color":"gray"}
+{"id":"shapes_table","type":"table","cols":3,"children":["header1","header2","header3","text_name","text_demo","text_desc","rect_name","rect_demo","rect_desc","ellipse_name","ellipse_demo","ellipse_desc","arc_name","arc_demo","arc_desc","line_name","line_demo","line_desc","polyline_name","polyline_demo","polyline_desc","box_name","box_demo","box_desc","image_name","image_demo","image_desc","vstack_name","vstack_demo","vstack_desc","hstack_name","hstack_demo","hstack_desc","table_name","table_demo","table_desc","group_name","group_demo","group_desc","container_name","container_demo","container_desc"],"header_fill_color":"lightblue","border_color":"darkblue","border_width":2,"cell_padding":15}
+{"id":"header1","type":"text","content":"Shape Type","font_size":16,"color":"darkblue"}
+{"id":"header2","type":"text","content":"Example","font_size":16,"color":"darkblue"}
+{"id":"header3","type":"text","content":"Description","font_size":16,"color":"darkblue"}
+{"id":"text_name","type":"text","content":"Text","font_size":14,"color":"black"}
+{"id":"text_demo","type":"text","content":"Hello World!\nMultiline text\nsupported","font_size":12,"color":"darkgreen"}
+{"id":"text_desc","type":"text","content":"Renders text with font styling, wrapping, and line spacing","font_size":11,"color":"gray"}
+{"id":"rect_name","type":"text","content":"Rectangle","font_size":14,"color":"black"}
+{"id":"rect_demo","type":"rect","width":60,"height":40,"background":"lightcoral","border_color":"darkred","border_width":2,"border_radius":5}
+{"id":"rect_desc","type":"text","content":"Rectangular shapes with optional rounded corners","font_size":11,"color":"gray"}
+{"id":"ellipse_name","type":"text","content":"Ellipse","font_size":14,"color":"black"}
+{"id":"ellipse_demo","type":"ellipse","rx":30,"ry":20,"fill":"lightblue","stroke":"darkblue","stroke_width":2}
+{"id":"ellipse_desc","type":"text","content":"Ellipses and circles with customizable radii","font_size":11,"color":"gray"}
+{"id":"arc_name","type":"text","content":"Arc","font_size":14,"color":"black"}
+{"id":"arc_demo","type":"arc","radius":25,"start_angle":0,"end_angle":270,"stroke_color":"purple","stroke_width":3,"filled":true,"fill_color":"lavender"}
+{"id":"arc_desc","type":"text","content":"Arc segments, semicircles, and pie slices","font_size":11,"color":"gray"}
+{"id":"line_name","type":"text","content":"Line","font_size":14,"color":"black"}
+{"id":"line_demo","type":"line","start_x":0,"start_y":0,"end_x":50,"end_y":30,"stroke_color":"red","stroke_width":3}
+{"id":"line_desc","type":"text","content":"Straight lines between two points","font_size":11,"color":"gray"}
+{"id":"polyline_name","type":"text","content":"Polyline","font_size":14,"color":"black"}
+{"id":"polyline_demo","type":"polyline","points":[[0,20],[15,0],[30,20],[45,5],[60,25]],"stroke_color":"orange","stroke_width":2}
+{"id":"polyline_desc","type":"text","content":"Connected line segments forming complex paths","font_size":11,"color":"gray"}
+{"id":"box_name","type":"text","content":"Box","font_size":14,"color":"black"}
+{"id":"box_demo","type":"box","padding":8,"background":"lightyellow","border_color":"gold","border_width":2,"children":["box_child"]}
+{"id":"box_child","type":"text","content":"Boxed","font_size":10,"color":"darkorange"}
+{"id":"box_desc","type":"text","content":"Container with padding, background, and border","font_size":11,"color":"gray"}
+{"id":"image_name","type":"text","content":"Image","font_size":14,"color":"black"}
+{"id":"image_demo","type":"rect","width":50,"height":30,"background":"lightgray","border_color":"gray","border_width":1}
+{"id":"image_desc","type":"text","content":"Images from files or base64 data (placeholder shown)","font_size":11,"color":"gray"}
+{"id":"vstack_name","type":"text","content":"VStack","font_size":14,"color":"black"}
+{"id":"vstack_demo","type":"vstack","children":["vs1","vs2","vs3"],"h_align":"center"}
+{"id":"vs1","type":"rect","width":15,"height":8,"background":"red"}
+{"id":"vs2","type":"rect","width":20,"height":8,"background":"green"}
+{"id":"vs3","type":"rect","width":12,"height":8,"background":"blue"}
+{"id":"vstack_desc","type":"text","content":"Vertical layout container for stacking elements","font_size":11,"color":"gray"}
+{"id":"hstack_name","type":"text","content":"HStack","font_size":14,"color":"black"}
+{"id":"hstack_demo","type":"hstack","children":["hs1","hs2","hs3"],"v_align":"center"}
+{"id":"hs1","type":"rect","width":8,"height":15,"background":"red"}
+{"id":"hs2","type":"rect","width":8,"height":20,"background":"green"}
+{"id":"hs3","type":"rect","width":8,"height":12,"background":"blue"}
+{"id":"hstack_desc","type":"text","content":"Horizontal layout container for side-by-side elements","font_size":11,"color":"gray"}
+{"id":"table_name","type":"text","content":"Table","font_size":14,"color":"black"}
+{"id":"table_demo","type":"table","cols":2,"children":["t1","t2","t3","t4"],"border_color":"black","border_width":1,"cell_padding":3}
+{"id":"t1","type":"text","content":"A","font_size":10}
+{"id":"t2","type":"text","content":"B","font_size":10}
+{"id":"t3","type":"text","content":"C","font_size":10}
+{"id":"t4","type":"text","content":"D","font_size":10}
+{"id":"table_desc","type":"text","content":"Grid layout with configurable rows and columns","font_size":11,"color":"gray"}
+{"id":"group_name","type":"text","content":"Group","font_size":14,"color":"black"}
+{"id":"group_demo","type":"group","children":["g1","g2"]}
+{"id":"g1","type":"rect","width":20,"height":15,"background":"pink"}
+{"id":"g2","type":"rect","width":15,"height":20,"background":"lightgreen"}
+{"id":"group_desc","type":"text","content":"Groups elements without layout constraints","font_size":11,"color":"gray"}
+{"id":"container_name","type":"text","content":"Free Container","font_size":14,"color":"black"}
+{"id":"container_demo","type":"free_container","width":60,"height":40,"children":["fc1","fc2"]}
+{"id":"fc1","type":"rect","width":15,"height":10,"background":"cyan","x":5,"y":5}
+{"id":"fc2","type":"rect","width":10,"height":15,"background":"magenta","x":35,"y":20}
+{"id":"container_desc","type":"text","content":"Absolute positioning container using x,y coordinates","font_size":11,"color":"gray"}
+===/docs/examples/images.jsonl===
+{"id":"root","type":"vstack","children":["header","main_content","footer"],"h_align":"center"}
+{"id":"header","type":"box","padding":20,"background":"#2c3e50","children":["header_content"]}
+{"id":"header_content","type":"text","content":"📷 Multi-Service Image Test","font_size":28,"color":"white"}
+{"id":"main_content","type":"vstack","children":["placeholders_section","avatars_section","mixed_section"],"h_align":"center"}
+{"id":"placeholders_section","type":"vstack","children":["placeholder_title","placeholder_images"],"h_align":"center"}
+{"id":"placeholder_title","type":"text","content":"Lorem Picsum Placeholders","font_size":20,"color":"#34495e"}
+{"id":"placeholder_images","type":"hstack","children":["placeholder_1","placeholder_2","placeholder_3","placeholder_4"],"v_align":"center"}
+{"id":"placeholder_1","type":"image","src":"https://picsum.photos/150/150?random=10","width":150,"height":150}
+{"id":"placeholder_2","type":"image","src":"https://picsum.photos/150/150?random=20","width":150,"height":150}
+{"id":"placeholder_3","type":"image","src":"https://picsum.photos/150/150?random=30","width":150,"height":150}
+{"id":"placeholder_4","type":"image","src":"https://picsum.photos/150/150?random=40","width":150,"height":150}
+{"id":"avatars_section","type":"vstack","children":["avatar_title","avatar_images"],"h_align":"center"}
+{"id":"avatar_title","type":"text","content":"DiceBear Avatar Generator","font_size":20,"color":"#34495e"}
+{"id":"avatar_images","type":"hstack","children":["avatar_1","avatar_2","avatar_3"],"v_align":"center"}
+{"id":"avatar_1","type":"image","src":"https://api.dicebear.com/7.x/avataaars/svg?seed=Felix","width":100,"height":100}
+{"id":"avatar_2","type":"image","src":"https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka","width":100,"height":100}
+{"id":"avatar_3","type":"image","src":"https://api.dicebear.com/7.x/avataaars/svg?seed=John","width":100,"height":100}
+{"id":"mixed_section","type":"vstack","children":["mixed_title","mixed_content"],"h_align":"center"}
+{"id":"mixed_title","type":"text","content":"Mixed Content Layout","font_size":20,"color":"#34495e"}
+{"id":"mixed_content","type":"free_container","width":600,"height":300,"background":"#ecf0f1","border_color":"#bdc3c7","border_width":2,"children":["large_img","info_card","small_avatars"]}
+{"id":"large_img","type":"image","src":"https://picsum.photos/250/200?random=100","width":250,"height":200,"x":20,"y":20}
+{"id":"info_card","type":"box","padding":15,"background":"white","border_color":"#95a5a6","border_width":1,"border_radius":8,"children":["info_text"],"x":300,"y":30}
+{"id":"info_text","type":"text","content":"This large image demonstrates absolute positioning within a free container. The image uses Lorem Picsum with specific dimensions and a random seed.","line_width":250,"font_size":12,"color":"#2c3e50"}
+{"id":"small_avatars","type":"hstack","children":["mini_avatar_1","mini_avatar_2","mini_avatar_3"],"v_align":"center","x":350,"y":200}
+{"id":"mini_avatar_1","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test1","width":40,"height":40}
+{"id":"mini_avatar_2","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test2","width":40,"height":40}
+{"id":"mini_avatar_3","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test3","width":40,"height":40}
+{"id":"footer","type":"box","padding":10,"background":"#95a5a6","children":["footer_text"]}
+{"id":"footer_text","type":"text","content":"🌐 Images loaded from: picsum.photos (photos) • dicebear.com (avatars)","font_size":12,"color":"#2c3e50"}
+===/docs/examples/text/text-in-box-auto-wrap.jsonl===
+{"id":"test_box","type":"box","width":400,"padding":20,"children":["long_text"]}
+{"id":"long_text","type":"text","content":"This is a very long text that should automatically wrap to fit within the 400px box width with 20px padding on each side."}
 ===/.gitignore===
 /target
 /Cargo.lock
@@ -5649,6 +6628,622 @@ fn test_box_fixed_size() {
     // assert the box size is equal to the fixed size
     assert_eq!(box_size.0, 100.0);
     assert_eq!(box_size.1, 50.0);
+}
+
+===/src/constraints/mod.rs===
+use crate::components::*;
+use anyhow::Result;
+use cassowary::strength::{MEDIUM, REQUIRED, STRONG, WEAK};
+use cassowary::{AddEditVariableError, Constraint, Solver, Variable, WeightedRelation::*};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub enum SimpleConstraint {
+    // ===== BASIC ALIGNMENT CONSTRAINTS =====
+    AlignLeft(EntityID, EntityID),
+    /// Align the right edges of two entities  
+    AlignRight(EntityID, EntityID),
+    /// Align the top edges of two entities
+    AlignTop(EntityID, EntityID),
+    /// Align the bottom edges of two entities
+    AlignBottom(EntityID, EntityID),
+    /// Align the horizontal centers of two entities
+    AlignCenterHorizontal(EntityID, EntityID),
+    /// Align the vertical centers of two entities
+    AlignCenterVertical(EntityID, EntityID),
+
+    // ===== DIRECTIONAL POSITIONING CONSTRAINTS =====
+    /// First entity is to the right of the second entity
+    RightOf(EntityID, EntityID),
+    /// First entity is to the left of the second entity
+    LeftOf(EntityID, EntityID),
+    /// First entity is above the second entity
+    Above(EntityID, EntityID),
+    /// First entity is below the second entity
+    Below(EntityID, EntityID),
+
+    // ===== SPACING CONSTRAINTS =====
+    /// Fixed horizontal spacing between two entities (gap between right edge of first and left edge of second)
+    HorizontalSpacing(EntityID, EntityID, Float),
+    /// Fixed vertical spacing between two entities (gap between bottom edge of first and top edge of second)
+    VerticalSpacing(EntityID, EntityID, Float),
+    /// Fixed distance between the centers of two entities
+    FixedDistance(EntityID, EntityID, Float),
+
+    // ===== SIZE RELATIONSHIP CONSTRAINTS =====
+    /// Two entities have the same width
+    SameWidth(EntityID, EntityID),
+    /// Two entities have the same height
+    SameHeight(EntityID, EntityID),
+    /// Two entities have the same width and height
+    SameSize(EntityID, EntityID),
+    /// First entity's width is proportional to second entity's width by the given ratio
+    ProportionalWidth(EntityID, EntityID, Float),
+    /// First entity's height is proportional to second entity's height by the given ratio
+    ProportionalHeight(EntityID, EntityID, Float),
+
+    // ===== ADVANCED LAYOUT CONSTRAINTS =====
+    /// Maintain a specific aspect ratio (width/height) for an entity
+    AspectRatio(EntityID, Float),
+    /// Evenly distribute entities horizontally with equal spacing
+    DistributeHorizontally(Vec<EntityID>),
+    /// Evenly distribute entities vertically with equal spacing
+    DistributeVertically(Vec<EntityID>),
+    /// Stack entities horizontally with specified spacing between them
+    StackHorizontal(Vec<EntityID>, Float),
+    /// Stack entities vertically with specified spacing between them
+    StackVertical(Vec<EntityID>, Float),
+}
+
+pub struct ConstraintSystem {
+    solver: Solver,
+    variables: HashMap<String, EntityVars>,
+}
+
+struct EntityVars {
+    x: Variable,
+    y: Variable,
+    width: Variable,
+    height: Variable,
+}
+
+impl ConstraintSystem {
+    pub fn new() -> Self {
+        Self {
+            solver: Solver::new(),
+            variables: HashMap::new(),
+        }
+    }
+
+    pub fn add_entity(&mut self, id: String) -> anyhow::Result<()> {
+        let vars = EntityVars {
+            x: Variable::new(),
+            y: Variable::new(),
+            width: Variable::new(),
+            height: Variable::new(),
+        };
+
+        // Ensure positive sizes
+        self.solver
+            .add_constraint(vars.width | GE(REQUIRED) | 0.0)
+            .map_err(|e| anyhow::anyhow!("Failed to add width constraint: {:?}", e))?;
+        self.solver
+            .add_constraint(vars.height | GE(REQUIRED) | 0.0)
+            .map_err(|e| anyhow::anyhow!("Failed to add height constraint: {:?}", e))?;
+
+        // Mark editable variables
+        self.solver
+            .add_constraint(vars.width | GE(REQUIRED) | 0.0)
+            .map_err(|e| anyhow::anyhow!("Failed to add width >= 0 constraint: {:?}", e))?;
+        self.solver
+            .add_constraint(vars.height | GE(REQUIRED) | 0.0)
+            .map_err(|e| anyhow::anyhow!("Failed to add height >= 0 constraint: {:?}", e))?;
+        self.solver
+            .add_constraint(vars.x | EQ(WEAK) | 0.0)
+            .map_err(|e| anyhow::anyhow!("Failed to add default x constraint: {:?}", e))?;
+        self.solver
+            .add_constraint(vars.y | EQ(WEAK) | 0.0)
+            .map_err(|e| anyhow::anyhow!("Failed to add default y constraint: {:?}", e))?;
+
+        self.variables.insert(id, vars);
+        Ok(())
+    }
+
+    pub fn add_constraint(&mut self, constraint: SimpleConstraint) -> Result<()> {
+        match constraint {
+            SimpleConstraint::AlignLeft(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x)
+                    .map_err(|e| anyhow::anyhow!("Failed to add align left constraint: {:?}", e))?;
+            }
+
+            SimpleConstraint::AlignRight(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Right edge = x + width, so: x1 + width1 = x2 + width2
+                self.solver
+                    .add_constraint(
+                        (vars1.x + vars1.width) | EQ(REQUIRED) | (vars2.x + vars2.width),
+                    )
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add align right constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::AlignTop(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y)
+                    .map_err(|e| anyhow::anyhow!("Failed to add align top constraint: {:?}", e))?;
+            }
+
+            SimpleConstraint::AlignBottom(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Bottom edge = y + height, so: y1 + height1 = y2 + height2
+                self.solver
+                    .add_constraint(
+                        (vars1.y + vars1.height) | EQ(REQUIRED) | (vars2.y + vars2.height),
+                    )
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add align bottom constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::AlignCenterHorizontal(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Horizontal center = x + width/2, so: x1 + width1/2 = x2 + width2/2
+                self.solver
+                    .add_constraint(
+                        (vars1.x + vars1.width * 0.5)
+                            | EQ(REQUIRED)
+                            | (vars2.x + vars2.width * 0.5),
+                    )
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add align center horizontal constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::AlignCenterVertical(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Vertical center = y + height/2, so: y1 + height1/2 = y2 + height2/2
+                self.solver
+                    .add_constraint(
+                        (vars1.y + vars1.height * 0.5)
+                            | EQ(REQUIRED)
+                            | (vars2.y + vars2.height * 0.5),
+                    )
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add align center vertical constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::RightOf(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x + vars2.width)
+                    .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
+            }
+
+            SimpleConstraint::LeftOf(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x - vars1.width)
+                    .map_err(|e| anyhow::anyhow!("Failed to add leftOf constraint: {:?}", e))?;
+            }
+
+            SimpleConstraint::Below(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y + vars2.height)
+                    .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
+            }
+            SimpleConstraint::Above(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                self.solver
+                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y - vars2.height)
+                    .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
+            }
+
+            SimpleConstraint::HorizontalSpacing(id1, id2, spacing) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Horizontal spacing: gap between right edge of first and left edge of second
+                // x2 = x1 + width1 + spacing
+                self.solver
+                    .add_constraint(vars2.x | EQ(REQUIRED) | (vars1.x + vars1.width + spacing))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add horizontal spacing constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::VerticalSpacing(id1, id2, spacing) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Vertical spacing: gap between bottom edge of first and top edge of second
+                // y2 = y1 + height1 + spacing
+                self.solver
+                    .add_constraint(vars2.y | EQ(REQUIRED) | (vars1.y + vars1.height + spacing))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add vertical spacing constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::FixedDistance(id1, id2, distance) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+
+                // Fixed distance between centers of two entities
+                // Distance = sqrt((cx2 - cx1)² + (cy2 - cy1)²)
+                // Since Cassowary is a linear solver, we can't directly implement sqrt.
+                // We'll use the Manhattan distance as an approximation, or implement
+                // a more sophisticated approach using auxiliary variables.
+
+                // For now, let's implement using Manhattan distance (|dx| + |dy| = distance)
+                // This is a reasonable approximation for many layout purposes.
+
+                // Create auxiliary variables for the center positions
+                let center1_x = Variable::new();
+                let center1_y = Variable::new();
+                let center2_x = Variable::new();
+                let center2_y = Variable::new();
+
+                // Define centers
+                self.solver
+                    .add_constraint(center1_x | EQ(REQUIRED) | (vars1.x + vars1.width * 0.5))
+                    .map_err(|e| anyhow::anyhow!("Failed to add center1_x constraint: {:?}", e))?;
+                self.solver
+                    .add_constraint(center1_y | EQ(REQUIRED) | (vars1.y + vars1.height * 0.5))
+                    .map_err(|e| anyhow::anyhow!("Failed to add center1_y constraint: {:?}", e))?;
+                self.solver
+                    .add_constraint(center2_x | EQ(REQUIRED) | (vars2.x + vars2.width * 0.5))
+                    .map_err(|e| anyhow::anyhow!("Failed to add center2_x constraint: {:?}", e))?;
+                self.solver
+                    .add_constraint(center2_y | EQ(REQUIRED) | (vars2.y + vars2.height * 0.5))
+                    .map_err(|e| anyhow::anyhow!("Failed to add center2_y constraint: {:?}", e))?;
+
+                // For Manhattan distance approximation:
+                // We'll enforce that the total horizontal and vertical distance equals the target distance
+                // This works well for cases where entities are primarily aligned horizontally or vertically
+
+                // Create auxiliary variables for absolute differences
+                let dx_pos = Variable::new(); // max(center2_x - center1_x, 0)
+                let dx_neg = Variable::new(); // max(center1_x - center2_x, 0)
+                let dy_pos = Variable::new(); // max(center2_y - center1_y, 0)
+                let dy_neg = Variable::new(); // max(center1_y - center2_y, 0)
+
+                // Ensure non-negative auxiliary variables
+                self.solver
+                    .add_constraint(dx_pos | GE(REQUIRED) | 0.0)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add dx_pos >= 0 constraint: {:?}", e)
+                    })?;
+                self.solver
+                    .add_constraint(dx_neg | GE(REQUIRED) | 0.0)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add dx_neg >= 0 constraint: {:?}", e)
+                    })?;
+                self.solver
+                    .add_constraint(dy_pos | GE(REQUIRED) | 0.0)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add dy_pos >= 0 constraint: {:?}", e)
+                    })?;
+                self.solver
+                    .add_constraint(dy_neg | GE(REQUIRED) | 0.0)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add dy_neg >= 0 constraint: {:?}", e)
+                    })?;
+
+                // Define the absolute differences
+                self.solver
+                    .add_constraint((center2_x - center1_x) | EQ(REQUIRED) | (dx_pos - dx_neg))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add dx difference constraint: {:?}", e)
+                    })?;
+                self.solver
+                    .add_constraint((center2_y - center1_y) | EQ(REQUIRED) | (dy_pos - dy_neg))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add dy difference constraint: {:?}", e)
+                    })?;
+
+                // Manhattan distance constraint: |dx| + |dy| = distance
+                self.solver
+                    .add_constraint((dx_pos + dx_neg + dy_pos + dy_neg) | EQ(REQUIRED) | distance)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add manhattan distance constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::SameWidth(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Both entities must have identical widths
+                self.solver
+                    .add_constraint(vars1.width | EQ(REQUIRED) | vars2.width)
+                    .map_err(|e| anyhow::anyhow!("Failed to add same width constraint: {:?}", e))?;
+            }
+
+            SimpleConstraint::SameHeight(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Both entities must have identical heights
+                self.solver
+                    .add_constraint(vars1.height | EQ(REQUIRED) | vars2.height)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::SameSize(id1, id2) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // Both entities must have identical width AND height
+                self.solver
+                    .add_constraint(vars1.width | EQ(REQUIRED) | vars2.width)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add same size width constraint: {:?}", e)
+                    })?;
+                self.solver
+                    .add_constraint(vars1.height | EQ(REQUIRED) | vars2.height)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add same size height constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::ProportionalWidth(id1, id2, ratio) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // First entity's width = second entity's width * ratio
+                // width1 = width2 * ratio
+                self.solver
+                    .add_constraint(vars1.width | EQ(REQUIRED) | (vars2.width * ratio))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add proportional width constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::ProportionalHeight(id1, id2, ratio) => {
+                let vars1 = self.variables.get(&id1).expect("Entity not found");
+                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                // First entity's height = second entity's height * ratio
+                // height1 = height2 * ratio
+                self.solver
+                    .add_constraint(vars1.height | EQ(REQUIRED) | (vars2.height * ratio))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add proportional height constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::AspectRatio(id, ratio) => {
+                let vars = self.variables.get(&id).expect("Entity not found");
+                // Maintain aspect ratio: width / height = ratio
+                // Rearranged: width = height * ratio
+                self.solver
+                    .add_constraint(vars.width | EQ(REQUIRED) | (vars.height * ratio))
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add aspect ratio constraint: {:?}", e)
+                    })?;
+            }
+
+            SimpleConstraint::DistributeHorizontally(entities) => {
+                if entities.len() < 2 {
+                    return Err(anyhow::anyhow!(
+                        "DistributeHorizontally requires at least 2 entities"
+                    ));
+                }
+
+                // Since container size is calculated from children positions,
+                // distribution means: equal spacing between consecutive entities
+                // The container will size itself to fit all distributed children
+
+                for i in 1..entities.len() {
+                    let prev_vars = self
+                        .variables
+                        .get(&entities[i - 1])
+                        .expect("Previous entity not found");
+                    let curr_vars = self
+                        .variables
+                        .get(&entities[i])
+                        .expect("Current entity not found");
+
+                    if i == 1 {
+                        // First spacing - this becomes our reference spacing
+                        continue;
+                    }
+
+                    // All spacings must be equal
+                    // spacing_i = spacing_1 for all i
+                    let prev_prev_vars = self
+                        .variables
+                        .get(&entities[i - 2])
+                        .expect("Previous-previous entity not found");
+
+                    // Current spacing = Previous spacing
+                    // (curr.x - prev.x - prev.width) = (prev.x - prev_prev.x - prev_prev.width)
+                    let spacing_current = curr_vars.x - prev_vars.x - prev_vars.width;
+                    let spacing_reference = prev_vars.x - prev_prev_vars.x - prev_prev_vars.width;
+
+                    self.solver
+                        .add_constraint(spacing_current | EQ(REQUIRED) | spacing_reference)
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to add horizontal distribution constraint: {:?}",
+                                e
+                            )
+                        })?;
+                }
+            }
+
+            SimpleConstraint::DistributeVertically(entities) => {
+                if entities.len() < 2 {
+                    return Err(anyhow::anyhow!(
+                        "DistributeVertically requires at least 2 entities"
+                    ));
+                }
+
+                // Since container size is calculated from children positions,
+                // vertical distribution means: equal spacing between consecutive entities
+                // The container will size itself to fit all distributed children
+
+                for i in 1..entities.len() {
+                    let prev_vars = self
+                        .variables
+                        .get(&entities[i - 1])
+                        .expect("Previous entity not found");
+                    let curr_vars = self
+                        .variables
+                        .get(&entities[i])
+                        .expect("Current entity not found");
+
+                    if i == 1 {
+                        // First spacing becomes our reference spacing
+                        continue;
+                    }
+
+                    // All spacings must be equal
+                    let prev_prev_vars = self
+                        .variables
+                        .get(&entities[i - 2])
+                        .expect("Previous-previous entity not found");
+
+                    // Current spacing = Reference spacing
+                    // (curr.y - prev.y - prev.height) = (prev.y - prev_prev.y - prev_prev.height)
+                    let spacing_current = curr_vars.y - prev_vars.y - prev_vars.height;
+                    let spacing_reference = prev_vars.y - prev_prev_vars.y - prev_prev_vars.height;
+
+                    self.solver
+                        .add_constraint(spacing_current | EQ(REQUIRED) | spacing_reference)
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to add vertical distribution constraint: {:?}",
+                                e
+                            )
+                        })?;
+                }
+            }
+
+            SimpleConstraint::StackHorizontal(entities, spacing) => {
+                if entities.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "StackHorizontal requires at least 1 entity"
+                    ));
+                }
+
+                // Stack entities horizontally with fixed spacing between them
+                // entity[i+1].x = entity[i].x + entity[i].width + spacing
+                for i in 1..entities.len() {
+                    let prev_vars = self
+                        .variables
+                        .get(&entities[i - 1])
+                        .expect("Previous entity not found");
+                    let curr_vars = self
+                        .variables
+                        .get(&entities[i])
+                        .expect("Current entity not found");
+
+                    // Current entity starts where previous entity ends plus spacing
+                    self.solver
+                        .add_constraint(
+                            curr_vars.x | EQ(REQUIRED) | (prev_vars.x + prev_vars.width + spacing),
+                        )
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add horizontal stack constraint: {:?}", e)
+                        })?;
+                }
+            }
+
+            SimpleConstraint::StackVertical(entities, spacing) => {
+                if entities.is_empty() {
+                    return Err(anyhow::anyhow!("StackVertical requires at least 1 entity"));
+                }
+
+                // Stack entities vertically with fixed spacing between them
+                // entity[i+1].y = entity[i].y + entity[i].height + spacing
+                for i in 1..entities.len() {
+                    let prev_vars = self
+                        .variables
+                        .get(&entities[i - 1])
+                        .expect("Previous entity not found");
+                    let curr_vars = self
+                        .variables
+                        .get(&entities[i])
+                        .expect("Current entity not found");
+
+                    // Current entity starts where previous entity ends plus spacing
+                    self.solver
+                        .add_constraint(
+                            curr_vars.y | EQ(REQUIRED) | (prev_vars.y + prev_vars.height + spacing),
+                        )
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add vertical stack constraint: {:?}", e)
+                        })?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn solve(&mut self) -> Result<HashMap<String, (f32, f32, f32, f32)>> {
+        self.solver.fetch_changes();
+        let mut results = HashMap::new();
+        for (id, vars) in &self.variables {
+            let x = self.solver.get_value(vars.x) as f32;
+            let y = self.solver.get_value(vars.y) as f32;
+            let width = self.solver.get_value(vars.width) as f32;
+            let height = self.solver.get_value(vars.height) as f32;
+            results.insert(id.clone(), (x, y, width, height));
+        }
+        Ok(results)
+    }
+
+    pub fn suggest_size(
+        &mut self,
+        id: &str,
+        width: f32,
+        height: f32,
+    ) -> Result<(), cassowary::SuggestValueError> {
+        println!("Suggest_size called {} {} {}", id, width, height);
+        if let Some(vars) = self.variables.get(id) {
+            let _ = self
+                .solver
+                .add_constraint(vars.width | EQ(STRONG) | (width as f64))
+                .map_err(|e| anyhow::anyhow!("Failed to add suggested width constraint: {:?}", e));
+            let _ = self
+                .solver
+                .add_constraint(vars.height | EQ(STRONG) | (height as f64))
+                .map_err(|e| anyhow::anyhow!("Failed to add suggested height constraint: {:?}", e));
+        }
+
+        Ok(())
+    }
+
+    pub fn suggest_position(
+        &mut self,
+        id: &str,
+        x: f32,
+        y: f32,
+    ) -> Result<(), cassowary::SuggestValueError> {
+        if let Some(vars) = self.variables.get(id) {
+            let _ = self
+                .solver
+                .add_constraint(vars.x | EQ(MEDIUM) | (x as f64))
+                .map_err(|e| anyhow::anyhow!("Failed to add suggested x constraint: {:?}", e));
+            let _ = self
+                .solver
+                .add_constraint(vars.y | EQ(MEDIUM) | (y as f64))
+                .map_err(|e| anyhow::anyhow!("Failed to add suggested y constraint: {:?}", e));
+        }
+        Ok(())
+    }
 }
 
 ===/src/lib.rs===
@@ -9918,6 +11513,41 @@ base64 = "0.21"
 [lib]
 name = "svg_renderer"
 path = "src/lib.rs"
+===/test_viewer/index.html===
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SVG Renderer Test Viewer</title>
+   <style>
+    @font-face {
+    font-family: 'Roboto';
+    src: url('Roboto-Regular.ttf') format('truetype');
+    }
+
+   </style>
+</head>
+<body>
+    <form id="svg-form">
+        <label for="svg-source">Paste SVG here:</label>
+        <textarea id="svg-source" spellcheck="false" wrap="off" autocapitalize="none" autocomplete="off" autocorrect="off" autofocus="true" placeholder="Paste SVG here..."></textarea>
+        <input type="submit" value="Render">
+    </form>
+    <div id="svg-container"></div>
+    <script type="module">
+        const svgSource = document.getElementById('svg-source');
+        const svgContainer = document.getElementById('svg-container');
+        const form = document.getElementById('svg-form');
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            svgContainer.innerHTML = svgSource.value;
+        });
+    </script> 
+    
+</body>
+</html>
+
 ===/src/lib.rs===
 use std::io::Write;
 use volare_engine_layout::diagram_builder::DiagramTreeNode;

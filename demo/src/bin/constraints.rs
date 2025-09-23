@@ -75,8 +75,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut constraints = Vec::<SimpleConstraint>::new();
     // R1 should be set to the right of r2
     constraints.push(SimpleConstraint::RightOf("r1".into(), "r2".into()));
-    constraints.push(SimpleConstraint::BottomOf("r3".into(), "r2".into()));
-    constraints.push(SimpleConstraint::TopOf("r4".into(), "r1".into()));
+    constraints.push(SimpleConstraint::Below("r3".into(), "r2".into()));
+    constraints.push(SimpleConstraint::Above("r4".into(), "r1".into()));
     constraints.push(SimpleConstraint::RightOf("r1".into(), "r4".into()));
     let root = builder.new_constraint_layout_container("container".to_string(), children_with_pos, constraints);
     layout_tree_node(&mut builder, &root);

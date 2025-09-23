@@ -49,7 +49,7 @@ cmd=("${cmd[@]}" -not -path '.*' -print0) # Exclude hidden files
 "${cmd[@]}" | while IFS= read -r -d '' file; do
   # Check if the file is a text file
   file_type=$(file --brief --mime-type "$file")
-  if [[ "$file_type" = "text/plain" ]]; then
+  if [[ "$file_type" =~ ^text/ || "$file_type" = "application/json" ]]; then
     # Get the relative path to the file with respect to the input folder
     relative="${file#$folder}"
 

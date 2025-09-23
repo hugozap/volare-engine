@@ -13,6 +13,41 @@ base64 = "0.21"
 [lib]
 name = "svg_renderer"
 path = "src/lib.rs"
+===/test_viewer/index.html===
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SVG Renderer Test Viewer</title>
+   <style>
+    @font-face {
+    font-family: 'Roboto';
+    src: url('Roboto-Regular.ttf') format('truetype');
+    }
+
+   </style>
+</head>
+<body>
+    <form id="svg-form">
+        <label for="svg-source">Paste SVG here:</label>
+        <textarea id="svg-source" spellcheck="false" wrap="off" autocapitalize="none" autocomplete="off" autocorrect="off" autofocus="true" placeholder="Paste SVG here..."></textarea>
+        <input type="submit" value="Render">
+    </form>
+    <div id="svg-container"></div>
+    <script type="module">
+        const svgSource = document.getElementById('svg-source');
+        const svgContainer = document.getElementById('svg-container');
+        const form = document.getElementById('svg-form');
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            svgContainer.innerHTML = svgSource.value;
+        });
+    </script> 
+    
+</body>
+</html>
+
 ===/src/lib.rs===
 use std::io::Write;
 use volare_engine_layout::diagram_builder::DiagramTreeNode;
