@@ -345,7 +345,7 @@ fn convert_constraint_declaration(
 }
 
 // Helper functions for attribute extraction with multiple attribute name support
-fn get_string_attr(attrs: &Map<String, Value>, keys: &[&str], default: &str) -> String {
+pub fn get_string_attr(attrs: &Map<String, Value>, keys: &[&str], default: &str) -> String {
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             if let Some(s) = value.as_str() {
@@ -360,7 +360,7 @@ fn get_string_attr(attrs: &Map<String, Value>, keys: &[&str], default: &str) -> 
     default.to_string()
 }
 
-fn get_float_attr(attrs: &Map<String, Value>, keys: &[&str], default: f64) -> Float {
+pub fn get_float_attr(attrs: &Map<String, Value>, keys: &[&str], default: f64) -> Float {
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             if let Some(f) = value.as_f64() {
@@ -371,7 +371,7 @@ fn get_float_attr(attrs: &Map<String, Value>, keys: &[&str], default: f64) -> Fl
     default as Float
 }
 
-fn get_int_attr(attrs: &Map<String, Value>, keys: &[&str], default: i64) -> i64 {
+pub fn get_int_attr(attrs: &Map<String, Value>, keys: &[&str], default: i64) -> i64 {
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             if let Some(i) = value.as_i64() {
@@ -382,7 +382,7 @@ fn get_int_attr(attrs: &Map<String, Value>, keys: &[&str], default: i64) -> i64 
     default
 }
 
-fn get_bool_attr(attrs: &Map<String, Value>, keys: &[&str], default: bool) -> bool {
+pub fn get_bool_attr(attrs: &Map<String, Value>, keys: &[&str], default: bool) -> bool {
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             if let Some(b) = value.as_bool() {
@@ -393,7 +393,7 @@ fn get_bool_attr(attrs: &Map<String, Value>, keys: &[&str], default: bool) -> bo
     default
 }
 
-fn get_array_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<String>> {
+pub fn get_array_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<String>> {
     attrs.get(key).and_then(|v| {
         v.as_array().map(|arr| {
             arr.iter()
@@ -403,7 +403,7 @@ fn get_array_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<String>> 
     })
 }
 
-fn get_point_attr(
+pub fn get_point_attr(
     attrs: &Map<String, Value>,
     x_keys: &[&str],
     y_keys: &[&str],
@@ -414,7 +414,7 @@ fn get_point_attr(
     (x, y)
 }
 
-fn get_points_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<(Float, Float)>> {
+pub fn get_points_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<(Float, Float)>> {
     attrs.get(key).and_then(|v| {
         v.as_array().map(|arr| {
             arr.iter()
@@ -435,7 +435,7 @@ fn get_points_attr(attrs: &Map<String, Value>, key: &str) -> Option<Vec<(Float, 
 }
 
 /// Parse a unified width/height value that can be either a number (fixed) or string (behavior)
-fn parse_unified_dimension(attrs: &Map<String, Value>, keys: &[&str]) -> SizeBehavior {
+pub fn parse_unified_dimension(attrs: &Map<String, Value>, keys: &[&str]) -> SizeBehavior {
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             match value {
@@ -673,7 +673,7 @@ impl JsonLinesParser {
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
             return builder
-                .create_custom_component(&component_type, &attributes)
+                .create_custom_component(&component_type, &attributes, &self)
                 .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 

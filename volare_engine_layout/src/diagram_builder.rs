@@ -13,7 +13,7 @@ use std::{collections::HashMap, hash::Hash, rc::Rc, sync::Arc};
  *
  */
 //use TextOptions
-use crate::{components::*, transform::Transform, BoundingBox, ConstraintSystem, SimpleConstraint};
+use crate::{components::*, parser::JsonLinesParser, transform::Transform, BoundingBox, ConstraintSystem, SimpleConstraint};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
@@ -156,6 +156,7 @@ impl DiagramBuilder {
         F: Fn(
                 &serde_json::Map<String, serde_json::Value>,
                 &mut DiagramBuilder,
+                &JsonLinesParser,
             ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
             + Send
             + Sync
@@ -176,7 +177,8 @@ impl DiagramBuilder {
     pub fn create_custom_component(
         &mut self,
         component_type: &str,
-        options: &serde_json::Map<String, serde_json::Value>,
+        attrs: &serde_json::Map<String, serde_json::Value>,
+        lines_parser: &JsonLinesParser,
     ) -> Result<DiagramTreeNode, String> {
         if !self.custom_components.has_component(component_type) {
             return Err(format!(
@@ -185,9 +187,9 @@ impl DiagramBuilder {
             ));
         }
 
-        let factory = { self.custom_components.get(component_type).unwrap().clone() };
+            let factory = { self.custom_components.get(component_type).unwrap().clone() };
 
-        factory(options, self)
+            factory(attrs, self, lines_parser)
     }
 
     /* Create a new entity of a given type
@@ -873,6 +875,7 @@ impl DiagramBuilder {
             dyn Fn(
                     &serde_json::Map<String, serde_json::Value>,
                     &mut DiagramBuilder,
+                    &JsonLinesParser,
                 ) -> Result<DiagramTreeNode, String>
                 + Send
                 + Sync,
@@ -921,6 +924,7 @@ mod component_registration_tests {
     fn create_badge_component(
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
+        parser: &JsonLinesParser,
     ) -> Result<DiagramTreeNode, String> {
         println!("🏷️  Creating badge component with attrs: {:?}", attrs);
 
@@ -992,7 +996,9 @@ mod component_registration_tests {
         .unwrap()
         .clone();
 
-        let result = builder.create_custom_component("badge", &attrs);
+        let parser  = JsonLinesParser::new();
+
+        let result = builder.create_custom_component("badge", &attrs, &parser);
         assert!(result.is_ok());
         let badge_node = result.unwrap();
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);

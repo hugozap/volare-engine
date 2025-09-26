@@ -1,6 +1,7 @@
 pub mod table;
 
 use crate::constraints::{ConstraintSystem, SimpleConstraint};
+use crate::parser::JsonLinesParser;
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
@@ -1317,6 +1318,7 @@ pub type CustomComponentFactory = Arc<
     dyn Fn(
             &Map<String, Value>,
             &mut crate::DiagramBuilder,
+            &JsonLinesParser,
         ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
         + Send
         + Sync,
@@ -1340,6 +1342,7 @@ impl CustomComponentRegistry {
         F: Fn(
                 &Map<String, Value>,
                 &mut crate::DiagramBuilder,
+                &JsonLinesParser,
             ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
             + Send
             + Sync
@@ -1355,9 +1358,10 @@ impl CustomComponentRegistry {
         component_type: &str,
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
+        parser: &JsonLinesParser,
     ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
         match self.factories.get(component_type) {
-            Some(factory) => factory(attributes, builder),
+            Some(factory) => factory(attributes, builder, parser),
             None => Err(format!("Unknown custom component type: {}", component_type)),
         }
     }
@@ -1380,6 +1384,7 @@ impl CustomComponentRegistry {
             dyn Fn(
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
+                    &JsonLinesParser,
                 ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
                 + Send
                 + Sync,
@@ -1433,6 +1438,7 @@ mod custom_component_tests {
     fn create_badge_component(
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
+        parser: &JsonLinesParser,
     ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
         // Extract attributes with defaults
         let text = attrs
@@ -1486,8 +1492,9 @@ mod custom_component_tests {
             "border_radius": 20.0
         });
 
+        let parser = JsonLinesParser::new();
         let attrs_map = attrs.as_object().unwrap();
-        let badge = registry.create_component("badge", attrs_map, &mut builder);
+        let badge = registry.create_component("badge", attrs_map, &mut builder, &parser);
 
         assert!(badge.is_ok());
         let badge_node = badge.unwrap();
