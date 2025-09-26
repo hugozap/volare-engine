@@ -541,3 +541,9 @@ Since constraint containers handle positioning through constraints, explicit `x`
 ```
 
 This would be used as a suggestion in the constraint system, but the final positioning will be determined by the constraints.
+
+x,y positions may be overrided by the system, if possible it's better to not use them, and prefer constraint declaration.
+
+## Over constraint warning
+
+Be careful to not over constraint the system by setting incompatible constraints.

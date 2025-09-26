@@ -90,10 +90,6 @@ pub enum ConstraintDeclaration {
     ProportionalHeight { entities: Vec<String>, ratio: Float },
     #[serde(rename = "aspect_ratio")]
     AspectRatio { entity: String, ratio: Float },
-    #[serde(rename = "distribute_horizontally")]
-    DistributeHorizontally { entities: Vec<String> },
-    #[serde(rename = "distribute_vertically")]
-    DistributeVertically { entities: Vec<String> },
 }
 
 fn convert_constraint_declaration(
@@ -101,69 +97,34 @@ fn convert_constraint_declaration(
 ) -> Result<SimpleConstraint, JsonLinesError> {
     match decl {
         ConstraintDeclaration::AlignLeft { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "align_left requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::AlignLeft(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::AlignRight { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "align_right requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::AlignRight(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::AlignTop { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "align_top requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::AlignTop(
-                entities[0].clone(),
-                entities[1].clone(),
+              entities.to_vec()
             ))
         }
         ConstraintDeclaration::AlignBottom { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "align_bottom requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::AlignBottom(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::AlignCenterHorizontal { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "align_center_horizontal requires exactly 2 entities".to_string(),
-                ));
-            }
+
             Ok(SimpleConstraint::AlignCenterHorizontal(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::AlignCenterVertical { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "align_center_vertical requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::AlignCenterVertical(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::RightOf { entities } => {
@@ -242,7 +203,7 @@ fn convert_constraint_declaration(
             }
             Ok(SimpleConstraint::StackHorizontal(
                 entities.clone(),
-                *spacing,
+                Some(*spacing),
             ))
         }
         ConstraintDeclaration::StackVertical { entities, spacing } => {
@@ -251,7 +212,7 @@ fn convert_constraint_declaration(
                     "stack_vertical requires at least 2 entities".to_string(),
                 ));
             }
-            Ok(SimpleConstraint::StackVertical(entities.clone(), *spacing))
+            Ok(SimpleConstraint::StackVertical(entities.clone(), Some(*spacing)))
         }
         ConstraintDeclaration::FixedDistance { entities, distance } => {
             if entities.len() != 2 {
@@ -266,36 +227,19 @@ fn convert_constraint_declaration(
             ))
         }
         ConstraintDeclaration::SameWidth { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "same_width requires exactly 2 entities".to_string(),
-                ));
-            }
+    
             Ok(SimpleConstraint::SameWidth(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::SameHeight { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "same_height requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::SameHeight(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::SameSize { entities } => {
-            if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "same_size requires exactly 2 entities".to_string(),
-                ));
-            }
             Ok(SimpleConstraint::SameSize(
-                entities[0].clone(),
-                entities[1].clone(),
+                entities.to_vec()
             ))
         }
         ConstraintDeclaration::ProportionalWidth { entities, ratio } => {
@@ -324,22 +268,6 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::AspectRatio { entity, ratio } => {
             Ok(SimpleConstraint::AspectRatio(entity.clone(), *ratio))
-        }
-        ConstraintDeclaration::DistributeHorizontally { entities } => {
-            if entities.len() < 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "distribute_horizontally requires at least 2 entities".to_string(),
-                ));
-            }
-            Ok(SimpleConstraint::DistributeHorizontally(entities.clone()))
-        }
-        ConstraintDeclaration::DistributeVertically { entities } => {
-            if entities.len() < 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "distribute_vertically requires at least 2 entities".to_string(),
-                ));
-            }
-            Ok(SimpleConstraint::DistributeVertically(entities.clone()))
         }
     }
 }

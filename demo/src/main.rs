@@ -314,7 +314,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     });
 
-    let constraints = vec![SimpleConstraint::AlignLeft("constrained1".to_string(), "constrained2".to_string())];
+    let constraints = vec![SimpleConstraint::AlignLeft(vec!["constrained1".to_string(), "constrained2".to_string()])];
     let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![(elem1, None),(elem2, None)], constraints);
     table_items.push(constraint_container);
     //texts.push(get_test_table(&mut session));
