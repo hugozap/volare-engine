@@ -3,7 +3,7 @@
 
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, TEXT_BASE, TEXT_LG, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_SM, WIDTH_XL
+    BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_SM, WIDTH_XL
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -62,7 +62,7 @@ pub mod style {
     // Line Heights (as spacing multipliers)
     pub const LINE_HEIGHT_TIGHT: Float = 1.2;
     pub const LINE_HEIGHT_NORMAL: Float = 1.5;
-    pub const LINE_HEIGHT_RELAXED: Float = 1.8;
+    pub const LINE_HEIGHT_RELAXED: Float = 2.0;
 
     // === SPACING ===
 
@@ -256,6 +256,13 @@ pub fn create_document_text(
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
 
     let toptions = match variant.as_str() {
+        "xlarge" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            ..TextOptions::default()
+        },
         "large" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
