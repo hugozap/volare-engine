@@ -157,7 +157,6 @@ fn calculate_optimal_line_width(
     best_width
 }
 
-// Add this function to layout.rs
 fn auto_wrap_text_in_box(
     session: &mut DiagramBuilder,
     text_entity_id: &EntityID,

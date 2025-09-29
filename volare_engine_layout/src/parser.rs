@@ -471,7 +471,7 @@ fn parse_css_transform(transform_str: &str) -> Result<Transform, String> {
 
 /// Parser for JSON Lines diagram format
 pub struct JsonLinesParser {
-    entities: HashMap<String, JsonEntity>,
+    pub entities: HashMap<String, JsonEntity>,
 }
 
 impl JsonLinesParser {
@@ -589,6 +589,8 @@ impl JsonLinesParser {
         entity_id: &str,
         builder: &mut DiagramBuilder,
     ) -> Result<DiagramTreeNode, JsonLinesError> {
+
+        println!("*** building entity {} ***", entity_id);
         let entity = self
             .entities
             .get(entity_id)
@@ -597,11 +599,13 @@ impl JsonLinesParser {
         // Clone the entity type to avoid borrow conflicts
         let component_type = entity.entity_type.clone();
         let attributes = entity.attributes.clone();
+        println!("Attributes length {}", attributes.len());
+
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
             return builder
-                .create_custom_component(&component_type, &attributes, &self)
+                .create_custom_component(&entity_id, &component_type, &attributes, &self)
                 .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 

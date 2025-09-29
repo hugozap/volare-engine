@@ -1,3 +1,44 @@
+===/Cargo.toml===
+[package]
+name = "custom_components"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+volare_engine_layout = { path = "../volare_engine_layout" }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+textwrap = "0.16.2"
+uuid = { version = "1.0", features = ["v4", "js"] }
+
+[lib]
+name = "custom_components"
+path = "src/lib.rs"
+===/src/lib.rs===
+//components/src/lib.rs
+// Main library file for Volare Engine custom components
+
+// Re-export the main engine for convenience
+pub use volare_engine_layout::*;
+
+// Component modules
+pub mod document;
+// You can add more component domains here as you create them:
+// pub mod business_process;
+// pub mod technical_diagrams;
+// pub mod educational;
+// pub mod data_viz;
+
+// Convenience function to register ALL component sets at once
+/// Register all available component sets with a DiagramBuilder
+/// This is a convenience function that registers components from all domains
+pub fn register_all_components(builder: &mut DiagramBuilder) {
+   
+    document::register_document_components(builder);
+    println!("All component libraries registered successfully!");
+}
+
+===/src/document/mod.rs===
 // src/components/documents/mod.rs
 // Document components with consistent styling through predefined constants
 
@@ -163,11 +204,11 @@ pub mod theme {
 }
 
 pub fn create_document_container(
-    id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
+    let id = get_string_attr(attrs, &["id"], "");
     let mut children = Vec::new();
     let header_id = get_string_attr(attrs, &["header_id"], "");
     let content_id = get_string_attr(attrs, &["content_id"], "");
@@ -243,14 +284,11 @@ pub fn create_document_container(
  * width attribute: |sm|md|lg|xl|full|<number>
  */
 pub fn create_document_text(
-    id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
-    attrs.clone().iter().for_each(|(k,v)| {
-        println!("k,v: {},{}", k,v);
-    });
+    let id = get_string_attr(attrs, &["id"], "");
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
@@ -351,3 +389,4 @@ pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document.text", create_document_text);
     println!("📄 Document component registered: 'document'");
 }
+

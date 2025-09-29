@@ -43,7 +43,7 @@ for ignore_file in "${ignore_files[@]}"; do
   cmd=("${cmd[@]}" -not -name "$ignore_file")
 done
 
-cmd=("${cmd[@]}" -not -path '.*' -print0) # Exclude hidden files
+cmd=("${cmd[@]}" -not -path '*/.*' -print0) # Exclude hidden files
 
 # Traverse the folder and concatenate files
 "${cmd[@]}" | while IFS= read -r -d '' file; do

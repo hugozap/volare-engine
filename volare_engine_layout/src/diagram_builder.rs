@@ -154,6 +154,7 @@ impl DiagramBuilder {
     pub fn register_custom_component<F>(&mut self, component_type: &str, factory: F)
     where
         F: Fn(
+                &str,
                 &serde_json::Map<String, serde_json::Value>,
                 &mut DiagramBuilder,
                 &JsonLinesParser,
@@ -176,6 +177,7 @@ impl DiagramBuilder {
 
     pub fn create_custom_component(
         &mut self,
+        entity_id: &str,
         component_type: &str,
         attrs: &serde_json::Map<String, serde_json::Value>,
         lines_parser: &JsonLinesParser,
@@ -189,7 +191,7 @@ impl DiagramBuilder {
 
             let factory = { self.custom_components.get(component_type).unwrap().clone() };
 
-            factory(attrs, self, lines_parser)
+            factory(entity_id, attrs, self, lines_parser)
     }
 
     /* Create a new entity of a given type
@@ -244,20 +246,20 @@ impl DiagramBuilder {
 
     pub fn set_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
         let current = self.get_transform(entity_id.clone());
-        println!(
-            "📍 set_position called for {} - pos: ({}, {}) - before: {:?}",
-            entity_id, x, y, current
-        );
+        // println!(
+        //     "📍 set_position called for {} - pos: ({}, {}) - before: {:?}",
+        //     entity_id, x, y, current
+        // );
 
         // Preserve existing rotation/scale, just update translation
         let mut new_transform = current;
         new_transform.matrix[4] = x; // e - translation X
         new_transform.matrix[5] = y; // f - translation Y
 
-        println!(
-            "📍 set_position result for {} - after: {:?}",
-            entity_id, new_transform
-        );
+        // println!(
+        //     "📍 set_position result for {} - after: {:?}",
+        //     entity_id, new_transform
+        // );
         self.set_transform(entity_id, new_transform);
     }
 
@@ -873,6 +875,7 @@ impl DiagramBuilder {
     ) -> Option<
         &Arc<
             dyn Fn(
+                    &str,
                     &serde_json::Map<String, serde_json::Value>,
                     &mut DiagramBuilder,
                     &JsonLinesParser,

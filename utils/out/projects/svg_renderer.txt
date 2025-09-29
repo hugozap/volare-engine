@@ -164,6 +164,12 @@ fn render_box(
 
     let mut box_content = String::new();
 
+    let stroke_val = if box_shape.box_options.stroke_width == 0.0 {
+        String::from("none")
+    } else {
+        box_shape.box_options.stroke_width.to_string()
+    };
+
     // Draw box rectangle
     match &box_shape.box_options.fill_color {
         Fill::Color(color) => {
@@ -171,7 +177,7 @@ fn render_box(
                 r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
                 size.0, size.1, color,
                 box_shape.box_options.stroke_color,
-                box_shape.box_options.stroke_width,
+                stroke_val.as_str(),
                 box_shape.box_options.border_radius,
                 box_shape.box_options.border_radius
             ));
@@ -271,8 +277,6 @@ fn render_free_container(
 
     render_with_transform(session, svg, entity_id, &container_content);
 }
-
-
 
 fn render_constraint_layout_container(
     session: &DiagramBuilder,
@@ -557,8 +561,8 @@ fn render_arc(
     let size = session.get_size(entity_id.clone());
 
     // Center the arc within its bounding box (like ellipses do)
-    let center_x = size.0 / 2.0;  // Same as ellipse: radius
-    let center_y = size.1 / 2.0;  // Same as ellipse: radius
+    let center_x = size.0 / 2.0; // Same as ellipse: radius
+    let center_y = size.1 / 2.0; // Same as ellipse: radius
 
     // Get normalized angles
     let (start_angle, end_angle) = arc_shape.normalize_angles();
@@ -739,8 +743,11 @@ fn render_with_transform(
 ) {
     let transform = session.get_transform(entity_id.clone());
     let transform_str = transform.to_svg_string();
-    println!("transform for entity {} {}", entity_id.clone(), transform_str);
-
+    println!(
+        "transform for entity {} {}",
+        entity_id.clone(),
+        transform_str
+    );
 
     if transform_str.is_empty() {
         // No transform, use simple group

@@ -1316,6 +1316,7 @@ impl Entity for ShapeArc {
 /// Returns a Result with either a DiagramTreeNode or an error message
 pub type CustomComponentFactory = Arc<
     dyn Fn(
+            &str,
             &Map<String, Value>,
             &mut crate::DiagramBuilder,
             &JsonLinesParser,
@@ -1340,6 +1341,7 @@ impl CustomComponentRegistry {
     pub fn register<F>(&mut self, component_type: &str, factory: F)
     where
         F: Fn(
+                &str,
                 &Map<String, Value>,
                 &mut crate::DiagramBuilder,
                 &JsonLinesParser,
@@ -1355,13 +1357,14 @@ impl CustomComponentRegistry {
     /// Create a component instance using the registered factory
     pub fn create_component(
         &self,
+        id: &str, 
         component_type: &str,
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
         parser: &JsonLinesParser,
     ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
         match self.factories.get(component_type) {
-            Some(factory) => factory(attributes, builder, parser),
+            Some(factory) => factory(id, attributes, builder, parser),
             None => Err(format!("Unknown custom component type: {}", component_type)),
         }
     }
@@ -1382,6 +1385,7 @@ impl CustomComponentRegistry {
     ) -> Option<
         &Arc<
             dyn Fn(
+                     &str,
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
                     &JsonLinesParser,
@@ -1436,6 +1440,7 @@ mod custom_component_tests {
     /// Test custom component: Badge
     /// Creates a rounded box with text and a colored background
     fn create_badge_component(
+        id: &str,
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
         parser: &JsonLinesParser,

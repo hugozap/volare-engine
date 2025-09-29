@@ -547,3 +547,8 @@ x,y positions may be overrided by the system, if possible it's better to not use
 ## Over constraint warning
 
 Be careful to not over constraint the system by setting incompatible constraints.
+
+
+## Document components
+
+Please use this components to get smart defaults for spacing and typography
