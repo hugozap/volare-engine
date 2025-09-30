@@ -5,7 +5,11 @@ use std::fmt::format;
 
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL
+    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT,
+    FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED,
+    LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL,
+    SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS,
+    WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL,
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -183,7 +187,7 @@ pub fn create_document_container(
     let header_id = get_string_attr(attrs, &["header_id"], "");
     let content_id = get_string_attr(attrs, &["content_id"], "");
     let footer_id = get_string_attr(attrs, &["footer_id"], "");
-
+    println!("create_document_container id {}", id);
     eprintln!("Building header: {}", header_id);
     // let newparser = JsonLinesParser::new();
     if let Ok(header_child) = parser.build(&header_id, builder) {
@@ -272,19 +276,17 @@ pub fn document_text(
     content: String,
     container_width: f32,
 ) -> Result<DiagramTreeNode, String> {
-    let toptions = match variant.as_str() {
+    let mut toptions = match variant.as_str() {
         "xlarge" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
             ..TextOptions::default()
         },
         "large" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
             ..TextOptions::default()
         },
 
@@ -292,7 +294,6 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XS,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
             ..TextOptions::default()
         },
 
@@ -300,7 +301,6 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XS,
             text_color: SECONDARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
             ..TextOptions::default()
         },
 
@@ -308,10 +308,11 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_BASE,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_NORMAL,
             ..TextOptions::default()
         },
     };
+
+    toptions.line_spacing = toptions.font_size * 0.4;
 
     let text = builder.new_text(format!("{}_text", id.clone()), content.as_str(), toptions);
     let w_size = SizeBehavior::Fixed(container_width);
@@ -332,7 +333,7 @@ pub fn document_text(
 /**
  * Custom component for creating Titles
  */
-pub fn create_title(
+pub fn create_document_title(
     id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
@@ -346,7 +347,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_3XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
+            line_spacing: TEXT_3XL * 0.1,
             font_weight: FONT_WEIGHT_BOLD_MAX,
             ..TextOptions::default()
         },
@@ -354,7 +355,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_2XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
+            line_spacing: TEXT_2XL * 0.4,
             font_weight: FONT_WEIGHT_BOLD_MAX,
             ..TextOptions::default()
         },
@@ -363,7 +364,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
+            line_spacing: TEXT_XL * 0.5,
             font_weight: FONT_WEIGHT_BOLD_MD,
             ..TextOptions::default()
         },
@@ -372,7 +373,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
             text_color: SECONDARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
+            line_spacing: TEXT_LG * 0.5,
             font_weight: FONT_WEIGHT_BOLD_LIGHT,
             ..TextOptions::default()
         },
@@ -381,12 +382,13 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_2XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_NORMAL,
+            line_spacing: TEXT_2XL * 0.5,
             font_weight: FONT_WEIGHT_BOLD_LIGHT,
             ..TextOptions::default()
         },
     };
 
+    let bottom_margin = toptions.line_spacing;
     let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
     let w_size = SizeBehavior::Fixed(container_width);
     let coptions = BoxOptions {
@@ -403,13 +405,13 @@ pub fn create_title(
         format!("{}_spacer", id),
         SpacerOptions {
             width: 0.0,
-            height: SPACE_3XL,
+            height: bottom_margin,
             direction: SpacerDirection::Vertical,
         },
     );
     let t_container = builder.new_box(format!("{}_text_container", id), text.clone(), coptions);
     let container = builder.new_vstack(
-        format!("_container"),
+        format!("{}_container", id),
         vec![t_container, spacer],
         HorizontalAlignment::Left,
     );
@@ -438,14 +440,19 @@ pub fn create_properties(
     // Crear las celdas a partir de las propiedades Vec<(String,String)>
     let cell_values: Vec<String> = properties.into_iter().flat_map(|(a, b)| [a, b]).collect();
 
-
     let cell_texts: Vec<DiagramTreeNode> = cell_values
         .into_iter()
         .map(|value| {
             // TODO: variant debe ser enum
             // TODO: en vez de uuid derivar el id del nombre de la propiedad si es posible
             // TODO: usar width diferente para nombre y value
-            document_text(format!("{}_prop_{}",id, uuid::Uuid::new_v4()).as_str(), builder, "small".into(), value, WIDTH_PROPERTY)
+            document_text(
+                format!("{}_prop_{}", id, uuid::Uuid::new_v4()).as_str(),
+                builder,
+                "small".into(),
+                value,
+                WIDTH_PROPERTY,
+            )
         })
         .filter_map(|v| v.ok())
         .collect();
@@ -509,12 +516,234 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
     }
     default
 }
+/**
+ * Document Section Component
+ *
+ * Creates a section with optional title, meta information, and multi-column layout.
+ *
+ * Attributes:
+ * - title (string, optional): The section title
+ * - meta (string, optional): Metadata/category information
+ * - columns (array of ids): Column content element IDs
+ *
+ * Example JSONL:
+ * {"id":"section-example", "type":"document.section", "title":"Section Title", "meta":"Design Theory - 2024", "columns":["col1","col2","col3"]}
+ */
+pub fn create_document_section(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let mut section_children = Vec::new();
+
+    // Extract attributes
+    let title = get_string_attr(attrs, &["title"], "");
+    let meta = get_string_attr(attrs, &["meta"], "");
+    let columns = get_array_attr(attrs, "columns");
+    let witdth = get_width(attrs, &["width"], WIDTH_MD);
+
+    // Create header if title or meta is present
+    if !title.is_empty() || !meta.is_empty() {
+        let header_node = create_section_header(id, &title, &meta, builder, parser, witdth)?;
+        section_children.push(header_node);
+        let header_spacer_opts = SpacerOptions {
+            width: 0.0,
+            height: SPACE_MD,
+            direction: SpacerDirection::Vertical,
+        };
+        let header_spacer = builder.new_spacer(format!("{}_header_spacer", id), header_spacer_opts);
+        section_children.push(header_spacer);
+    }
+
+    // Create columns layout if columns are provided
+    if let Some(column_ids) = columns {
+        if !column_ids.is_empty() {
+            let columns_node = create_columns_layout(id, &column_ids, builder, parser)?;
+            section_children.push(columns_node);
+        }
+    }
+
+    // Wrap everything in a vertical stack
+    let section_vstack = builder.new_vstack(
+        format!("{}_section", id),
+        section_children,
+        HorizontalAlignment::Left,
+    );
+
+    // Add spacing after entire section
+    let section_spacer = builder.new_spacer(
+        format!("{}_bottom_spacer", id),
+        SpacerOptions {
+            width: 0.0,
+            height: SPACE_XS,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let section_with_spacing = builder.new_vstack(
+        id.to_string(),
+        vec![section_vstack, section_spacer],
+        HorizontalAlignment::Left,
+    );
+
+    Ok(section_with_spacing)
+}
+
+/**
+ * Creates the header for a section with title and optional meta information
+ * Uses the document.title component for consistent styling
+ */
+fn create_section_header(
+    id: &str,
+    title: &str,
+    meta: &str,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+    width: Float,
+) -> Result<DiagramTreeNode, String> {
+    let mut header_children = Vec::new();
+
+    // Create title if present using document.title component
+    if !title.is_empty() {
+        // Create attributes map for the title
+        //TODO : remplazar esto, usar funcion directa que no requiera mapa de atributos
+        let mut title_attrs = serde_json::Map::new();
+        title_attrs.insert(
+            "text".to_string(),
+            serde_json::Value::String(title.to_string()),
+        );
+        title_attrs.insert(
+            "variant".to_string(),
+            serde_json::Value::String("h2".to_string()),
+        );
+        title_attrs.insert(
+            "width".to_string(),
+            serde_json::Value::String(width.to_string()),
+        );
+
+        // Use the create_title function
+        let title_node =
+            create_document_title(&format!("{}_title", id), &title_attrs, builder, parser)?;
+
+        header_children.push(title_node);
+    }
+
+    // Create meta text if present
+    if !meta.is_empty() {
+        // Add small spacing between title and meta
+        if !title.is_empty() {
+            let meta_spacer = builder.new_spacer(
+                format!("{}_meta_spacer", id),
+                SpacerOptions {
+                    width: 0.0,
+                    height: SPACE_XS,
+                    direction: SpacerDirection::Vertical,
+                },
+            );
+            header_children.push(meta_spacer);
+        }
+
+        let meta_options = TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XS,
+            text_color: MUTED_TEXT.to_string(),
+            line_width: 100,
+            line_spacing: LINE_HEIGHT_NORMAL,
+            font_weight: 400,
+        };
+
+        let meta_node = builder.new_text(format!("{}_meta", id), meta, meta_options);
+
+        header_children.push(meta_node);
+    }
+
+    // Return vertical stack with header elements
+    let header_vstack = builder.new_vstack(
+        format!("{}_header", id),
+        header_children,
+        HorizontalAlignment::Left,
+    );
+
+    Ok(header_vstack)
+}
+
+/**
+ * Creates a horizontal layout for columns
+ */
+fn create_columns_layout(
+    id: &str,
+    column_ids: &[String],
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let mut column_nodes = Vec::new();
+
+    for (idx, column_id) in column_ids.iter().enumerate() {
+        // Build the column content
+        match parser.build(column_id, builder) {
+            Ok(column_node) => {
+                // Wrap each column in a box for consistent spacing and layout
+                let column_box_options = BoxOptions {
+                    fill_color: Fill::Color("transparent".to_string()),
+                    stroke_color: "transparent".to_string(),
+                    stroke_width: 0.0,
+                    padding: 0.0,
+                    border_radius: 0.0,
+                    width_behavior: SizeBehavior::Content, // Size based on column content
+                    height_behavior: SizeBehavior::Content,
+                    horizontal_alignment: HorizontalAlignment::Left,
+                };
+
+                let column_box = builder.new_box(
+                    format!("{}_col_{}", id, idx),
+                    column_node,
+                    column_box_options,
+                );
+
+                column_nodes.push(column_box);
+                if idx < column_ids.len() - 1 {
+                    // Add some spacing between columns
+                    let col_spacer_opts = SpacerOptions {
+                        width: SPACE_MD,
+                        height: 0.0,
+                        direction: SpacerDirection::Horizontal,
+                    };
+                    let col_spacer =
+                        builder.new_spacer(format!("{}_{}_col_spacer", id, idx), col_spacer_opts);
+                    column_nodes.push(col_spacer);
+                }
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to build column '{}': {}", column_id, e);
+                // Continue with other columns even if one fails
+            }
+        }
+    }
+
+    if column_nodes.is_empty() {
+        return Err("No valid columns found in section".to_string());
+    }
+
+    // Create horizontal stack for columns
+    let columns_hstack = builder.new_hstack(
+        format!("{}_columns", id),
+        column_nodes,
+        VerticalAlignment::Top, // Align columns to top
+    );
+
+    Ok(columns_hstack)
+}
+
+// Don't forget to register the component in register_document_components:
+// builder.register_custom_component("document.section", create_document_section);
 
 /// Register document components with a DiagramBuilder
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
     builder.register_custom_component("document.text", create_document_text);
-    builder.register_custom_component("document.title", create_title);
+    builder.register_custom_component("document.title", create_document_title);
     builder.register_custom_component("document.properties", create_properties);
+    builder.register_custom_component("document.section", create_document_section);
     println!("📄 Document component registered: 'document'");
 }

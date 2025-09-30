@@ -99,9 +99,9 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
         }
     };
 
-    // FIXED: Apply bounding box compensation when positioning the wrapped element
-    let transform_x = desired_content_x - wrapped_elem_bounds.x;
-    let transform_y = desired_content_y - wrapped_elem_bounds.y;
+    // let transform_x = desired_content_x - wrapped_elem_bounds.x;
+     let transform_x = desired_content_x;
+     let transform_y = desired_content_y;
 
     session.set_position(shape_box.wrapped_entity.clone(), transform_x, transform_y);
 
@@ -307,8 +307,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         // Add line height
         y += line_size.1;
 
-        // Add line spacing ONLY between lines (not after the last line)
-        if i < shape_text.lines.len() - 1 {
+        if i < shape_text.lines.len() -1 {
             y += shape_text.text_options.line_spacing;
         }
     }

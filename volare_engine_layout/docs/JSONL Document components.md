@@ -19,6 +19,7 @@ attributes
 attributes
 - title (string - optional)
 - columns: (array of ids)
+- meta: (optional) complementary text
 
 The section provides a multi column layout, the columns attribute contains the array of ids of the elements that contain the column content.
 

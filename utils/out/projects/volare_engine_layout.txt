@@ -1226,8 +1226,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         // Add line height
         y += line_size.1;
 
-        // Add line spacing ONLY between lines (not after the last line)
-        if i < shape_text.lines.len() - 1 {
+        if i < shape_text.lines.len() {
             y += shape_text.text_options.line_spacing;
         }
     }

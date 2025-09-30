@@ -432,6 +432,8 @@ impl DiagramBuilder {
             elements: Vec::new(),
             horizontal_alignment,
         };
+        println!("new_vstack id {}", vstack.entity.clone());
+
         let mut node = DiagramTreeNode {
             entity_type: EntityType::VerticalStackShape,
             entity_id: stack_id.clone(),

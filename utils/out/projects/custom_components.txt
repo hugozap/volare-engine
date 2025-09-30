@@ -318,14 +318,14 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
+            line_spacing: LINE_HEIGHT_RELAXED*TEXT_XL,
             ..TextOptions::default()
         },
         "large" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
+            line_spacing: LINE_HEIGHT_RELAXED*TEXT_LG,
             ..TextOptions::default()
         },
 
@@ -333,7 +333,7 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XS,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
+            line_spacing: LINE_HEIGHT_TIGHT*TEXT_XS,
             ..TextOptions::default()
         },
 
@@ -341,7 +341,7 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XS,
             text_color: SECONDARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
+            line_spacing: LINE_HEIGHT_TIGHT*TEXT_XS,
             ..TextOptions::default()
         },
 
@@ -349,7 +349,7 @@ pub fn document_text(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_BASE,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_NORMAL,
+            line_spacing: LINE_HEIGHT_NORMAL*TEXT_BASE,
             ..TextOptions::default()
         },
     };
@@ -373,7 +373,7 @@ pub fn document_text(
 /**
  * Custom component for creating Titles
  */
-pub fn create_title(
+pub fn create_document_title(
     id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
@@ -387,7 +387,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_3XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
+            line_spacing: LINE_HEIGHT_RELAXED*TEXT_3XL,
             font_weight: FONT_WEIGHT_BOLD_MAX,
             ..TextOptions::default()
         },
@@ -395,7 +395,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_2XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_RELAXED,
+            line_spacing: LINE_HEIGHT_RELAXED*TEXT_2XL,
             font_weight: FONT_WEIGHT_BOLD_MAX,
             ..TextOptions::default()
         },
@@ -404,7 +404,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
+            line_spacing: LINE_HEIGHT_RELAXED*TEXT_XL,
             font_weight: FONT_WEIGHT_BOLD_MD,
             ..TextOptions::default()
         },
@@ -413,7 +413,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
             text_color: SECONDARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_TIGHT,
+            line_spacing: LINE_HEIGHT_RELAXED*TEXT_LG,
             font_weight: FONT_WEIGHT_BOLD_LIGHT,
             ..TextOptions::default()
         },
@@ -422,7 +422,7 @@ pub fn create_title(
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_2XL,
             text_color: PRIMARY_TEXT.to_string(),
-            line_spacing: LINE_HEIGHT_NORMAL,
+            line_spacing: LINE_HEIGHT_NORMAL*TEXT_2XL,
             font_weight: FONT_WEIGHT_BOLD_LIGHT,
             ..TextOptions::default()
         },
@@ -444,7 +444,7 @@ pub fn create_title(
         format!("{}_spacer", id),
         SpacerOptions {
             width: 0.0,
-            height: SPACE_3XL,
+            height: SPACE_XS,
             direction: SpacerDirection::Vertical,
         },
     );
@@ -555,7 +555,7 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
     builder.register_custom_component("document.text", create_document_text);
-    builder.register_custom_component("document.title", create_title);
+    builder.register_custom_component("document.title", create_document_title);
     builder.register_custom_component("document.properties", create_properties);
     println!("📄 Document component registered: 'document'");
 }
