@@ -18,7 +18,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 {"id":"doc", "type":"document", "header_id":"header", "content_id":"content", "footer_id":"footer"}
 {"id":"header", "type":"document.text", "text":"HELLO HEADER (with variant = large)","variant":"large","width":"100"}
 {"id":"content", "type":"document.text", "text":"hello content (with no variant (default)), this is a larger document to check how it looks with a multiline text string","variant":"xlarge","width":"150"}
-{"id":"footer", "type":"document.text", "text":"hello footer (with variant = subtle)","variant":"subtle", "width":"100"}
+{"id":"footer", "type":"hstack","children":["car_properties"]}
+{"id":"car_properties","type":"document.properties","properties":[["name","mustang"],["year","2024"],["description","The mustang is a fast and powerful car, it represents strenght and traditional values from the 60's"]]}
 "##;
 
  // Parse the JSON Lines

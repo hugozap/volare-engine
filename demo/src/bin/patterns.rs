@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("items".to_string(), table_items, 1, toptions);
 
     // Calculate layout

@@ -56,6 +56,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         border_radius: 0.0,
         width_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), // fixed width
         height_behavior: volare_engine_layout::SizeBehavior::Content,     // auto height
+        ..Default::default()
     };
 
     let box1 = session.new_box("box1".to_string(), blue_text, box_options);
@@ -67,7 +68,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("text_table".to_string(), table_items, 5, toptions);
 
     // Calculate layout

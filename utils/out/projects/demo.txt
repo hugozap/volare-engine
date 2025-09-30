@@ -11,6 +11,7 @@ edition = "2021"
 #add dep to crate in local workspace
 volare_engine_layout = { path = "../volare_engine_layout" }
 svg_renderer = { path = "../svg_renderer" }
+custom_components = { path = "../custom_components"}
 resvg = "0.25.0"
 rusttype = "0.9.3"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -694,57 +695,67 @@ fn generate_svg_from_jsonl(
 
 //import svg_renderer
 // use image_renderer::PNGRenderer;
+use demo::measure_text::measure_text_ultra_tight;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions};
-use demo::measure_text::{ measure_text_ultra_tight};
+use volare_engine_layout::{
+    renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions,
+};
 
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions, Fill,
+    Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
 use std::fs::File;
 
-struct CardOptions {
-
-}
+struct CardOptions {}
 
 //componente card
 //la tarjeta tiene contenido y titulo
-fn card_component(id: String, session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
-    
-    session.new_vstack(id.clone(), vec![header,content], HorizontalAlignment::Center)
-
+fn card_component(
+    id: String,
+    session: &mut DiagramBuilder,
+    header: DiagramTreeNode,
+    content: DiagramTreeNode,
+    opts: CardOptions,
+) -> DiagramTreeNode {
+    session.new_vstack(
+        id.clone(),
+        vec![header, content],
+        HorizontalAlignment::Center,
+    )
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
-  
+
     session.set_measure_text_fn(measure_text_ultra_tight);
 
     let mut table_items = Vec::new();
 
-    let cardOptions = CardOptions {
+    let cardOptions = CardOptions {};
 
+    let textOpts = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 16.0,
+        line_width: 100,
+        text_color: "black".to_string(), // white text
+        line_spacing: 5.0,
+        ..Default::default()
     };
-
-      let textOpts =  TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            line_width: 100,
-            text_color: "black".to_string(),  // white text
-            line_spacing: 5.0,
-        };
 
     let cheader = session.new_text("title".to_string(), "card title", textOpts.clone());
     let ccontent = session.new_text("contents".to_string(), "card contents", textOpts.clone());
-    let card1 = card_component("card".to_string(), &mut session, cheader, ccontent, cardOptions);
+    let card1 = card_component(
+        "card".to_string(),
+        &mut session,
+        cheader,
+        ccontent,
+        cardOptions,
+    );
 
-
-
-    
     // Add the FreeContainer to the table
     // table_items.push(container_with_elements);
 
@@ -752,7 +763,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("items".to_string(), table_items, 1, toptions);
 
     // Calculate layout
@@ -763,8 +774,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
-  
-    
+
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -775,7 +785,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
-    
 
     // Render PNG
     // let mut png_path = temp_dir.clone();
@@ -1353,29 +1362,81 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+===/src/bin/document.rs===
+// src/bin/intricate_city.rs
+// Demo program that generates an intricate city using only polylines, rects, and free containers
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+use custom_components::document::register_document_components;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🏙️ Generando sample doc");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("document_demo");
+    std::fs::create_dir_all(&output_dir)?;
+
+    let input = r##"
+{"id":"doc", "type":"document", "header_id":"header", "content_id":"content", "footer_id":"footer"}
+{"id":"header", "type":"document.text", "text":"HELLO HEADER (with variant = large)","variant":"large","width":"100"}
+{"id":"content", "type":"document.text", "text":"hello content (with no variant (default)), this is a larger document to check how it looks with a multiline text string","variant":"xlarge","width":"150"}
+{"id":"footer", "type":"hstack","children":["car_properties"]}
+{"id":"car_properties","type":"document.properties","properties":[["name","mustang"],["year","2024"],["description","The mustang is a fast and powerful car, it represents strenght and traditional values from the 60's"]]}
+"##;
+
+ // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+    register_document_components(&mut parse_builder);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let output_path = output_dir.join("demo.svg");
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+
+
+    println!("\n✅ document demo created");
+    println!("📁 Archivo guardado en: {}", output_dir.display());
+
+    Ok(())
+}
+
 ===/src/bin/text.rs===
 // Create an SVG file with all supported elements
 
 //import svg_renderer
 // use image_renderer::PNGRenderer;
+use demo::measure_text::measure_text_ultra_tight;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
-use demo::measure_text::{ measure_text_ultra_tight};
 
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions, Fill,
+    Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
 use std::fs::File;
 
-
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
-  
+
     session.set_measure_text_fn(measure_text_ultra_tight);
 
     let mut table_items = Vec::new();
@@ -1388,37 +1449,37 @@ cumulative scaling from parent transforms,
 and you need to pass down the "base" position to child renderers.
 The comment "Calculate absolute position without any scaling" suggests the goal is to get back to unscaled coordinates that the child rendering pipeline expects.""#;
 
-    let textOpts =  TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            line_width: 100,
-            text_color: "white".to_string(),  // white text
-            line_spacing: 5.0,
-        };
+    let textOpts = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 16.0,
+        line_width: 100,
+        text_color: "white".to_string(), // white text
+        line_spacing: 5.0,
+        ..Default::default()
+    };
 
     let blue_text = session.new_text(
         "blue_text".to_string(),
         std::str::from_utf8(thetext).unwrap(),
-       textOpts.clone(),
+        textOpts.clone(),
     );
 
-   // debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
-
+    // debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
 
     let box_options = BoxOptions {
-        fill_color: Fill::Color("#0000FF".to_string()),  // blue background
-        stroke_color: "#000066".to_string(),  // dark blue border
+        fill_color: Fill::Color("#0000FF".to_string()), // blue background
+        stroke_color: "#000066".to_string(),            // dark blue border
         stroke_width: 1.0,
         //TODO: falta tener en cuenta padding al momento de hacer layout de elementos de box
         padding: 50.0,
         border_radius: 0.0,
         width_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), // fixed width
-        height_behavior: volare_engine_layout::SizeBehavior::Content, // auto height
+        height_behavior: volare_engine_layout::SizeBehavior::Content,     // auto height
+        ..Default::default()
     };
 
     let box1 = session.new_box("box1".to_string(), blue_text, box_options);
 
-    
     // Add the FreeContainer to the table
     // table_items.push(container_with_elements);
 
@@ -1426,7 +1487,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("text_table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
@@ -1437,8 +1498,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
-  
-    
+
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -1449,7 +1509,6 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
-    
 
     // Render PNG
     // let mut png_path = temp_dir.clone();
@@ -1859,8 +1918,8 @@ pub mod measure_text;
 // use image_renderer::PNGRenderer;
 use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{RectOptions, SimpleConstraint, SizeBehavior};
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+use volare_engine_layout::{RectOptions, SimpleConstraint, SizeBehavior};
 
 //import layout
 use volare_engine_layout::{
@@ -1868,13 +1927,9 @@ use volare_engine_layout::{
     Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
-use measure_text::{
-    measure_text_svg_character_advance,
-}; // Use the ultra-tight measurement for text
+use measure_text::measure_text_svg_character_advance; // Use the ultra-tight measurement for text
 
 use std::fs::File;
-
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
@@ -1885,6 +1940,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         line_width: 100,
         text_color: "black".to_string(),
         line_spacing: 0.0,
+        ..Default::default()
     };
     session.set_measure_text_fn(measure_text_svg_character_advance);
 
@@ -1912,15 +1968,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    //Create horizontal stack with 2 rects and one text, set vertical align to center 
+    //Create horizontal stack with 2 rects and one text, set vertical align to center
     let mut rectOpts = RectOptions::default();
-    rectOpts.width_behavior =  SizeBehavior::Fixed(150.0);
+    rectOpts.width_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.height_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.stroke_color = "black".to_string();
     rectOpts.stroke_width = 1.0;
     let rect = session.new_rectangle("r1".to_string(), rectOpts.clone());
     let rect2 = session.new_rectangle("r2".to_string(), rectOpts.clone());
-
 
     let label = session.new_text(
         "label".to_string(),
@@ -1931,17 +1986,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 60,
             text_color: "#333333".to_string(),
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
     let hstack_centered = session.new_hstack(
         "hstack_centered".to_string(),
         vec![rect, label, rect2],
-        volare_engine_layout::VerticalAlignment::Center
+        volare_engine_layout::VerticalAlignment::Center,
     );
-
-
-    
 
     // Create a more visible polyline - hexagon
     let mut hex_points = Vec::new();
@@ -1978,7 +2031,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         table_items_ellipses.push(ellipse);
     }
-    let tableEllipses = session.new_table("table_ellipses".to_string(), table_items_ellipses, 5, TableOptions::default());
+    let tableEllipses = session.new_table(
+        "table_ellipses".to_string(),
+        table_items_ellipses,
+        5,
+        TableOptions::default(),
+    );
 
     //Create a list of 10 texts
     let mut table_items = Vec::new();
@@ -2044,13 +2102,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     table_items.push(text);
 
     //Add sample image from file (first instance)
-    let sampleImage = session.new_image_from_file("imagefile0".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
+    let sampleImage = session.new_image_from_file(
+        "imagefile0".to_string(),
+        "demo/assets/sample.png",
+        (SizeBehavior::Content, SizeBehavior::Content),
+    );
     //table_items.push(sampleImage);
 
     //Add sample image from file
     // The path is relative to where the binary is run
-    let file_image = session.new_image_from_file("imagefile".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
-   // table_items.push(file_image);
+    let file_image = session.new_image_from_file(
+        "imagefile".to_string(),
+        "demo/assets/sample.png",
+        (SizeBehavior::Content, SizeBehavior::Content),
+    );
+    // table_items.push(file_image);
 
     // Create a FreeContainer with multiple visual elements at specific positions using the new method
 
@@ -2064,6 +2130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 100,
             text_color: "#000000".to_string(),
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
@@ -2094,6 +2161,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 100,
             text_color: "white".to_string(), // white text
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
@@ -2105,10 +2173,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         padding: 10.0,
         border_radius: 3.0,
         width_behavior: volare_engine_layout::SizeBehavior::Fixed(700.0), // Fixed width for the box
-        height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), 
+        height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0),
         ..BoxOptions::default()
     };
-    let blue_box = session.new_box("bluebox".to_string(),blue_text, box_options);
+    let blue_box = session.new_box("bluebox".to_string(), blue_text, box_options);
 
     let green_ellipse = session.new_elipse(
         "greeneclipse".to_string(),
@@ -2129,17 +2197,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 100,
             text_color: "#555555".to_string(), // dark gray
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
     // Create a container with all children at once
-    let container_with_elements = session.new_free_container("containerwithelems".to_string(),vec![
-        (title_text, (30.0, 10.0)),
-        (red_circle, (40.0, 50.0)),
-        (blue_box, (80.0, 40.0)),
-        (green_ellipse, (150.0, 70.0)),
-        (subtitle, (30.0, 120.0)),
-    ]);
+    let container_with_elements = session.new_free_container(
+        "containerwithelems".to_string(),
+        vec![
+            (title_text, (30.0, 10.0)),
+            (red_circle, (40.0, 50.0)),
+            (blue_box, (80.0, 40.0)),
+            (green_ellipse, (150.0, 70.0)),
+            (subtitle, (30.0, 120.0)),
+        ],
+    );
 
     // Add styling to the container with more vibrant colors
     let free_container = session.get_free_container_mut(container_with_elements.entity_id.clone());
@@ -2147,33 +2219,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
 
-
     // Add the FreeContainer to the table
     table_items.push(container_with_elements);
 
-
     // Create constraint layout and elements
-    let elem1 = session.new_rectangle("constrained1".to_string(), RectOptions{
-        width_behavior: SizeBehavior::Fixed(50.0),
-        height_behavior: SizeBehavior::Fixed(50.0),
-        fill_color: Fill::Color("red".to_string()),
-        stroke_color: "yellow".to_string(),
-        ..Default::default()
-    });
-    let elem2 = session.new_rectangle("constrained2".to_string(), RectOptions{
-        width_behavior: SizeBehavior::Fixed(50.0),
-        height_behavior: SizeBehavior::Fixed(50.0),
-        fill_color: Fill::Color("black".to_string()),
-        ..Default::default()
-    });
+    let elem1 = session.new_rectangle(
+        "constrained1".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(50.0),
+            fill_color: Fill::Color("red".to_string()),
+            stroke_color: "yellow".to_string(),
+            ..Default::default()
+        },
+    );
+    let elem2 = session.new_rectangle(
+        "constrained2".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(50.0),
+            fill_color: Fill::Color("black".to_string()),
+            ..Default::default()
+        },
+    );
 
-    let constraints = vec![SimpleConstraint::AlignLeft(vec!["constrained1".to_string(), "constrained2".to_string()])];
-    let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![(elem1, None),(elem2, None)], constraints);
+    let constraints = vec![SimpleConstraint::AlignLeft(vec![
+        "constrained1".to_string(),
+        "constrained2".to_string(),
+    ])];
+    let constraint_container = session.new_constraint_layout_container(
+        "constraint_container1".to_string(),
+        vec![(elem1, None), (elem2, None)],
+        constraints,
+    );
     table_items.push(constraint_container);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 2;
+    toptions.cell_padding = 2.0;
     let table = session.new_table("table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
@@ -2223,6 +2306,7 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
         line_width: 100,
         text_color: "black".to_string(),
         line_spacing: 5.0,
+        ..Default::default()
     };
     //Create a list of 10 texts
     let mut texts = Vec::new();
@@ -2244,5 +2328,4 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     let table = session.new_table("tabletexts".to_string(), texts, 3, table_options);
     table
 }
-
 

@@ -413,6 +413,7 @@ pub struct BoxOptions {
     // Add size behavior fields
     pub width_behavior: SizeBehavior,
     pub height_behavior: SizeBehavior,
+    pub horizontal_alignment: HorizontalAlignment,
 }
 
 impl Clone for BoxOptions {
@@ -425,6 +426,7 @@ impl Clone for BoxOptions {
             border_radius: self.border_radius,
             width_behavior: self.width_behavior.clone(),
             height_behavior: self.height_behavior.clone(),
+            horizontal_alignment: self.horizontal_alignment.clone(),
         }
     }
 }
@@ -445,6 +447,7 @@ impl BoxOptions {
             border_radius: 0.0,
             width_behavior: SizeBehavior::Content,
             height_behavior: SizeBehavior::Content,
+            horizontal_alignment: HorizontalAlignment::Center,
         }
     }
 }
@@ -672,6 +675,7 @@ impl TextOptions {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum HorizontalAlignment {
     Left,
     Center,

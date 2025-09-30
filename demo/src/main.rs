@@ -344,7 +344,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 2;
+    toptions.cell_padding = 2.0;
     let table = session.new_table("table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
