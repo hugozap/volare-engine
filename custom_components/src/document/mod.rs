@@ -1,9 +1,11 @@
 // src/components/documents/mod.rs
 // Document components with consistent styling through predefined constants
 
+use std::fmt::format;
+
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_SM, WIDTH_XL
+    BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_SM, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_SM, WIDTH_XL
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -58,6 +60,13 @@ pub mod style {
     pub const TEXT_XL: Float = 18.0; // Section headings
     pub const TEXT_2XL: Float = 24.0; // Page titles
     pub const TEXT_3XL: Float = 32.0; // Main titles
+
+    // Title font weights
+
+    pub const FONT_WEIGHT_NORMAL:u32 = 400;
+    pub const FONT_WEIGHT_BOLD_MAX:u32 = 900;
+    pub const FONT_WEIGHT_BOLD_MD:u32 = 700;
+    pub const FONT_WEIGHT_BOLD_LIGHT:u32 = 600;
 
     // Line Heights (as spacing multipliers)
     pub const LINE_HEIGHT_TIGHT: Float = 1.2;
@@ -311,6 +320,86 @@ pub fn create_document_text(
     Ok(container)
 }
 
+/**
+ * Custom component for creating Titles
+ */
+pub fn create_title(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let variant = get_string_attr(attrs, &["variant"], "default");
+    let content = get_string_attr(attrs, &["text", "content"], "");
+    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+    let toptions = match variant.as_str() {
+        "h1" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_3XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            font_weight: FONT_WEIGHT_BOLD_MAX,
+            ..TextOptions::default()
+        },
+        "h2" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_2XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            font_weight: FONT_WEIGHT_BOLD_MAX,
+            ..TextOptions::default()
+        },
+
+        "h3" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_TIGHT,
+            font_weight: FONT_WEIGHT_BOLD_MD,
+            ..TextOptions::default()
+        },
+
+        "h4" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_LG,
+            text_color: SECONDARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_TIGHT,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+
+        _ => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_2XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_NORMAL,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+    };
+
+
+    let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
+    let w_size = SizeBehavior::Fixed(container_width);
+    let coptions = BoxOptions {
+        fill_color: Fill::Color("transparent".to_string()),
+        stroke_color: "transparent".to_string(),
+        stroke_width: 0.0,
+        padding: 0.0,
+        border_radius: 0.0,
+        width_behavior: w_size,
+        height_behavior: SizeBehavior::Content,
+    };
+    let spacer = builder.new_spacer(format!("{}_spacer", id), SpacerOptions { width: 0.0, height: SPACE_3XL,direction: SpacerDirection::Vertical});
+    let t_container = builder.new_box(format!("{}_text_container", id), text.clone(), coptions);
+    let container = builder.new_vstack(format!("_container"), vec![t_container,spacer], HorizontalAlignment::Left);
+    Ok(container)
+}
+
+
+
+
+
 
 // Helper function for extracting a text width from names or pixel value
 // |sm|md|lg|xl|full|<number>
@@ -356,5 +445,6 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
     builder.register_custom_component("document.text", create_document_text);
+    builder.register_custom_component("document.title", create_title);
     println!("📄 Document component registered: 'document'");
 }

@@ -647,6 +647,7 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
+                    font_weight: str::parse(&get_string_attr(&entity.attributes, &["font_weight"], "400")).unwrap(),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
