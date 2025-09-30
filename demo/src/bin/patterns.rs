@@ -2,57 +2,67 @@
 
 //import svg_renderer
 // use image_renderer::PNGRenderer;
+use demo::measure_text::measure_text_ultra_tight;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions};
-use demo::measure_text::{ measure_text_ultra_tight};
+use volare_engine_layout::{
+    renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions,
+};
 
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions, Fill,
+    Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
 use std::fs::File;
 
-struct CardOptions {
-
-}
+struct CardOptions {}
 
 //componente card
 //la tarjeta tiene contenido y titulo
-fn card_component(id: String, session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
-    
-    session.new_vstack(id.clone(), vec![header,content], HorizontalAlignment::Center)
-
+fn card_component(
+    id: String,
+    session: &mut DiagramBuilder,
+    header: DiagramTreeNode,
+    content: DiagramTreeNode,
+    opts: CardOptions,
+) -> DiagramTreeNode {
+    session.new_vstack(
+        id.clone(),
+        vec![header, content],
+        HorizontalAlignment::Center,
+    )
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
-  
+
     session.set_measure_text_fn(measure_text_ultra_tight);
 
     let mut table_items = Vec::new();
 
-    let cardOptions = CardOptions {
+    let cardOptions = CardOptions {};
 
+    let textOpts = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 16.0,
+        line_width: 100,
+        text_color: "black".to_string(), // white text
+        line_spacing: 5.0,
+        ..Default::default()
     };
-
-      let textOpts =  TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            line_width: 100,
-            text_color: "black".to_string(),  // white text
-            line_spacing: 5.0,
-        };
 
     let cheader = session.new_text("title".to_string(), "card title", textOpts.clone());
     let ccontent = session.new_text("contents".to_string(), "card contents", textOpts.clone());
-    let card1 = card_component("card".to_string(), &mut session, cheader, ccontent, cardOptions);
+    let card1 = card_component(
+        "card".to_string(),
+        &mut session,
+        cheader,
+        ccontent,
+        cardOptions,
+    );
 
-
-
-    
     // Add the FreeContainer to the table
     // table_items.push(container_with_elements);
 
@@ -60,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("items".to_string(), table_items, 1, toptions);
 
     // Calculate layout
@@ -71,8 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
-  
-    
+
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -83,7 +92,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
-    
 
     // Render PNG
     // let mut png_path = temp_dir.clone();

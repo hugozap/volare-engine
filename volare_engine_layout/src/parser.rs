@@ -647,6 +647,7 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
+                    font_weight: str::parse(&get_string_attr(&entity.attributes, &["font_weight"], "400")).unwrap(),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
@@ -696,6 +697,8 @@ impl JsonLinesParser {
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                     width_behavior,
                     height_behavior,
+                    // TODO: leer de atributo
+                    horizontal_alignment: HorizontalAlignment::Center,
                 };
 
                 // Parse and apply transforms
@@ -1011,7 +1014,8 @@ impl JsonLinesParser {
                     border_color: get_string_attr(&entity.attributes, &["border_color"], "black"),
                     border_width: get_int_attr(&entity.attributes, &["border_width"], 1) as usize,
                     cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20)
-                        as usize,
+                        as Float,
+                    with_header: true,
                 };
 
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());

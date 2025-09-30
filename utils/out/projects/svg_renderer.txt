@@ -377,7 +377,7 @@ fn render_line(
     node: &DiagramTreeNode,
 ) {
     let line_shape = session.get_line(node.entity_id.clone());
-
+    print!("Rendering line!!!!");
     let line_content = format!(
         r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
         line_shape.start.0,

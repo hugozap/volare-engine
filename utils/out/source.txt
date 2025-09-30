@@ -1484,6 +1484,7 @@ edition = "2021"
 #add dep to crate in local workspace
 volare_engine_layout = { path = "../volare_engine_layout" }
 svg_renderer = { path = "../svg_renderer" }
+custom_components = { path = "../custom_components"}
 resvg = "0.25.0"
 rusttype = "0.9.3"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -2167,57 +2168,67 @@ fn generate_svg_from_jsonl(
 
 //import svg_renderer
 // use image_renderer::PNGRenderer;
+use demo::measure_text::measure_text_ultra_tight;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions};
-use demo::measure_text::{ measure_text_ultra_tight};
+use volare_engine_layout::{
+    renderer_base::Renderer, BoxOptions, GradientStop, HorizontalAlignment, LineOptions,
+};
 
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions, Fill,
+    Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
 use std::fs::File;
 
-struct CardOptions {
-
-}
+struct CardOptions {}
 
 //componente card
 //la tarjeta tiene contenido y titulo
-fn card_component(id: String, session:&mut DiagramBuilder, header: DiagramTreeNode, content: DiagramTreeNode, opts: CardOptions) -> DiagramTreeNode {
-    
-    session.new_vstack(id.clone(), vec![header,content], HorizontalAlignment::Center)
-
+fn card_component(
+    id: String,
+    session: &mut DiagramBuilder,
+    header: DiagramTreeNode,
+    content: DiagramTreeNode,
+    opts: CardOptions,
+) -> DiagramTreeNode {
+    session.new_vstack(
+        id.clone(),
+        vec![header, content],
+        HorizontalAlignment::Center,
+    )
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
-  
+
     session.set_measure_text_fn(measure_text_ultra_tight);
 
     let mut table_items = Vec::new();
 
-    let cardOptions = CardOptions {
+    let cardOptions = CardOptions {};
 
+    let textOpts = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 16.0,
+        line_width: 100,
+        text_color: "black".to_string(), // white text
+        line_spacing: 5.0,
+        ..Default::default()
     };
-
-      let textOpts =  TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            line_width: 100,
-            text_color: "black".to_string(),  // white text
-            line_spacing: 5.0,
-        };
 
     let cheader = session.new_text("title".to_string(), "card title", textOpts.clone());
     let ccontent = session.new_text("contents".to_string(), "card contents", textOpts.clone());
-    let card1 = card_component("card".to_string(), &mut session, cheader, ccontent, cardOptions);
+    let card1 = card_component(
+        "card".to_string(),
+        &mut session,
+        cheader,
+        ccontent,
+        cardOptions,
+    );
 
-
-
-    
     // Add the FreeContainer to the table
     // table_items.push(container_with_elements);
 
@@ -2225,7 +2236,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("items".to_string(), table_items, 1, toptions);
 
     // Calculate layout
@@ -2236,8 +2247,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
-  
-    
+
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -2248,7 +2258,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
-    
 
     // Render PNG
     // let mut png_path = temp_dir.clone();
@@ -2826,29 +2835,81 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+===/src/bin/document.rs===
+// src/bin/intricate_city.rs
+// Demo program that generates an intricate city using only polylines, rects, and free containers
+
+use demo::measure_text::measure_text_svg_character_advance;
+use std::fs::File;
+use std::path::Path;
+use volare_engine_layout::*;
+use custom_components::document::register_document_components;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🏙️ Generando sample doc");
+
+    // Create output directory
+    let output_dir = std::env::temp_dir().join("document_demo");
+    std::fs::create_dir_all(&output_dir)?;
+
+    let input = r##"
+{"id":"doc", "type":"document", "header_id":"header", "content_id":"content", "footer_id":"footer"}
+{"id":"header", "type":"document.text", "text":"HELLO HEADER (with variant = large)","variant":"large","width":"100"}
+{"id":"content", "type":"document.text", "text":"hello content (with no variant (default)), this is a larger document to check how it looks with a multiline text string","variant":"xlarge","width":"150"}
+{"id":"footer", "type":"hstack","children":["car_properties"]}
+{"id":"car_properties","type":"document.properties","properties":[["name","mustang"],["year","2024"],["description","The mustang is a fast and powerful car, it represents strenght and traditional values from the 60's"]]}
+"##;
+
+ // Parse the JSON Lines
+    let mut parser = parser::JsonLinesParser::new();
+    let root_id = parser.parse_string(input)?;
+
+    // Create a fresh builder for parsing
+    let mut parse_builder = DiagramBuilder::new();
+    parse_builder.set_measure_text_fn(measure_text_svg_character_advance);
+    register_document_components(&mut parse_builder);
+
+    // Build the diagram
+    let diagram = parser.build(&root_id, &mut parse_builder)?;
+
+    // Calculate layout
+    layout::layout_tree_node(&mut parse_builder, &diagram);
+
+    // Render to SVG
+    let output_path = output_dir.join("demo.svg");
+    let svg_renderer = svg_renderer::SVGRenderer {};
+    let mut svg_file = File::create(&output_path)?;
+    svg_renderer.render(&parse_builder, &diagram, &mut svg_file)?;
+
+
+
+    println!("\n✅ document demo created");
+    println!("📁 Archivo guardado en: {}", output_dir.display());
+
+    Ok(())
+}
+
 ===/src/bin/text.rs===
 // Create an SVG file with all supported elements
 
 //import svg_renderer
 // use image_renderer::PNGRenderer;
+use demo::measure_text::measure_text_ultra_tight;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
-use demo::measure_text::{ measure_text_ultra_tight};
 
 //import layout
 use volare_engine_layout::{
     diagram_builder::DiagramTreeNode, layout::layout_tree_node, DiagramBuilder, EllipseOptions,
-    TableOptions, TextOptions, Fill,
+    Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
 use std::fs::File;
 
-
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
     let mut session = DiagramBuilder::new();
-  
+
     session.set_measure_text_fn(measure_text_ultra_tight);
 
     let mut table_items = Vec::new();
@@ -2861,37 +2922,37 @@ cumulative scaling from parent transforms,
 and you need to pass down the "base" position to child renderers.
 The comment "Calculate absolute position without any scaling" suggests the goal is to get back to unscaled coordinates that the child rendering pipeline expects.""#;
 
-    let textOpts =  TextOptions {
-            font_family: "AnonymicePro Nerd Font".to_string(),
-            font_size: 16.0,
-            line_width: 100,
-            text_color: "white".to_string(),  // white text
-            line_spacing: 5.0,
-        };
+    let textOpts = TextOptions {
+        font_family: "AnonymicePro Nerd Font".to_string(),
+        font_size: 16.0,
+        line_width: 100,
+        text_color: "white".to_string(), // white text
+        line_spacing: 5.0,
+        ..Default::default()
+    };
 
     let blue_text = session.new_text(
         "blue_text".to_string(),
         std::str::from_utf8(thetext).unwrap(),
-       textOpts.clone(),
+        textOpts.clone(),
     );
 
-   // debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
-
+    // debug_text_measurement(std::str::from_utf8(thetext).unwrap(), &textOpts.clone());
 
     let box_options = BoxOptions {
-        fill_color: Fill::Color("#0000FF".to_string()),  // blue background
-        stroke_color: "#000066".to_string(),  // dark blue border
+        fill_color: Fill::Color("#0000FF".to_string()), // blue background
+        stroke_color: "#000066".to_string(),            // dark blue border
         stroke_width: 1.0,
         //TODO: falta tener en cuenta padding al momento de hacer layout de elementos de box
         padding: 50.0,
         border_radius: 0.0,
         width_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), // fixed width
-        height_behavior: volare_engine_layout::SizeBehavior::Content, // auto height
+        height_behavior: volare_engine_layout::SizeBehavior::Content,     // auto height
+        ..Default::default()
     };
 
     let box1 = session.new_box("box1".to_string(), blue_text, box_options);
 
-    
     // Add the FreeContainer to the table
     // table_items.push(container_with_elements);
 
@@ -2899,7 +2960,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 5;
+    toptions.cell_padding = 5.0;
     let table = session.new_table("text_table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
@@ -2910,8 +2971,7 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
     let temp_dir = std::env::temp_dir();
     //create path for ~/temp/svg-render-test.svg
     // Render SVG
-  
-    
+
     let mut svg_path = temp_dir.clone();
     svg_path.push("svg-render-test.svg");
     let svg_renderer = SVGRenderer {};
@@ -2922,7 +2982,6 @@ The comment "Calculate absolute position without any scaling" suggests the goal 
         std::process::exit(1);
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
-    
 
     // Render PNG
     // let mut png_path = temp_dir.clone();
@@ -3332,8 +3391,8 @@ pub mod measure_text;
 // use image_renderer::PNGRenderer;
 use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
-use volare_engine_layout::{RectOptions, SimpleConstraint, SizeBehavior};
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
+use volare_engine_layout::{RectOptions, SimpleConstraint, SizeBehavior};
 
 //import layout
 use volare_engine_layout::{
@@ -3341,13 +3400,9 @@ use volare_engine_layout::{
     Fill, TableOptions, TextOptions,
 };
 //import io modules to write to file
-use measure_text::{
-    measure_text_svg_character_advance,
-}; // Use the ultra-tight measurement for text
+use measure_text::measure_text_svg_character_advance; // Use the ultra-tight measurement for text
 
 use std::fs::File;
-
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //create session
@@ -3358,6 +3413,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         line_width: 100,
         text_color: "black".to_string(),
         line_spacing: 0.0,
+        ..Default::default()
     };
     session.set_measure_text_fn(measure_text_svg_character_advance);
 
@@ -3385,15 +3441,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    //Create horizontal stack with 2 rects and one text, set vertical align to center 
+    //Create horizontal stack with 2 rects and one text, set vertical align to center
     let mut rectOpts = RectOptions::default();
-    rectOpts.width_behavior =  SizeBehavior::Fixed(150.0);
+    rectOpts.width_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.height_behavior = SizeBehavior::Fixed(150.0);
     rectOpts.stroke_color = "black".to_string();
     rectOpts.stroke_width = 1.0;
     let rect = session.new_rectangle("r1".to_string(), rectOpts.clone());
     let rect2 = session.new_rectangle("r2".to_string(), rectOpts.clone());
-
 
     let label = session.new_text(
         "label".to_string(),
@@ -3404,17 +3459,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 60,
             text_color: "#333333".to_string(),
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
     let hstack_centered = session.new_hstack(
         "hstack_centered".to_string(),
         vec![rect, label, rect2],
-        volare_engine_layout::VerticalAlignment::Center
+        volare_engine_layout::VerticalAlignment::Center,
     );
-
-
-    
 
     // Create a more visible polyline - hexagon
     let mut hex_points = Vec::new();
@@ -3451,7 +3504,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         table_items_ellipses.push(ellipse);
     }
-    let tableEllipses = session.new_table("table_ellipses".to_string(), table_items_ellipses, 5, TableOptions::default());
+    let tableEllipses = session.new_table(
+        "table_ellipses".to_string(),
+        table_items_ellipses,
+        5,
+        TableOptions::default(),
+    );
 
     //Create a list of 10 texts
     let mut table_items = Vec::new();
@@ -3517,13 +3575,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     table_items.push(text);
 
     //Add sample image from file (first instance)
-    let sampleImage = session.new_image_from_file("imagefile0".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
+    let sampleImage = session.new_image_from_file(
+        "imagefile0".to_string(),
+        "demo/assets/sample.png",
+        (SizeBehavior::Content, SizeBehavior::Content),
+    );
     //table_items.push(sampleImage);
 
     //Add sample image from file
     // The path is relative to where the binary is run
-    let file_image = session.new_image_from_file("imagefile".to_string(), "demo/assets/sample.png", (SizeBehavior::Content, SizeBehavior::Content));
-   // table_items.push(file_image);
+    let file_image = session.new_image_from_file(
+        "imagefile".to_string(),
+        "demo/assets/sample.png",
+        (SizeBehavior::Content, SizeBehavior::Content),
+    );
+    // table_items.push(file_image);
 
     // Create a FreeContainer with multiple visual elements at specific positions using the new method
 
@@ -3537,6 +3603,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 100,
             text_color: "#000000".to_string(),
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
@@ -3567,6 +3634,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 100,
             text_color: "white".to_string(), // white text
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
@@ -3578,10 +3646,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         padding: 10.0,
         border_radius: 3.0,
         width_behavior: volare_engine_layout::SizeBehavior::Fixed(700.0), // Fixed width for the box
-        height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0), 
+        height_behavior: volare_engine_layout::SizeBehavior::Fixed(200.0),
         ..BoxOptions::default()
     };
-    let blue_box = session.new_box("bluebox".to_string(),blue_text, box_options);
+    let blue_box = session.new_box("bluebox".to_string(), blue_text, box_options);
 
     let green_ellipse = session.new_elipse(
         "greeneclipse".to_string(),
@@ -3602,17 +3670,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             line_width: 100,
             text_color: "#555555".to_string(), // dark gray
             line_spacing: 0.0,
+            ..Default::default()
         },
     );
 
     // Create a container with all children at once
-    let container_with_elements = session.new_free_container("containerwithelems".to_string(),vec![
-        (title_text, (30.0, 10.0)),
-        (red_circle, (40.0, 50.0)),
-        (blue_box, (80.0, 40.0)),
-        (green_ellipse, (150.0, 70.0)),
-        (subtitle, (30.0, 120.0)),
-    ]);
+    let container_with_elements = session.new_free_container(
+        "containerwithelems".to_string(),
+        vec![
+            (title_text, (30.0, 10.0)),
+            (red_circle, (40.0, 50.0)),
+            (blue_box, (80.0, 40.0)),
+            (green_ellipse, (150.0, 70.0)),
+            (subtitle, (30.0, 120.0)),
+        ],
+    );
 
     // Add styling to the container with more vibrant colors
     let free_container = session.get_free_container_mut(container_with_elements.entity_id.clone());
@@ -3620,33 +3692,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     free_container.border_color = Some("#FF0000".to_string()); // Bright red border
     free_container.border_width = 5.0; // Thicker border
 
-
     // Add the FreeContainer to the table
     table_items.push(container_with_elements);
 
-
     // Create constraint layout and elements
-    let elem1 = session.new_rectangle("constrained1".to_string(), RectOptions{
-        width_behavior: SizeBehavior::Fixed(50.0),
-        height_behavior: SizeBehavior::Fixed(50.0),
-        fill_color: Fill::Color("red".to_string()),
-        stroke_color: "yellow".to_string(),
-        ..Default::default()
-    });
-    let elem2 = session.new_rectangle("constrained2".to_string(), RectOptions{
-        width_behavior: SizeBehavior::Fixed(50.0),
-        height_behavior: SizeBehavior::Fixed(50.0),
-        fill_color: Fill::Color("black".to_string()),
-        ..Default::default()
-    });
+    let elem1 = session.new_rectangle(
+        "constrained1".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(50.0),
+            fill_color: Fill::Color("red".to_string()),
+            stroke_color: "yellow".to_string(),
+            ..Default::default()
+        },
+    );
+    let elem2 = session.new_rectangle(
+        "constrained2".to_string(),
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(50.0),
+            height_behavior: SizeBehavior::Fixed(50.0),
+            fill_color: Fill::Color("black".to_string()),
+            ..Default::default()
+        },
+    );
 
-    let constraints = vec![SimpleConstraint::AlignLeft(vec!["constrained1".to_string(), "constrained2".to_string()])];
-    let constraint_container = session.new_constraint_layout_container("constraint_container1".to_string(), vec![(elem1, None),(elem2, None)], constraints);
+    let constraints = vec![SimpleConstraint::AlignLeft(vec![
+        "constrained1".to_string(),
+        "constrained2".to_string(),
+    ])];
+    let constraint_container = session.new_constraint_layout_container(
+        "constraint_container1".to_string(),
+        vec![(elem1, None), (elem2, None)],
+        constraints,
+    );
     table_items.push(constraint_container);
     //texts.push(get_test_table(&mut session));
     //Create a table for the texts with 2 columns
     let mut toptions = TableOptions::default();
-    toptions.cell_padding = 2;
+    toptions.cell_padding = 2.0;
     let table = session.new_table("table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
@@ -3696,6 +3779,7 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
         line_width: 100,
         text_color: "black".to_string(),
         line_spacing: 5.0,
+        ..Default::default()
     };
     //Create a list of 10 texts
     let mut texts = Vec::new();
@@ -3717,7 +3801,6 @@ fn get_test_table(session: &mut DiagramBuilder) -> DiagramTreeNode {
     let table = session.new_table("tabletexts".to_string(), texts, 3, table_options);
     table
 }
-
 
 
 ===/volare_engine_layout.txt===
@@ -4651,7 +4734,8 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect,
+    ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -4707,11 +4791,12 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     let desired_content_x = match shape_box.box_options.width_behavior {
         SizeBehavior::Fixed(fixed_width) => {
             let available_width = fixed_width - shape_box.box_options.padding * 2.0;
-            if wrapped_elem_bounds.width <= available_width {
+            if wrapped_elem_bounds.width <= available_width
+                && shape_box.box_options.horizontal_alignment == HorizontalAlignment::Center
+            {
                 // Center the content bounding box
                 shape_box.box_options.padding + (available_width - wrapped_elem_bounds.width) / 2.0
             } else {
-                // Content is larger than available space, align bounding box to left edge
                 shape_box.box_options.padding
             }
         }
@@ -5231,7 +5316,9 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     let height: Float = row_heights.iter().sum();
 
     //Update the size of the table header rect
-    session.set_size(table.header_rect.clone(), width, row_heights[0]);
+    if let Some(header_rect) = &table.header_rect {
+        session.set_size(header_rect.clone(), width, row_heights[0]);
+    }
 
     //print the size of the table
     println!("Table size: {:?}", (width, height));
@@ -5239,25 +5326,46 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     session.set_size(table.entity.clone(), width, height);
 
     //We need to update the position of the horizontal lines and their size
-    for (i, line) in table.row_lines.iter().enumerate() {
+    for (i, line_id) in table.row_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(line.clone());
+        let line_size = session.get_size(line_id.clone());
         if i < horizontal_line_positions.len() {
-            //set the y position of the horizontal line, x will be 0
-            session.set_position(line.clone(), 0.0, horizontal_line_positions[i]);
-            //update the size, we only need to update the height and leave the width as it is (0 by default)
-            session.set_size(line.clone(), width, line_size.1);
+            let line = session.get_line_mut(line_id.clone());
+            let line_w:Float;
+            let line_h: Float;
+            if let Some(line) = line {
+                line.start = (0.0, horizontal_line_positions[i]);
+                line.end = (width, horizontal_line_positions[i]);
+                line_w = line.end.0 - line.start.0;
+                line_h = line.end.1 - line.start.1;
+                // correct size of line
+                session.set_size(
+                    line_id.clone(),
+                    line_w,
+                    line_h
+                )
+            }
         }
     }
 
-    for (i, line) in table.col_lines.iter().enumerate() {
+    for (i, line_id) in table.col_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(line.clone());
         if i < vertical_line_positions.len() {
-            //set the x position of the vertical line, y will be 0
-            session.set_position(line.clone(), vertical_line_positions[i], 0.0);
-            //update the size, we only need to update the width and leave the height as it is (0 by default)
-            session.set_size(line.clone(), line_size.0, height);
+            let line = session.get_line_mut(line_id.clone());
+            let line_w:Float;
+            let line_h: Float;
+            if let Some(line) = line {
+                line.start = (vertical_line_positions[i], 0.0);
+                line.end = (vertical_line_positions[i],height);
+                line_w = line.end.0 - line.start.0;
+                line_h = line.end.1 - line.start.1;
+                // correct size of line
+                session.set_size(
+                    line_id.clone(),
+                    line_w,
+                    line_h
+                )
+            }
         }
     }
 }
@@ -5326,20 +5434,25 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
 
 //TODO: Hay que cambiar, layout no debe crear el constraint system
 // el constraint system se registra en el builder
-pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
+pub fn layout_constraint_container(
+    session: &mut DiagramBuilder,
+    container: &ConstraintLayoutContainer,
+) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
-    let child_sizes:Vec<(String, (Float,Float))> = container.children
+    let child_sizes: Vec<(String, (Float, Float))> = container
+        .children
         .iter()
-        .filter_map(|child_id| {
-            Some((child_id.clone(), session.get_size(child_id.clone()).clone()))
-        }).collect();
-        
+        .filter_map(|child_id| Some((child_id.clone(), session.get_size(child_id.clone()).clone())))
+        .collect();
+
     let system = session.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
     // at this point children already have their sizes calculated
-    for (child_id, (w,h)) in child_sizes{
-            system.suggest_size(child_id.as_str(), w, h).map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
+    for (child_id, (w, h)) in child_sizes {
+        system
+            .suggest_size(child_id.as_str(), w, h)
+            .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
 
     // Solve constraints
@@ -5352,35 +5465,34 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
     // Negative positions for children are problematic, we compensate by adding an offset
     // if the element that's most to the left has -10, all elements will be added 10 to x
 
-    let mut min_x:Float = INFINITY;
-    let mut min_y:Float = INFINITY;
+    let mut min_x: Float = INFINITY;
+    let mut min_y: Float = INFINITY;
 
-    for(_, (x,y,_,_)) in results.clone() {
+    for (_, (x, y, _, _)) in results.clone() {
         min_x = min_x.min(x);
         min_y = min_y.min(y)
     }
 
-    let offset_x = if min_x < 0.0 {
-        min_x.abs()
-    } else {
-        0.0
-    };
+    let offset_x = if min_x < 0.0 { min_x.abs() } else { 0.0 };
 
-    let offset_y = if min_y < 0.0 {
-        min_y.abs()
-    } else {
-        0.0
-    };
+    let offset_y = if min_y < 0.0 { min_y.abs() } else { 0.0 };
 
     println!("offset_x: {}", offset_x);
     println!("offset_y: {}", offset_y);
 
     // Set final position and size for children
-    for (entity_id, (x,y,width,height)) in results {
-        println!("constraint variable: {}, x:{}, y:{}, w:{}, h:{}", entity_id.clone(), x, y, width, height);
-        session.set_position(entity_id.clone(), x + offset_x, y+ offset_y);
+    for (entity_id, (x, y, width, height)) in results {
+        println!(
+            "constraint variable: {}, x:{}, y:{}, w:{}, h:{}",
+            entity_id.clone(),
+            x,
+            y,
+            width,
+            height
+        );
+        session.set_position(entity_id.clone(), x + offset_x, y + offset_y);
         session.set_size(entity_id.clone(), width, height);
-    
+
         let right = x + offset_x + width;
         let bottom = y + offset_y + height;
         if right > container_width {
@@ -5392,7 +5504,10 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
         }
     }
 
-    println!("container size calculated: {},{}", container_width, container_height);
+    println!(
+        "container size calculated: {},{}",
+        container_width, container_height
+    );
     session.set_size(container.entity.clone(), container_width, container_height);
     Ok(())
 }
@@ -5499,7 +5614,9 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::ConstraintLayoutContainer => {
-            let container = session.get_constraint_layout(root.entity_id.clone()).clone();
+            let container = session
+                .get_constraint_layout(root.entity_id.clone())
+                .clone();
             layout_constraint_container(session, &container);
         }
 
@@ -6813,6 +6930,7 @@ pub struct BoxOptions {
     // Add size behavior fields
     pub width_behavior: SizeBehavior,
     pub height_behavior: SizeBehavior,
+    pub horizontal_alignment: HorizontalAlignment,
 }
 
 impl Clone for BoxOptions {
@@ -6825,6 +6943,7 @@ impl Clone for BoxOptions {
             border_radius: self.border_radius,
             width_behavior: self.width_behavior.clone(),
             height_behavior: self.height_behavior.clone(),
+            horizontal_alignment: self.horizontal_alignment.clone(),
         }
     }
 }
@@ -6845,6 +6964,7 @@ impl BoxOptions {
             border_radius: 0.0,
             width_behavior: SizeBehavior::Content,
             height_behavior: SizeBehavior::Content,
+            horizontal_alignment: HorizontalAlignment::Center,
         }
     }
 }
@@ -7043,6 +7163,7 @@ pub struct TextOptions {
     // (number of max characters per line)used to know when to insert breaks
     pub line_width: usize,
     pub line_spacing: f32, // spacing between lines
+    pub font_weight: u32,
 }
 
 impl Clone for TextOptions {
@@ -7053,6 +7174,7 @@ impl Clone for TextOptions {
             text_color: self.text_color.clone(),
             line_width: self.line_width,
             line_spacing: self.line_spacing,
+            font_weight: self.font_weight,
         }
     }
 }
@@ -7065,10 +7187,12 @@ impl TextOptions {
             text_color: String::from("black"),
             line_width: 20,
             line_spacing: 0.0,
+            font_weight: 400,
         }
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum HorizontalAlignment {
     Left,
     Center,
@@ -7716,6 +7840,7 @@ impl Entity for ShapeArc {
 /// Returns a Result with either a DiagramTreeNode or an error message
 pub type CustomComponentFactory = Arc<
     dyn Fn(
+            &str,
             &Map<String, Value>,
             &mut crate::DiagramBuilder,
             &JsonLinesParser,
@@ -7740,6 +7865,7 @@ impl CustomComponentRegistry {
     pub fn register<F>(&mut self, component_type: &str, factory: F)
     where
         F: Fn(
+                &str,
                 &Map<String, Value>,
                 &mut crate::DiagramBuilder,
                 &JsonLinesParser,
@@ -7755,13 +7881,14 @@ impl CustomComponentRegistry {
     /// Create a component instance using the registered factory
     pub fn create_component(
         &self,
+        id: &str, 
         component_type: &str,
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
         parser: &JsonLinesParser,
     ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
         match self.factories.get(component_type) {
-            Some(factory) => factory(attributes, builder, parser),
+            Some(factory) => factory(id, attributes, builder, parser),
             None => Err(format!("Unknown custom component type: {}", component_type)),
         }
     }
@@ -7782,6 +7909,7 @@ impl CustomComponentRegistry {
     ) -> Option<
         &Arc<
             dyn Fn(
+                     &str,
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
                     &JsonLinesParser,
@@ -7836,6 +7964,7 @@ mod custom_component_tests {
     /// Test custom component: Badge
     /// Creates a rounded box with text and a colored background
     fn create_badge_component(
+        id: &str,
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
         parser: &JsonLinesParser,
@@ -7913,7 +8042,8 @@ pub struct TableOptions {
     pub header_fill_color: String,
     pub border_color: String,
     pub border_width: usize,
-    pub cell_padding: usize,
+    pub cell_padding: Float,
+    pub with_header: bool, // if true, first row has different background
 }
 
 /* A table contains a list of rows, each row has a cell 
@@ -7927,7 +8057,7 @@ pub struct Table {
     pub cells: Vec<EntityID>,
     pub col_lines: Vec<EntityID>,
     pub row_lines: Vec<EntityID>,
-    pub header_rect: EntityID,
+    pub header_rect: Option<EntityID>,
     pub table_options: TableOptions,
 }
 
@@ -7950,7 +8080,7 @@ impl Clone for Table {
 
 //constructor that receives only the table options
 impl Table {
-    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, header_rect: EntityID, table_options: TableOptions) -> Table {
+    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, header_rect: Option<EntityID>, table_options: TableOptions) -> Table {
         Table {
             entity,
             cols,
@@ -7988,7 +8118,8 @@ impl Default for TableOptions {
             border_color: String::from("black"),
             header_fill_color: String::from("lightgray"),
             border_width: 1,
-            cell_padding: 20,
+            cell_padding: 20.0,
+            with_header: true,
         }
     }
 }
@@ -8001,6 +8132,7 @@ impl Clone for TableOptions {
             border_color: self.border_color.clone(),
             border_width: self.border_width,
             cell_padding: self.cell_padding,
+            with_header: self.with_header,
         }
     }
 }
@@ -8743,6 +8875,8 @@ impl JsonLinesParser {
         entity_id: &str,
         builder: &mut DiagramBuilder,
     ) -> Result<DiagramTreeNode, JsonLinesError> {
+
+        println!("*** building entity {} ***", entity_id);
         let entity = self
             .entities
             .get(entity_id)
@@ -8751,11 +8885,13 @@ impl JsonLinesParser {
         // Clone the entity type to avoid borrow conflicts
         let component_type = entity.entity_type.clone();
         let attributes = entity.attributes.clone();
+        println!("Attributes length {}", attributes.len());
+
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
             return builder
-                .create_custom_component(&component_type, &attributes, &self)
+                .create_custom_component(&entity_id, &component_type, &attributes, &self)
                 .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 
@@ -8797,6 +8933,7 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
+                    font_weight: str::parse(&get_string_attr(&entity.attributes, &["font_weight"], "400")).unwrap(),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
@@ -8846,6 +8983,8 @@ impl JsonLinesParser {
                     border_radius: get_float_attr(&entity.attributes, &["border_radius"], 0.0),
                     width_behavior,
                     height_behavior,
+                    // TODO: leer de atributo
+                    horizontal_alignment: HorizontalAlignment::Center,
                 };
 
                 // Parse and apply transforms
@@ -9161,7 +9300,8 @@ impl JsonLinesParser {
                     border_color: get_string_attr(&entity.attributes, &["border_color"], "black"),
                     border_width: get_int_attr(&entity.attributes, &["border_width"], 1) as usize,
                     cell_padding: get_int_attr(&entity.attributes, &["cell_padding", "padding"], 20)
-                        as usize,
+                        as Float,
+                    with_header: true,
                 };
 
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
@@ -9795,7 +9935,10 @@ use std::{collections::HashMap, hash::Hash, rc::Rc, sync::Arc};
  *
  */
 //use TextOptions
-use crate::{components::*, parser::JsonLinesParser, transform::Transform, BoundingBox, ConstraintSystem, SimpleConstraint};
+use crate::{
+    components::*, parser::JsonLinesParser, transform::Transform, BoundingBox, ConstraintSystem,
+    SimpleConstraint,
+};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
@@ -9936,6 +10079,7 @@ impl DiagramBuilder {
     pub fn register_custom_component<F>(&mut self, component_type: &str, factory: F)
     where
         F: Fn(
+                &str,
                 &serde_json::Map<String, serde_json::Value>,
                 &mut DiagramBuilder,
                 &JsonLinesParser,
@@ -9958,6 +10102,7 @@ impl DiagramBuilder {
 
     pub fn create_custom_component(
         &mut self,
+        entity_id: &str,
         component_type: &str,
         attrs: &serde_json::Map<String, serde_json::Value>,
         lines_parser: &JsonLinesParser,
@@ -9969,9 +10114,9 @@ impl DiagramBuilder {
             ));
         }
 
-            let factory = { self.custom_components.get(component_type).unwrap().clone() };
+        let factory = { self.custom_components.get(component_type).unwrap().clone() };
 
-            factory(attrs, self, lines_parser)
+        factory(entity_id, attrs, self, lines_parser)
     }
 
     /* Create a new entity of a given type
@@ -10026,20 +10171,20 @@ impl DiagramBuilder {
 
     pub fn set_position(&mut self, entity_id: EntityID, x: Float, y: Float) {
         let current = self.get_transform(entity_id.clone());
-        println!(
-            "📍 set_position called for {} - pos: ({}, {}) - before: {:?}",
-            entity_id, x, y, current
-        );
+        // println!(
+        //     "📍 set_position called for {} - pos: ({}, {}) - before: {:?}",
+        //     entity_id, x, y, current
+        // );
 
         // Preserve existing rotation/scale, just update translation
         let mut new_transform = current;
         new_transform.matrix[4] = x; // e - translation X
         new_transform.matrix[5] = y; // f - translation Y
 
-        println!(
-            "📍 set_position result for {} - after: {:?}",
-            entity_id, new_transform
-        );
+        // println!(
+        //     "📍 set_position result for {} - after: {:?}",
+        //     entity_id, new_transform
+        // );
         self.set_transform(entity_id, new_transform);
     }
 
@@ -10402,7 +10547,7 @@ impl DiagramBuilder {
         self.new_entity(header_id.clone(), EntityType::RectShape);
         // Create the rectangle for the header row
         let header = self.new_rectangle(
-            header_id,
+            header_id.clone(),
             RectOptions {
                 fill_color: Fill::Color(options.header_fill_color.clone()),
                 stroke_color: String::from("black"),
@@ -10419,7 +10564,7 @@ impl DiagramBuilder {
             col_lines.clone(),
             row_lines.clone(),
             cols,
-            header.entity_id.clone(),
+            if options.with_header { Some(header_id.clone())} else {None},
             options.clone(),
         );
 
@@ -10431,10 +10576,12 @@ impl DiagramBuilder {
         };
 
         // Add the header before the cells, otherwise it can cover the cells
-        node.add_child(DiagramTreeNode::new(
-            EntityType::RectShape,
-            header.entity_id.clone(),
-        ));
+        if options.with_header {
+            node.add_child(DiagramTreeNode::new(
+                EntityType::RectShape,
+                header_id.clone(),
+            ));
+        }
 
         for child in cells {
             node.add_child(child)
@@ -10510,27 +10657,34 @@ impl DiagramBuilder {
         let id = self.new_entity(id.clone(), EntityType::ConstraintLayoutContainer);
         let children = Rc::new(children);
 
-        let children_ids = children.clone().iter().map(|(node, _) | {
-            node.entity_id.clone()
-        }).collect::<Vec<String>>();
+        let children_ids = children
+            .clone()
+            .iter()
+            .map(|(node, _)| node.entity_id.clone())
+            .collect::<Vec<String>>();
 
-        let children_nodes = children.clone().iter().map(|(node,_) | {
-            Box::new(node.clone())
-        }).collect::<Vec<Box<DiagramTreeNode>>>();
+        let children_nodes = children
+            .clone()
+            .iter()
+            .map(|(node, _)| Box::new(node.clone()))
+            .collect::<Vec<Box<DiagramTreeNode>>>();
 
-        let container = ConstraintLayoutContainer::new(id.clone(),children_ids.clone().to_vec());
+        let container = ConstraintLayoutContainer::new(id.clone(), children_ids.clone().to_vec());
 
         // Setup constraint system
-        
+
         // register entities in the constrain system and suggest positions
         let mut cs = ConstraintSystem::new();
         for (node, pos) in children.clone().to_vec() {
             if let Err(e) = cs.add_entity(node.entity_id.clone()) {
-                eprintln!("Failed to add entity to constrain system: {}", node.entity_id.clone());
+                eprintln!(
+                    "Failed to add entity to constrain system: {}",
+                    node.entity_id.clone()
+                );
             }
             // suggest position if there's one
             if let Some(p) = pos {
-                 let _ = cs.suggest_position(&node.entity_id.clone(), p.x, p.y);
+                let _ = cs.suggest_position(&node.entity_id.clone(), p.x, p.y);
             }
         }
 
@@ -10541,15 +10695,15 @@ impl DiagramBuilder {
 
         // Store the constraint system
         self.constraint_systems.insert(id.clone(), cs);
-        self.constraint_layout_containers.insert(id.clone(), container);
+        self.constraint_layout_containers
+            .insert(id.clone(), container);
 
         // Add children to system
         DiagramTreeNode {
             entity_type: EntityType::ConstraintLayoutContainer,
             entity_id: id.clone(),
             children: children_nodes,
-
-         }
+        }
     }
 }
 
@@ -10581,6 +10735,10 @@ impl DiagramBuilder {
 
     pub fn get_line(&self, id: EntityID) -> &ShapeLine {
         &self.lines[&id]
+    }
+
+     pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
+        self.lines.get_mut(&id)
     }
 
     pub fn get_rectangle(&self, id: EntityID) -> &ShapeRect {
@@ -10637,7 +10795,7 @@ impl DiagramBuilder {
         self.constraint_systems.get(&id).unwrap()
     }
 
-     pub fn get_constraint_system_mut(&mut self, id: EntityID) -> &mut ConstraintSystem {
+    pub fn get_constraint_system_mut(&mut self, id: EntityID) -> &mut ConstraintSystem {
         self.constraint_systems.get_mut(&id).unwrap()
     }
 
@@ -10655,6 +10813,7 @@ impl DiagramBuilder {
     ) -> Option<
         &Arc<
             dyn Fn(
+                    &str,
                     &serde_json::Map<String, serde_json::Value>,
                     &mut DiagramBuilder,
                     &JsonLinesParser,
@@ -10704,6 +10863,7 @@ mod component_registration_tests {
     /// Custom Component 1: Badge
     /// Creates a rounded pill-shaped element with text
     fn create_badge_component(
+        id : &str,
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
         parser: &JsonLinesParser,
@@ -10724,6 +10884,7 @@ mod component_registration_tests {
             text_color: color,
             line_width: 200,
             line_spacing: 0.0,
+            ..Default::default()
         };
         let text_node = builder.new_text("text".to_string(), &text, text_options);
 
@@ -10736,6 +10897,7 @@ mod component_registration_tests {
             border_radius: font_size,               // Make it pill-shaped
             width_behavior: SizeBehavior::Content,  // Auto width based on text
             height_behavior: SizeBehavior::Content, // Auto height based on text
+            ..Default::default()
         };
         let badge = builder.new_box("container".to_string(), text_node, box_options);
 
@@ -10778,9 +10940,9 @@ mod component_registration_tests {
         .unwrap()
         .clone();
 
-        let parser  = JsonLinesParser::new();
+        let parser = JsonLinesParser::new();
 
-        let result = builder.create_custom_component("badge", &attrs, &parser);
+        let result = builder.create_custom_component("b1","badge", &attrs, &parser);
         assert!(result.is_ok());
         let badge_node = result.unwrap();
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);
@@ -10849,17 +11011,20 @@ pub fn register_all_components(builder: &mut DiagramBuilder) {
 // src/components/documents/mod.rs
 // Document components with consistent styling through predefined constants
 
+use std::fmt::format;
+
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, TEXT_BASE, TEXT_LG, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_SM, WIDTH_XL
+    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
     get_array_attr, get_bool_attr, get_float_attr, get_int_attr, get_string_attr, JsonLinesParser,
 };
 use crate::*;
-use serde_json::{Map, Value};
+use serde_json::{from_value, Map, Value};
 use uuid::fmt::Simple;
+use uuid::uuid;
 
 /// Document Style Constants
 /// These constants define a consistent design system for document components
@@ -10907,10 +11072,17 @@ pub mod style {
     pub const TEXT_2XL: Float = 24.0; // Page titles
     pub const TEXT_3XL: Float = 32.0; // Main titles
 
+    // Title font weights
+
+    pub const FONT_WEIGHT_NORMAL: u32 = 400;
+    pub const FONT_WEIGHT_BOLD_MAX: u32 = 900;
+    pub const FONT_WEIGHT_BOLD_MD: u32 = 700;
+    pub const FONT_WEIGHT_BOLD_LIGHT: u32 = 600;
+
     // Line Heights (as spacing multipliers)
     pub const LINE_HEIGHT_TIGHT: Float = 1.2;
     pub const LINE_HEIGHT_NORMAL: Float = 1.5;
-    pub const LINE_HEIGHT_RELAXED: Float = 1.8;
+    pub const LINE_HEIGHT_RELAXED: Float = 2.0;
 
     // === SPACING ===
 
@@ -10940,6 +11112,7 @@ pub mod style {
     pub const WIDTH_LG: Float = 800.0; // Large documents
     pub const WIDTH_XL: Float = 1024.0; // Extra large documents
     pub const WIDTH_FULL: Float = 1200.0; // Full width documents
+    pub const WIDTH_PROPERTY: Float = 85.0; // For property field names/values
 
     // Border radius
     pub const RADIUS_SM: Float = 4.0;
@@ -11011,11 +11184,11 @@ pub mod theme {
 }
 
 pub fn create_document_container(
+    id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
-    let id = get_string_attr(attrs, &["id"], "");
     let mut children = Vec::new();
     let header_id = get_string_attr(attrs, &["header_id"], "");
     let content_id = get_string_attr(attrs, &["content_id"], "");
@@ -11069,11 +11242,7 @@ pub fn create_document_container(
         children.push(footer_container);
     }
 
-    let vstack = builder.new_vstack(
-        id.to_string(),
-        children,
-        HorizontalAlignment::Left,
-    );
+    let vstack = builder.new_vstack(id.to_string(), children, HorizontalAlignment::Left);
 
     return Ok(vstack);
 }
@@ -11091,16 +11260,36 @@ pub fn create_document_container(
  * width attribute: |sm|md|lg|xl|full|<number>
  */
 pub fn create_document_text(
+    id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
-    let id = get_string_attr(attrs, &["id"], "");
+    attrs.clone().iter().for_each(|(k, v)| {
+        println!("k,v: {},{}", k, v);
+    });
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
 
+    document_text(id, builder, variant, content, container_width)
+}
+
+pub fn document_text(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    variant: String,
+    content: String,
+    container_width: f32,
+) -> Result<DiagramTreeNode, String> {
     let toptions = match variant.as_str() {
+        "xlarge" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            ..TextOptions::default()
+        },
         "large" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
@@ -11144,11 +11333,162 @@ pub fn create_document_text(
         border_radius: 0.0,
         width_behavior: w_size,
         height_behavior: SizeBehavior::Content,
+        horizontal_alignment: HorizontalAlignment::Left,
     };
     let container = builder.new_box(format!("{}_text_container", id), text, coptions);
     Ok(container)
 }
 
+/**
+ * Custom component for creating Titles
+ */
+pub fn create_title(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let variant = get_string_attr(attrs, &["variant"], "default");
+    let content = get_string_attr(attrs, &["text", "content"], "");
+    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+    let toptions = match variant.as_str() {
+        "h1" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_3XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            font_weight: FONT_WEIGHT_BOLD_MAX,
+            ..TextOptions::default()
+        },
+        "h2" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_2XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            font_weight: FONT_WEIGHT_BOLD_MAX,
+            ..TextOptions::default()
+        },
+
+        "h3" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_TIGHT,
+            font_weight: FONT_WEIGHT_BOLD_MD,
+            ..TextOptions::default()
+        },
+
+        "h4" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_LG,
+            text_color: SECONDARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_TIGHT,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+
+        _ => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_2XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_NORMAL,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+    };
+
+    let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
+    let w_size = SizeBehavior::Fixed(container_width);
+    let coptions = BoxOptions {
+        fill_color: Fill::Color("transparent".to_string()),
+        stroke_color: "transparent".to_string(),
+        stroke_width: 0.0,
+        padding: 0.0,
+        border_radius: 0.0,
+        width_behavior: w_size,
+        height_behavior: SizeBehavior::Content,
+        horizontal_alignment: HorizontalAlignment::Left,
+    };
+    let spacer = builder.new_spacer(
+        format!("{}_spacer", id),
+        SpacerOptions {
+            width: 0.0,
+            height: SPACE_3XL,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+    let t_container = builder.new_box(format!("{}_text_container", id), text.clone(), coptions);
+    let container = builder.new_vstack(
+        format!("_container"),
+        vec![t_container, spacer],
+        HorizontalAlignment::Left,
+    );
+    Ok(container)
+}
+
+/**
+ * Component useful for presenting a list of name/value property list
+ */
+pub fn create_properties(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let properties = get_properties(attrs, &["properties", "items"]);
+    let table_opts = TableOptions {
+        cell_padding: SPACE_SM,
+        with_header: false,
+        border_color: BODY_COLOR.to_string(),
+        border_width: 1,
+        fill_color: BG_ACCENT.to_string(),
+        ..Default::default()
+    };
+
+    // Crear las celdas a partir de las propiedades Vec<(String,String)>
+    let cell_values: Vec<String> = properties.into_iter().flat_map(|(a, b)| [a, b]).collect();
+
+
+    let cell_texts: Vec<DiagramTreeNode> = cell_values
+        .into_iter()
+        .map(|value| {
+            // TODO: variant debe ser enum
+            // TODO: en vez de uuid derivar el id del nombre de la propiedad si es posible
+            // TODO: usar width diferente para nombre y value
+            document_text(format!("{}_prop_{}",id, uuid::Uuid::new_v4()).as_str(), builder, "small".into(), value, WIDTH_PROPERTY)
+        })
+        .filter_map(|v| v.ok())
+        .collect();
+
+    let table = builder.new_table(format!("{}_table", id), cell_texts, 2, table_opts);
+    Ok(table)
+}
+
+/**
+ * Used for the property panels, each item is expected to have two values, name and value
+ * e.g items=[["name","value"], ["name", "value"]...]
+ */
+pub fn get_properties(attrs: &Map<String, Value>, keys: &[&str]) -> Vec<(String, String)> {
+    let mut items = Vec::<(String, String)>::new();
+    for key in keys {
+        if let Some(value) = attrs.get(*key) {
+            if let Some(arr) = value.as_array() {
+                for item_arr_val in arr {
+                    if let Some(item_arr) = item_arr_val.as_array() {
+                        if item_arr.len() == 2 {
+                            let name_elem = &item_arr[0];
+                            let value_elem = &item_arr[1];
+                            let name = name_elem.as_str().unwrap();
+                            let value = value_elem.as_str().unwrap();
+                            items.push((name.to_owned(), value.to_owned()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    items
+}
 
 // Helper function for extracting a text width from names or pixel value
 // |sm|md|lg|xl|full|<number>
@@ -11156,25 +11496,15 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             if let Some(s) = value.as_str() {
-                return if s.is_empty(){
+                return if s.is_empty() {
                     default
                 } else {
                     match s {
-                        "sm" => {
-                            WIDTH_SM
-                        }
-                        "md" => {
-                            WIDTH_MD
-                        }
-                        "lg" => {
-                            WIDTH_LG
-                        }
-                         "xl" => {
-                            WIDTH_XL
-                        }
-                         "full" => {
-                            WIDTH_FULL
-                        }
+                        "sm" => WIDTH_SM,
+                        "md" => WIDTH_MD,
+                        "lg" => WIDTH_LG,
+                        "xl" => WIDTH_XL,
+                        "full" => WIDTH_FULL,
                         _ => {
                             if let Ok(val) = s.parse::<f32>() {
                                 val
@@ -11194,6 +11524,8 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
     builder.register_custom_component("document.text", create_document_text);
+    builder.register_custom_component("document.title", create_title);
+    builder.register_custom_component("document.properties", create_properties);
     println!("📄 Document component registered: 'document'");
 }
 
@@ -11578,7 +11910,7 @@ fn render_line(
     node: &DiagramTreeNode,
 ) {
     let line_shape = session.get_line(node.entity_id.clone());
-
+    print!("Rendering line!!!!");
     let line_content = format!(
         r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
         line_shape.start.0,

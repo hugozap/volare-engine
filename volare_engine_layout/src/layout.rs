@@ -9,7 +9,8 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect,
+    ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -65,11 +66,12 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     let desired_content_x = match shape_box.box_options.width_behavior {
         SizeBehavior::Fixed(fixed_width) => {
             let available_width = fixed_width - shape_box.box_options.padding * 2.0;
-            if wrapped_elem_bounds.width <= available_width {
+            if wrapped_elem_bounds.width <= available_width
+                && shape_box.box_options.horizontal_alignment == HorizontalAlignment::Center
+            {
                 // Center the content bounding box
                 shape_box.box_options.padding + (available_width - wrapped_elem_bounds.width) / 2.0
             } else {
-                // Content is larger than available space, align bounding box to left edge
                 shape_box.box_options.padding
             }
         }
@@ -589,7 +591,9 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     let height: Float = row_heights.iter().sum();
 
     //Update the size of the table header rect
-    session.set_size(table.header_rect.clone(), width, row_heights[0]);
+    if let Some(header_rect) = &table.header_rect {
+        session.set_size(header_rect.clone(), width, row_heights[0]);
+    }
 
     //print the size of the table
     println!("Table size: {:?}", (width, height));
@@ -597,25 +601,46 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
     session.set_size(table.entity.clone(), width, height);
 
     //We need to update the position of the horizontal lines and their size
-    for (i, line) in table.row_lines.iter().enumerate() {
+    for (i, line_id) in table.row_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(line.clone());
+        let line_size = session.get_size(line_id.clone());
         if i < horizontal_line_positions.len() {
-            //set the y position of the horizontal line, x will be 0
-            session.set_position(line.clone(), 0.0, horizontal_line_positions[i]);
-            //update the size, we only need to update the height and leave the width as it is (0 by default)
-            session.set_size(line.clone(), width, line_size.1);
+            let line = session.get_line_mut(line_id.clone());
+            let line_w:Float;
+            let line_h: Float;
+            if let Some(line) = line {
+                line.start = (0.0, horizontal_line_positions[i]);
+                line.end = (width, horizontal_line_positions[i]);
+                line_w = line.end.0 - line.start.0;
+                line_h = line.end.1 - line.start.1;
+                // correct size of line
+                session.set_size(
+                    line_id.clone(),
+                    line_w,
+                    line_h
+                )
+            }
         }
     }
 
-    for (i, line) in table.col_lines.iter().enumerate() {
+    for (i, line_id) in table.col_lines.iter().enumerate() {
         //get the size of the line (should be 0,0 by default)
-        let line_size = session.get_size(line.clone());
         if i < vertical_line_positions.len() {
-            //set the x position of the vertical line, y will be 0
-            session.set_position(line.clone(), vertical_line_positions[i], 0.0);
-            //update the size, we only need to update the width and leave the height as it is (0 by default)
-            session.set_size(line.clone(), line_size.0, height);
+            let line = session.get_line_mut(line_id.clone());
+            let line_w:Float;
+            let line_h: Float;
+            if let Some(line) = line {
+                line.start = (vertical_line_positions[i], 0.0);
+                line.end = (vertical_line_positions[i],height);
+                line_w = line.end.0 - line.start.0;
+                line_h = line.end.1 - line.start.1;
+                // correct size of line
+                session.set_size(
+                    line_id.clone(),
+                    line_w,
+                    line_h
+                )
+            }
         }
     }
 }
@@ -684,20 +709,25 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
 
 //TODO: Hay que cambiar, layout no debe crear el constraint system
 // el constraint system se registra en el builder
-pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &ConstraintLayoutContainer)-> anyhow::Result<()>{
+pub fn layout_constraint_container(
+    session: &mut DiagramBuilder,
+    container: &ConstraintLayoutContainer,
+) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
-    let child_sizes:Vec<(String, (Float,Float))> = container.children
+    let child_sizes: Vec<(String, (Float, Float))> = container
+        .children
         .iter()
-        .filter_map(|child_id| {
-            Some((child_id.clone(), session.get_size(child_id.clone()).clone()))
-        }).collect();
-        
+        .filter_map(|child_id| Some((child_id.clone(), session.get_size(child_id.clone()).clone())))
+        .collect();
+
     let system = session.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
     // at this point children already have their sizes calculated
-    for (child_id, (w,h)) in child_sizes{
-            system.suggest_size(child_id.as_str(), w, h).map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
+    for (child_id, (w, h)) in child_sizes {
+        system
+            .suggest_size(child_id.as_str(), w, h)
+            .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
 
     // Solve constraints
@@ -710,35 +740,34 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
     // Negative positions for children are problematic, we compensate by adding an offset
     // if the element that's most to the left has -10, all elements will be added 10 to x
 
-    let mut min_x:Float = INFINITY;
-    let mut min_y:Float = INFINITY;
+    let mut min_x: Float = INFINITY;
+    let mut min_y: Float = INFINITY;
 
-    for(_, (x,y,_,_)) in results.clone() {
+    for (_, (x, y, _, _)) in results.clone() {
         min_x = min_x.min(x);
         min_y = min_y.min(y)
     }
 
-    let offset_x = if min_x < 0.0 {
-        min_x.abs()
-    } else {
-        0.0
-    };
+    let offset_x = if min_x < 0.0 { min_x.abs() } else { 0.0 };
 
-    let offset_y = if min_y < 0.0 {
-        min_y.abs()
-    } else {
-        0.0
-    };
+    let offset_y = if min_y < 0.0 { min_y.abs() } else { 0.0 };
 
     println!("offset_x: {}", offset_x);
     println!("offset_y: {}", offset_y);
 
     // Set final position and size for children
-    for (entity_id, (x,y,width,height)) in results {
-        println!("constraint variable: {}, x:{}, y:{}, w:{}, h:{}", entity_id.clone(), x, y, width, height);
-        session.set_position(entity_id.clone(), x + offset_x, y+ offset_y);
+    for (entity_id, (x, y, width, height)) in results {
+        println!(
+            "constraint variable: {}, x:{}, y:{}, w:{}, h:{}",
+            entity_id.clone(),
+            x,
+            y,
+            width,
+            height
+        );
+        session.set_position(entity_id.clone(), x + offset_x, y + offset_y);
         session.set_size(entity_id.clone(), width, height);
-    
+
         let right = x + offset_x + width;
         let bottom = y + offset_y + height;
         if right > container_width {
@@ -750,7 +779,10 @@ pub fn layout_constraint_container(session: &mut DiagramBuilder, container: &Con
         }
     }
 
-    println!("container size calculated: {},{}", container_width, container_height);
+    println!(
+        "container size calculated: {},{}",
+        container_width, container_height
+    );
     session.set_size(container.entity.clone(), container_width, container_height);
     Ok(())
 }
@@ -857,7 +889,9 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::ConstraintLayoutContainer => {
-            let container = session.get_constraint_layout(root.entity_id.clone()).clone();
+            let container = session
+                .get_constraint_layout(root.entity_id.clone())
+                .clone();
             layout_constraint_container(session, &container);
         }
 

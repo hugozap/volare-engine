@@ -13,7 +13,10 @@ use std::{collections::HashMap, hash::Hash, rc::Rc, sync::Arc};
  *
  */
 //use TextOptions
-use crate::{components::*, parser::JsonLinesParser, transform::Transform, BoundingBox, ConstraintSystem, SimpleConstraint};
+use crate::{
+    components::*, parser::JsonLinesParser, transform::Transform, BoundingBox, ConstraintSystem,
+    SimpleConstraint,
+};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
@@ -189,9 +192,9 @@ impl DiagramBuilder {
             ));
         }
 
-            let factory = { self.custom_components.get(component_type).unwrap().clone() };
+        let factory = { self.custom_components.get(component_type).unwrap().clone() };
 
-            factory(entity_id, attrs, self, lines_parser)
+        factory(entity_id, attrs, self, lines_parser)
     }
 
     /* Create a new entity of a given type
@@ -622,7 +625,7 @@ impl DiagramBuilder {
         self.new_entity(header_id.clone(), EntityType::RectShape);
         // Create the rectangle for the header row
         let header = self.new_rectangle(
-            header_id,
+            header_id.clone(),
             RectOptions {
                 fill_color: Fill::Color(options.header_fill_color.clone()),
                 stroke_color: String::from("black"),
@@ -639,7 +642,7 @@ impl DiagramBuilder {
             col_lines.clone(),
             row_lines.clone(),
             cols,
-            header.entity_id.clone(),
+            if options.with_header { Some(header_id.clone())} else {None},
             options.clone(),
         );
 
@@ -651,10 +654,12 @@ impl DiagramBuilder {
         };
 
         // Add the header before the cells, otherwise it can cover the cells
-        node.add_child(DiagramTreeNode::new(
-            EntityType::RectShape,
-            header.entity_id.clone(),
-        ));
+        if options.with_header {
+            node.add_child(DiagramTreeNode::new(
+                EntityType::RectShape,
+                header_id.clone(),
+            ));
+        }
 
         for child in cells {
             node.add_child(child)
@@ -730,27 +735,34 @@ impl DiagramBuilder {
         let id = self.new_entity(id.clone(), EntityType::ConstraintLayoutContainer);
         let children = Rc::new(children);
 
-        let children_ids = children.clone().iter().map(|(node, _) | {
-            node.entity_id.clone()
-        }).collect::<Vec<String>>();
+        let children_ids = children
+            .clone()
+            .iter()
+            .map(|(node, _)| node.entity_id.clone())
+            .collect::<Vec<String>>();
 
-        let children_nodes = children.clone().iter().map(|(node,_) | {
-            Box::new(node.clone())
-        }).collect::<Vec<Box<DiagramTreeNode>>>();
+        let children_nodes = children
+            .clone()
+            .iter()
+            .map(|(node, _)| Box::new(node.clone()))
+            .collect::<Vec<Box<DiagramTreeNode>>>();
 
-        let container = ConstraintLayoutContainer::new(id.clone(),children_ids.clone().to_vec());
+        let container = ConstraintLayoutContainer::new(id.clone(), children_ids.clone().to_vec());
 
         // Setup constraint system
-        
+
         // register entities in the constrain system and suggest positions
         let mut cs = ConstraintSystem::new();
         for (node, pos) in children.clone().to_vec() {
             if let Err(e) = cs.add_entity(node.entity_id.clone()) {
-                eprintln!("Failed to add entity to constrain system: {}", node.entity_id.clone());
+                eprintln!(
+                    "Failed to add entity to constrain system: {}",
+                    node.entity_id.clone()
+                );
             }
             // suggest position if there's one
             if let Some(p) = pos {
-                 let _ = cs.suggest_position(&node.entity_id.clone(), p.x, p.y);
+                let _ = cs.suggest_position(&node.entity_id.clone(), p.x, p.y);
             }
         }
 
@@ -761,15 +773,15 @@ impl DiagramBuilder {
 
         // Store the constraint system
         self.constraint_systems.insert(id.clone(), cs);
-        self.constraint_layout_containers.insert(id.clone(), container);
+        self.constraint_layout_containers
+            .insert(id.clone(), container);
 
         // Add children to system
         DiagramTreeNode {
             entity_type: EntityType::ConstraintLayoutContainer,
             entity_id: id.clone(),
             children: children_nodes,
-
-         }
+        }
     }
 }
 
@@ -801,6 +813,10 @@ impl DiagramBuilder {
 
     pub fn get_line(&self, id: EntityID) -> &ShapeLine {
         &self.lines[&id]
+    }
+
+     pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
+        self.lines.get_mut(&id)
     }
 
     pub fn get_rectangle(&self, id: EntityID) -> &ShapeRect {
@@ -857,7 +873,7 @@ impl DiagramBuilder {
         self.constraint_systems.get(&id).unwrap()
     }
 
-     pub fn get_constraint_system_mut(&mut self, id: EntityID) -> &mut ConstraintSystem {
+    pub fn get_constraint_system_mut(&mut self, id: EntityID) -> &mut ConstraintSystem {
         self.constraint_systems.get_mut(&id).unwrap()
     }
 
@@ -925,6 +941,7 @@ mod component_registration_tests {
     /// Custom Component 1: Badge
     /// Creates a rounded pill-shaped element with text
     fn create_badge_component(
+        id : &str,
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
         parser: &JsonLinesParser,
@@ -945,6 +962,7 @@ mod component_registration_tests {
             text_color: color,
             line_width: 200,
             line_spacing: 0.0,
+            ..Default::default()
         };
         let text_node = builder.new_text("text".to_string(), &text, text_options);
 
@@ -957,6 +975,7 @@ mod component_registration_tests {
             border_radius: font_size,               // Make it pill-shaped
             width_behavior: SizeBehavior::Content,  // Auto width based on text
             height_behavior: SizeBehavior::Content, // Auto height based on text
+            ..Default::default()
         };
         let badge = builder.new_box("container".to_string(), text_node, box_options);
 
@@ -999,9 +1018,9 @@ mod component_registration_tests {
         .unwrap()
         .clone();
 
-        let parser  = JsonLinesParser::new();
+        let parser = JsonLinesParser::new();
 
-        let result = builder.create_custom_component("badge", &attrs, &parser);
+        let result = builder.create_custom_component("b1","badge", &attrs, &parser);
         assert!(result.is_ok());
         let badge_node = result.unwrap();
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);

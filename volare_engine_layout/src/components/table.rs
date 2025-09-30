@@ -8,7 +8,8 @@ pub struct TableOptions {
     pub header_fill_color: String,
     pub border_color: String,
     pub border_width: usize,
-    pub cell_padding: usize,
+    pub cell_padding: Float,
+    pub with_header: bool, // if true, first row has different background
 }
 
 /* A table contains a list of rows, each row has a cell 
@@ -22,7 +23,7 @@ pub struct Table {
     pub cells: Vec<EntityID>,
     pub col_lines: Vec<EntityID>,
     pub row_lines: Vec<EntityID>,
-    pub header_rect: EntityID,
+    pub header_rect: Option<EntityID>,
     pub table_options: TableOptions,
 }
 
@@ -45,7 +46,7 @@ impl Clone for Table {
 
 //constructor that receives only the table options
 impl Table {
-    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, header_rect: EntityID, table_options: TableOptions) -> Table {
+    pub fn new(entity: EntityID,cells: Vec<EntityID>, col_lines: Vec<EntityID>, row_lines: Vec<EntityID>, cols: usize, header_rect: Option<EntityID>, table_options: TableOptions) -> Table {
         Table {
             entity,
             cols,
@@ -83,7 +84,8 @@ impl Default for TableOptions {
             border_color: String::from("black"),
             header_fill_color: String::from("lightgray"),
             border_width: 1,
-            cell_padding: 20,
+            cell_padding: 20.0,
+            with_header: true,
         }
     }
 }
@@ -96,6 +98,7 @@ impl Clone for TableOptions {
             border_color: self.border_color.clone(),
             border_width: self.border_width,
             cell_padding: self.cell_padding,
+            with_header: self.with_header,
         }
     }
 }

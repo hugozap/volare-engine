@@ -413,6 +413,7 @@ pub struct BoxOptions {
     // Add size behavior fields
     pub width_behavior: SizeBehavior,
     pub height_behavior: SizeBehavior,
+    pub horizontal_alignment: HorizontalAlignment,
 }
 
 impl Clone for BoxOptions {
@@ -425,6 +426,7 @@ impl Clone for BoxOptions {
             border_radius: self.border_radius,
             width_behavior: self.width_behavior.clone(),
             height_behavior: self.height_behavior.clone(),
+            horizontal_alignment: self.horizontal_alignment.clone(),
         }
     }
 }
@@ -445,6 +447,7 @@ impl BoxOptions {
             border_radius: 0.0,
             width_behavior: SizeBehavior::Content,
             height_behavior: SizeBehavior::Content,
+            horizontal_alignment: HorizontalAlignment::Center,
         }
     }
 }
@@ -643,6 +646,7 @@ pub struct TextOptions {
     // (number of max characters per line)used to know when to insert breaks
     pub line_width: usize,
     pub line_spacing: f32, // spacing between lines
+    pub font_weight: u32,
 }
 
 impl Clone for TextOptions {
@@ -653,6 +657,7 @@ impl Clone for TextOptions {
             text_color: self.text_color.clone(),
             line_width: self.line_width,
             line_spacing: self.line_spacing,
+            font_weight: self.font_weight,
         }
     }
 }
@@ -665,10 +670,12 @@ impl TextOptions {
             text_color: String::from("black"),
             line_width: 20,
             line_spacing: 0.0,
+            font_weight: 400,
         }
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum HorizontalAlignment {
     Left,
     Center,

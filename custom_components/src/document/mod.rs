@@ -1,17 +1,20 @@
 // src/components/documents/mod.rs
 // Document components with consistent styling through predefined constants
 
+use std::fmt::format;
+
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, TEXT_BASE, TEXT_LG, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_SM, WIDTH_XL
+    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
     get_array_attr, get_bool_attr, get_float_attr, get_int_attr, get_string_attr, JsonLinesParser,
 };
 use crate::*;
-use serde_json::{Map, Value};
+use serde_json::{from_value, Map, Value};
 use uuid::fmt::Simple;
+use uuid::uuid;
 
 /// Document Style Constants
 /// These constants define a consistent design system for document components
@@ -59,10 +62,17 @@ pub mod style {
     pub const TEXT_2XL: Float = 24.0; // Page titles
     pub const TEXT_3XL: Float = 32.0; // Main titles
 
+    // Title font weights
+
+    pub const FONT_WEIGHT_NORMAL: u32 = 400;
+    pub const FONT_WEIGHT_BOLD_MAX: u32 = 900;
+    pub const FONT_WEIGHT_BOLD_MD: u32 = 700;
+    pub const FONT_WEIGHT_BOLD_LIGHT: u32 = 600;
+
     // Line Heights (as spacing multipliers)
     pub const LINE_HEIGHT_TIGHT: Float = 1.2;
     pub const LINE_HEIGHT_NORMAL: Float = 1.5;
-    pub const LINE_HEIGHT_RELAXED: Float = 1.8;
+    pub const LINE_HEIGHT_RELAXED: Float = 2.0;
 
     // === SPACING ===
 
@@ -92,6 +102,7 @@ pub mod style {
     pub const WIDTH_LG: Float = 800.0; // Large documents
     pub const WIDTH_XL: Float = 1024.0; // Extra large documents
     pub const WIDTH_FULL: Float = 1200.0; // Full width documents
+    pub const WIDTH_PROPERTY: Float = 85.0; // For property field names/values
 
     // Border radius
     pub const RADIUS_SM: Float = 4.0;
@@ -221,11 +232,7 @@ pub fn create_document_container(
         children.push(footer_container);
     }
 
-    let vstack = builder.new_vstack(
-        id.to_string(),
-        children,
-        HorizontalAlignment::Left,
-    );
+    let vstack = builder.new_vstack(id.to_string(), children, HorizontalAlignment::Left);
 
     return Ok(vstack);
 }
@@ -248,14 +255,31 @@ pub fn create_document_text(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
-    attrs.clone().iter().for_each(|(k,v)| {
-        println!("k,v: {},{}", k,v);
+    attrs.clone().iter().for_each(|(k, v)| {
+        println!("k,v: {},{}", k, v);
     });
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
 
+    document_text(id, builder, variant, content, container_width)
+}
+
+pub fn document_text(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    variant: String,
+    content: String,
+    container_width: f32,
+) -> Result<DiagramTreeNode, String> {
     let toptions = match variant.as_str() {
+        "xlarge" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            ..TextOptions::default()
+        },
         "large" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
@@ -299,11 +323,162 @@ pub fn create_document_text(
         border_radius: 0.0,
         width_behavior: w_size,
         height_behavior: SizeBehavior::Content,
+        horizontal_alignment: HorizontalAlignment::Left,
     };
     let container = builder.new_box(format!("{}_text_container", id), text, coptions);
     Ok(container)
 }
 
+/**
+ * Custom component for creating Titles
+ */
+pub fn create_title(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let variant = get_string_attr(attrs, &["variant"], "default");
+    let content = get_string_attr(attrs, &["text", "content"], "");
+    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+    let toptions = match variant.as_str() {
+        "h1" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_3XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            font_weight: FONT_WEIGHT_BOLD_MAX,
+            ..TextOptions::default()
+        },
+        "h2" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_2XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_RELAXED,
+            font_weight: FONT_WEIGHT_BOLD_MAX,
+            ..TextOptions::default()
+        },
+
+        "h3" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_TIGHT,
+            font_weight: FONT_WEIGHT_BOLD_MD,
+            ..TextOptions::default()
+        },
+
+        "h4" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_LG,
+            text_color: SECONDARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_TIGHT,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+
+        _ => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_2XL,
+            text_color: PRIMARY_TEXT.to_string(),
+            line_spacing: LINE_HEIGHT_NORMAL,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+    };
+
+    let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
+    let w_size = SizeBehavior::Fixed(container_width);
+    let coptions = BoxOptions {
+        fill_color: Fill::Color("transparent".to_string()),
+        stroke_color: "transparent".to_string(),
+        stroke_width: 0.0,
+        padding: 0.0,
+        border_radius: 0.0,
+        width_behavior: w_size,
+        height_behavior: SizeBehavior::Content,
+        horizontal_alignment: HorizontalAlignment::Left,
+    };
+    let spacer = builder.new_spacer(
+        format!("{}_spacer", id),
+        SpacerOptions {
+            width: 0.0,
+            height: SPACE_3XL,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+    let t_container = builder.new_box(format!("{}_text_container", id), text.clone(), coptions);
+    let container = builder.new_vstack(
+        format!("_container"),
+        vec![t_container, spacer],
+        HorizontalAlignment::Left,
+    );
+    Ok(container)
+}
+
+/**
+ * Component useful for presenting a list of name/value property list
+ */
+pub fn create_properties(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let properties = get_properties(attrs, &["properties", "items"]);
+    let table_opts = TableOptions {
+        cell_padding: SPACE_SM,
+        with_header: false,
+        border_color: BODY_COLOR.to_string(),
+        border_width: 1,
+        fill_color: BG_ACCENT.to_string(),
+        ..Default::default()
+    };
+
+    // Crear las celdas a partir de las propiedades Vec<(String,String)>
+    let cell_values: Vec<String> = properties.into_iter().flat_map(|(a, b)| [a, b]).collect();
+
+
+    let cell_texts: Vec<DiagramTreeNode> = cell_values
+        .into_iter()
+        .map(|value| {
+            // TODO: variant debe ser enum
+            // TODO: en vez de uuid derivar el id del nombre de la propiedad si es posible
+            // TODO: usar width diferente para nombre y value
+            document_text(format!("{}_prop_{}",id, uuid::Uuid::new_v4()).as_str(), builder, "small".into(), value, WIDTH_PROPERTY)
+        })
+        .filter_map(|v| v.ok())
+        .collect();
+
+    let table = builder.new_table(format!("{}_table", id), cell_texts, 2, table_opts);
+    Ok(table)
+}
+
+/**
+ * Used for the property panels, each item is expected to have two values, name and value
+ * e.g items=[["name","value"], ["name", "value"]...]
+ */
+pub fn get_properties(attrs: &Map<String, Value>, keys: &[&str]) -> Vec<(String, String)> {
+    let mut items = Vec::<(String, String)>::new();
+    for key in keys {
+        if let Some(value) = attrs.get(*key) {
+            if let Some(arr) = value.as_array() {
+                for item_arr_val in arr {
+                    if let Some(item_arr) = item_arr_val.as_array() {
+                        if item_arr.len() == 2 {
+                            let name_elem = &item_arr[0];
+                            let value_elem = &item_arr[1];
+                            let name = name_elem.as_str().unwrap();
+                            let value = value_elem.as_str().unwrap();
+                            items.push((name.to_owned(), value.to_owned()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    items
+}
 
 // Helper function for extracting a text width from names or pixel value
 // |sm|md|lg|xl|full|<number>
@@ -311,25 +486,15 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
     for key in keys {
         if let Some(value) = attrs.get(*key) {
             if let Some(s) = value.as_str() {
-                return if s.is_empty(){
+                return if s.is_empty() {
                     default
                 } else {
                     match s {
-                        "sm" => {
-                            WIDTH_SM
-                        }
-                        "md" => {
-                            WIDTH_MD
-                        }
-                        "lg" => {
-                            WIDTH_LG
-                        }
-                         "xl" => {
-                            WIDTH_XL
-                        }
-                         "full" => {
-                            WIDTH_FULL
-                        }
+                        "sm" => WIDTH_SM,
+                        "md" => WIDTH_MD,
+                        "lg" => WIDTH_LG,
+                        "xl" => WIDTH_XL,
+                        "full" => WIDTH_FULL,
                         _ => {
                             if let Ok(val) = s.parse::<f32>() {
                                 val
@@ -349,5 +514,7 @@ pub fn get_width(attrs: &Map<String, Value>, keys: &[&str], default: Float) -> F
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
     builder.register_custom_component("document.text", create_document_text);
+    builder.register_custom_component("document.title", create_title);
+    builder.register_custom_component("document.properties", create_properties);
     println!("📄 Document component registered: 'document'");
 }
