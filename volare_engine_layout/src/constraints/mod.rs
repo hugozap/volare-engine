@@ -241,7 +241,7 @@ impl ConstraintSystem {
                 let vars1 = self.variables.get(&id1).expect("Entity not found");
                 let vars2 = self.variables.get(&id2).expect("Entity not found");
                 self.solver
-                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x + vars2.width)
+                    .add_constraint(vars1.x | GE(REQUIRED) | vars2.x + vars2.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
             }
 
@@ -249,7 +249,7 @@ impl ConstraintSystem {
                 let vars1 = self.variables.get(&id1).expect("Entity not found");
                 let vars2 = self.variables.get(&id2).expect("Entity not found");
                 self.solver
-                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x - vars1.width)
+                    .add_constraint(vars1.x | LE(REQUIRED) | vars2.x - vars1.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add leftOf constraint: {:?}", e))?;
             }
 

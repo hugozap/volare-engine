@@ -283,7 +283,7 @@ pub fn document_text(
             text_color: PRIMARY_TEXT.to_string(),
             ..TextOptions::default()
         },
-        "large" => TextOptions {
+        "large" | "emphasized" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
             text_color: PRIMARY_TEXT.to_string(),
@@ -327,6 +327,25 @@ pub fn document_text(
         horizontal_alignment: HorizontalAlignment::Left,
     };
     let container = builder.new_box(format!("{}_text_container", id), text, coptions);
+    
+    // if variant is emphasized add left line
+    if variant == "emphasized" {
+        let left_line = builder.new_rectangle(format!("{}_left_line", id), RectOptions { 
+            stroke_width: 1.0,
+            width_behavior: SizeBehavior::Fixed(1.0),
+            stroke_color: PRIMARY_TEXT.to_owned(),
+            fill_color: Fill::Color(PRIMARY_TEXT.to_owned()),
+            ..Default::default()
+        });
+        let constraints = vec![
+            SimpleConstraint::SameHeight(vec![container.entity_id.clone(), left_line.entity_id.clone()]),
+            SimpleConstraint::LeftOf(left_line.entity_id.clone(), container.entity_id.clone()),
+            SimpleConstraint::HorizontalSpacing(left_line.entity_id.clone(), container.entity_id.clone(), SPACE_SM),
+        ];
+        let e_container = builder.new_constraint_layout_container(format!("{}_emp_container", id), vec![(container, None), (left_line, None)], constraints);
+        return Ok(e_container);
+    }
+
     Ok(container)
 }
 
