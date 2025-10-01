@@ -5,11 +5,7 @@ use std::fmt::format;
 
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT,
-    FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED,
-    LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL,
-    SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS,
-    WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL,
+    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, FONT_WEIGHT_NORMAL, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -754,15 +750,173 @@ fn create_columns_layout(
     Ok(columns_hstack)
 }
 
-// Don't forget to register the component in register_document_components:
-// builder.register_custom_component("document.section", create_document_section);
+/**
+ * Bullet List Component
+ * 
+ * Creates a bulleted list with good typography and spacing
+ * 
+ * Attributes:
+ * - items (array of strings): List items to display
+ * - width (optional): Width constraint (sm|md|lg|xl|full|number)
+ * 
+ * Example JSONL:
+ * {"id":"my-list", "type":"bullet-list", "items":["First item","Second item","Third item"]}
+ */
+pub fn create_bullet_list(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    // Extract items array
+    let items = get_array_attr(attrs, "items");
+ 
+    if items.is_none() {
+        return Err("bullet-list requires 'items' attribute with at least one item".to_string());
+    }
+    let items = items.unwrap();
+    
+    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+    
+    // Create list items
+    let mut list_children = Vec::new();
+    
+    for (idx, item_text) in items.iter().enumerate() {
+        let item_node = create_list_item(
+            &format!("{}_item_{}", id, idx),
+            item_text,
+            "•", // Bullet character
+            builder,
+            container_width,
+        )?;
+        
+        list_children.push(item_node);
+        
+        // Add spacing between items (except after last item)
+        if idx < items.len() - 1 {
+            let item_spacer = builder.new_spacer(
+                format!("{}_item_spacer_{}", id, idx),
+                SpacerOptions {
+                    width: 0.0,
+                    height: SPACE_SM,
+                    direction: SpacerDirection::Vertical,
+                },
+            );
+            list_children.push(item_spacer);
+        }
+    }
+    
+    // Wrap all items in a vertical stack
+    let list_vstack = builder.new_vstack(
+        format!("{}_list", id),
+        list_children,
+        HorizontalAlignment::Left,
+    );
+    
+    // Add spacing after the entire list
+    let bottom_spacer = builder.new_spacer(
+        format!("{}_bottom_spacer", id),
+        SpacerOptions {
+            width: 0.0,
+            height: SPACE_MD,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+    
+    let list_with_spacing = builder.new_vstack(
+        id.to_string(),
+        vec![list_vstack, bottom_spacer],
+        HorizontalAlignment::Left,
+    );
+    
+    Ok(list_with_spacing)
+}
 
-/// Register document components with a DiagramBuilder
+/**
+ * Creates a single list item with bullet/number and text
+ */
+fn create_list_item(
+    id: &str,
+    text: &str,
+    marker: &str,
+    builder: &mut DiagramBuilder,
+    container_width: Float,
+) -> Result<DiagramTreeNode, String> {
+    // Create bullet/marker
+    let marker_options = TextOptions {
+        font_family: FONT_SANS.to_string(),
+        font_size: TEXT_BASE,
+        text_color: PRIMARY_TEXT.to_string(),
+        line_width: 20,
+        line_spacing: TEXT_BASE * 0.4,
+        font_weight: FONT_WEIGHT_NORMAL,
+    };
+    
+    let marker_node = builder.new_text(
+        format!("{}_marker", id),
+        marker,
+        marker_options,
+    );
+    
+    // Create text content
+    let text_options = TextOptions {
+        font_family: FONT_SANS.to_string(),
+        font_size: TEXT_BASE,
+        text_color: PRIMARY_TEXT.to_string(),
+        line_width: (container_width - 20.0) as usize, // Account for bullet space
+        line_spacing: TEXT_BASE * 0.4,
+        font_weight: FONT_WEIGHT_NORMAL,
+    };
+    
+    let text_node = builder.new_text(
+        format!("{}_text", id),
+        text,
+        text_options,
+    );
+    
+    // Wrap text in a box to control width
+    let text_box_options = BoxOptions {
+        fill_color: Fill::Color("transparent".to_string()),
+        stroke_color: "transparent".to_string(),
+        stroke_width: 0.0,
+        padding: 0.0,
+        border_radius: 0.0,
+        width_behavior: SizeBehavior::Fixed(container_width - 20.0), // Leave space for bullet
+        height_behavior: SizeBehavior::Content,
+        horizontal_alignment: HorizontalAlignment::Left,
+    };
+    
+    let text_box = builder.new_box(
+        format!("{}_text_box", id),
+        text_node,
+        text_box_options,
+    );
+
+     let spacer = builder.new_spacer(
+        format!("{}_spacer", id),
+        SpacerOptions {
+            width: SPACE_XS,
+            height: 0.0,
+            direction: SpacerDirection::Horizontal,
+        },
+    ); 
+    
+    // Create horizontal stack with marker and text
+    let item_hstack = builder.new_hstack(
+        format!("{}_hstack", id),
+        vec![marker_node, spacer, text_box],
+        VerticalAlignment::Top,
+    );
+    
+    Ok(item_hstack)
+}
+
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
     builder.register_custom_component("document.text", create_document_text);
     builder.register_custom_component("document.title", create_document_title);
     builder.register_custom_component("document.properties", create_properties);
     builder.register_custom_component("document.section", create_document_section);
+    builder.register_custom_component("document.bullet_list", create_bullet_list);
     println!("📄 Document component registered: 'document'");
 }
