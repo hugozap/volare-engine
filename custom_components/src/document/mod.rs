@@ -479,23 +479,32 @@ pub fn create_vstack(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
-    let children = get_array_attr(attrs, "children").or(Some([].to_vec()));
-    vstack(id, builder, parser, children.unwrap())
+    let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
+
+    let mut children = Vec::<DiagramTreeNode>::new();
+    for (_, elem) in children_ids.unwrap().iter().enumerate() {
+        let child_elem = parser.build(elem.as_str(), builder).ok();
+        if let Some(elem) = child_elem {
+            children.push(elem);
+        }
+    }
+
+    vstack(id, builder, parser, children)
 }
 
+/**
+ * Creates a vstack and adds spacers between all elements
+ */
 fn vstack(
     id: &str,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-    children: Vec<String>,
+    children: Vec<DiagramTreeNode>,
 ) -> Result<DiagramTreeNode, String> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
     for (ix, elem) in children.iter().enumerate() {
-        let child_elem = parser.build(elem.as_str(), builder).ok();
-        if let Some(elem) = child_elem {
-            final_children.push(elem);
-        }
+        final_children.push(elem.clone());
         //add spacer
         let spacer_id = format!("{}_spacer_{}", id, ix);
         let spacer = builder.new_spacer(
@@ -511,6 +520,7 @@ fn vstack(
 
     Ok(builder.new_vstack(id.to_string(), final_children, HorizontalAlignment::Left))
 }
+
 
 /**
  * Creates a vstack with horizontal alignment set to left
@@ -599,14 +609,17 @@ pub fn create_properties(
     } else {
         let title_id = format!("{}_title", id);
         // Return a document.vstack with the title and the table
-        let _ = document_title(
+        let title = document_title(
             title_id.as_str(),
             builder,
-            "small".to_string(),
+            // TODO: usar enum
+            "h4".to_string(),
             title,
             WIDTH_PROPERTY_PANEL,
         );
-        return vstack(id, builder, parser, vec![title_id, table_id]);
+        //TODO: revisar uso de unwrap aqui, 
+        let stack_children = vec![title,Ok(table)].iter().filter_map(|e| e.clone().ok()).collect();
+        return vstack(id, builder, parser, stack_children);
     }
 }
 
