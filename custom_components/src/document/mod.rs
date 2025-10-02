@@ -361,7 +361,11 @@ pub fn create_document_title(
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
-    let toptions = match variant.as_str() {
+    document_title(id, builder, variant, content, container_width)
+}
+
+fn document_title(id: &str, builder: &mut DiagramBuilder, variant: String, content: String, container_width: f32) -> Result<DiagramTreeNode, String> {
+    let mut toptions = match variant.as_str() {
         "h1" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_3XL,
@@ -407,9 +411,11 @@ pub fn create_document_title(
         },
     };
 
+    toptions.line_width = calculate_optimal_line_width(&builder, &content, &toptions, container_width);
+
     let bottom_margin = toptions.line_spacing;
     let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
-    let w_size = SizeBehavior::Fixed(container_width);
+    let w_size = SizeBehavior::Content;
     let coptions = BoxOptions {
         fill_color: Fill::Color("transparent".to_string()),
         stroke_color: "transparent".to_string(),
@@ -863,14 +869,16 @@ fn create_list_item(
     );
     
     // Create text content
-    let text_options = TextOptions {
+    let mut text_options = TextOptions {
         font_family: FONT_SANS.to_string(),
         font_size: TEXT_BASE,
         text_color: PRIMARY_TEXT.to_string(),
-        line_width: (container_width - 20.0) as usize, // Account for bullet space
         line_spacing: TEXT_BASE * 0.4,
         font_weight: FONT_WEIGHT_NORMAL,
+        ..Default::default()
     };
+
+    text_options.line_width = calculate_optimal_line_width(&builder, text, &text_options, container_width);
     
     let text_node = builder.new_text(
         format!("{}_text", id),
@@ -885,7 +893,7 @@ fn create_list_item(
         stroke_width: 0.0,
         padding: 0.0,
         border_radius: 0.0,
-        width_behavior: SizeBehavior::Fixed(container_width - 20.0), // Leave space for bullet
+        width_behavior: SizeBehavior::Content,
         height_behavior: SizeBehavior::Content,
         horizontal_alignment: HorizontalAlignment::Left,
     };
