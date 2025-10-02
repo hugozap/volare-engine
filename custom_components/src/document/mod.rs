@@ -443,6 +443,62 @@ fn document_title(id: &str, builder: &mut DiagramBuilder, variant: String, conte
     Ok(container)
 }
 
+
+/**
+ * Creates a vstack with horizontal alignment set to left
+ * and spacers between elements for better layout.
+ */
+pub fn create_vstack(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let children = get_array_attr(attrs, "children").or(Some([].to_vec()));
+    let mut final_children = Vec::<DiagramTreeNode>::new();
+
+    for (ix,elem) in children.unwrap().iter().enumerate() {
+        let child_elem = parser.build(elem.as_str(), builder).ok();
+        if let Some(elem) = child_elem {
+            final_children.push(elem);
+        }
+        //add spacer
+        let spacer_id = format!("{}_spacer_{}", id, ix);
+        let spacer = builder.new_spacer(spacer_id, SpacerOptions { width: 0.0, height: SPACE_SM, direction: SpacerDirection::Vertical });
+        final_children.push(spacer);
+    }
+
+    Ok(builder.new_vstack(id.to_string(), final_children, HorizontalAlignment::Left))
+}
+
+
+/**
+ * Creates a vstack with horizontal alignment set to left
+ * and spacers between elements for better layout.
+ */
+pub fn create_hstack(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let children = get_array_attr(attrs, "children").or(Some([].to_vec()));
+    let mut final_children = Vec::<DiagramTreeNode>::new();
+
+    for (ix,elem) in children.unwrap().iter().enumerate() {
+        let child_elem = parser.build(elem.as_str(), builder).ok();
+        if let Some(elem) = child_elem {
+            final_children.push(elem);
+        }
+        //add spacer
+        let spacer_id = format!("{}_spacer_{}", id, ix);
+        let spacer = builder.new_spacer(spacer_id, SpacerOptions { width: SPACE_SM, height: 0.0, direction: SpacerDirection::Horizontal });
+        final_children.push(spacer);
+    }
+
+    Ok(builder.new_hstack(id.to_string(), final_children, VerticalAlignment::Top))
+}
+
 /**
  * Component useful for presenting a list of name/value property list
  */
@@ -925,6 +981,8 @@ fn create_list_item(
 
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
+    builder.register_custom_component("document.hstack", create_hstack);
+    builder.register_custom_component("document.vstack", create_vstack);
     builder.register_custom_component("document.text", create_document_text);
     builder.register_custom_component("document.title", create_document_title);
     builder.register_custom_component("document.properties", create_properties);
