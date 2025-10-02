@@ -5,7 +5,12 @@ use std::fmt::format;
 
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_ACCENT, BG_PRIMARY, BG_SECONDARY, BORDER_LIGHT_COLOR, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, FONT_WEIGHT_NORMAL, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL
+    BG_ACCENT, BG_PRIMARY, BG_SECONDARY, BORDER_LIGHT_COLOR, DOCUMENT_WIDTH_DEFAULT, FONT_SANS,
+    FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, FONT_WEIGHT_NORMAL,
+    LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL,
+    PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL,
+    TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY_PANEL,
+    WIDTH_SM, WIDTH_XL,
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -102,7 +107,7 @@ pub mod style {
     pub const WIDTH_LG: Float = 800.0; // Large documents
     pub const WIDTH_XL: Float = 1024.0; // Extra large documents
     pub const WIDTH_FULL: Float = 1200.0; // Full width documents
-    pub const WIDTH_PROPERTY: Float = 85.0; // For property field names/values
+    pub const WIDTH_PROPERTY_PANEL: Float = 85.0; // For property field names/values
 
     // Border radius
     pub const RADIUS_SM: Float = 4.0;
@@ -327,22 +332,36 @@ pub fn document_text(
         horizontal_alignment: HorizontalAlignment::Left,
     };
     let container = builder.new_box(format!("{}_text_container", id), text, coptions);
-    
+
     // if variant is emphasized add left line
     if variant == "emphasized" {
-        let left_line = builder.new_rectangle(format!("{}_left_line", id), RectOptions { 
-            stroke_width: 1.0,
-            width_behavior: SizeBehavior::Fixed(1.0),
-            stroke_color: PRIMARY_TEXT.to_owned(),
-            fill_color: Fill::Color(PRIMARY_TEXT.to_owned()),
-            ..Default::default()
-        });
+        let left_line = builder.new_rectangle(
+            format!("{}_left_line", id),
+            RectOptions {
+                stroke_width: 1.0,
+                width_behavior: SizeBehavior::Fixed(1.0),
+                stroke_color: PRIMARY_TEXT.to_owned(),
+                fill_color: Fill::Color(PRIMARY_TEXT.to_owned()),
+                ..Default::default()
+            },
+        );
         let constraints = vec![
-            SimpleConstraint::SameHeight(vec![container.entity_id.clone(), left_line.entity_id.clone()]),
+            SimpleConstraint::SameHeight(vec![
+                container.entity_id.clone(),
+                left_line.entity_id.clone(),
+            ]),
             SimpleConstraint::LeftOf(left_line.entity_id.clone(), container.entity_id.clone()),
-            SimpleConstraint::HorizontalSpacing(left_line.entity_id.clone(), container.entity_id.clone(), SPACE_SM),
+            SimpleConstraint::HorizontalSpacing(
+                left_line.entity_id.clone(),
+                container.entity_id.clone(),
+                SPACE_SM,
+            ),
         ];
-        let e_container = builder.new_constraint_layout_container(format!("{}_emp_container", id), vec![(container, None), (left_line, None)], constraints);
+        let e_container = builder.new_constraint_layout_container(
+            format!("{}_emp_container", id),
+            vec![(container, None), (left_line, None)],
+            constraints,
+        );
         return Ok(e_container);
     }
 
@@ -364,7 +383,13 @@ pub fn create_document_title(
     document_title(id, builder, variant, content, container_width)
 }
 
-fn document_title(id: &str, builder: &mut DiagramBuilder, variant: String, content: String, container_width: f32) -> Result<DiagramTreeNode, String> {
+fn document_title(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    variant: String,
+    content: String,
+    container_width: f32,
+) -> Result<DiagramTreeNode, String> {
     let mut toptions = match variant.as_str() {
         "h1" => TextOptions {
             font_family: FONT_SANS.to_string(),
@@ -411,7 +436,8 @@ fn document_title(id: &str, builder: &mut DiagramBuilder, variant: String, conte
         },
     };
 
-    toptions.line_width = calculate_optimal_line_width(&builder, &content, &toptions, container_width);
+    toptions.line_width =
+        calculate_optimal_line_width(&builder, &content, &toptions, container_width);
 
     let bottom_margin = toptions.line_spacing;
     let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
@@ -443,7 +469,6 @@ fn document_title(id: &str, builder: &mut DiagramBuilder, variant: String, conte
     Ok(container)
 }
 
-
 /**
  * Creates a vstack with horizontal alignment set to left
  * and spacers between elements for better layout.
@@ -455,22 +480,37 @@ pub fn create_vstack(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     let children = get_array_attr(attrs, "children").or(Some([].to_vec()));
+    vstack(id, builder, parser, children.unwrap())
+}
+
+fn vstack(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+    children: Vec<String>,
+) -> Result<DiagramTreeNode, String> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
-    for (ix,elem) in children.unwrap().iter().enumerate() {
+    for (ix, elem) in children.iter().enumerate() {
         let child_elem = parser.build(elem.as_str(), builder).ok();
         if let Some(elem) = child_elem {
             final_children.push(elem);
         }
         //add spacer
         let spacer_id = format!("{}_spacer_{}", id, ix);
-        let spacer = builder.new_spacer(spacer_id, SpacerOptions { width: 0.0, height: SPACE_SM, direction: SpacerDirection::Vertical });
+        let spacer = builder.new_spacer(
+            spacer_id,
+            SpacerOptions {
+                width: 0.0,
+                height: SPACE_SM,
+                direction: SpacerDirection::Vertical,
+            },
+        );
         final_children.push(spacer);
     }
 
     Ok(builder.new_vstack(id.to_string(), final_children, HorizontalAlignment::Left))
 }
-
 
 /**
  * Creates a vstack with horizontal alignment set to left
@@ -483,16 +523,27 @@ pub fn create_hstack(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     let children = get_array_attr(attrs, "children").or(Some([].to_vec()));
+    hstack(id, builder, parser, children.unwrap())
+}
+
+fn hstack(id: &str, builder: &mut DiagramBuilder, parser: &JsonLinesParser, children: Vec<String>) -> Result<DiagramTreeNode, String> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
-    for (ix,elem) in children.unwrap().iter().enumerate() {
+    for (ix, elem) in children.iter().enumerate() {
         let child_elem = parser.build(elem.as_str(), builder).ok();
         if let Some(elem) = child_elem {
             final_children.push(elem);
         }
         //add spacer
         let spacer_id = format!("{}_spacer_{}", id, ix);
-        let spacer = builder.new_spacer(spacer_id, SpacerOptions { width: SPACE_SM, height: 0.0, direction: SpacerDirection::Horizontal });
+        let spacer = builder.new_spacer(
+            spacer_id,
+            SpacerOptions {
+                width: SPACE_SM,
+                height: 0.0,
+                direction: SpacerDirection::Horizontal,
+            },
+        );
         final_children.push(spacer);
     }
 
@@ -509,6 +560,8 @@ pub fn create_properties(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     let properties = get_properties(attrs, &["properties", "items"]);
+    let title = get_string_attr(attrs, &["title"], "");
+
     let table_opts = TableOptions {
         cell_padding: SPACE_SM,
         with_header: false,
@@ -532,14 +585,29 @@ pub fn create_properties(
                 builder,
                 "small".into(),
                 value,
-                WIDTH_PROPERTY,
+                WIDTH_PROPERTY_PANEL,
             )
         })
         .filter_map(|v| v.ok())
         .collect();
 
-    let table = builder.new_table(format!("{}_table", id), cell_texts, 2, table_opts);
-    Ok(table)
+
+    let table_id = format!("{}_table", id);
+    let table = builder.new_table(table_id.clone(), cell_texts, 2, table_opts);
+    if title.len() == 0 {
+        return Ok(table);
+    } else {
+        let title_id = format!("{}_title", id);
+        // Return a document.vstack with the title and the table
+        let _ = document_title(
+            title_id.as_str(),
+            builder,
+            "small".to_string(),
+            title,
+            WIDTH_PROPERTY_PANEL,
+        );
+        return vstack(id, builder, parser, vec![title_id, table_id]);
+    }
 }
 
 /**
@@ -818,13 +886,13 @@ fn create_columns_layout(
 
 /**
  * Bullet List Component
- * 
+ *
  * Creates a bulleted list with good typography and spacing
- * 
+ *
  * Attributes:
  * - items (array of strings): List items to display
  * - width (optional): Width constraint (sm|md|lg|xl|full|number)
- * 
+ *
  * Example JSONL:
  * {"id":"my-list", "type":"bullet-list", "items":["First item","Second item","Third item"]}
  */
@@ -836,17 +904,17 @@ pub fn create_bullet_list(
 ) -> Result<DiagramTreeNode, String> {
     // Extract items array
     let items = get_array_attr(attrs, "items");
- 
+
     if items.is_none() {
         return Err("bullet-list requires 'items' attribute with at least one item".to_string());
     }
     let items = items.unwrap();
-    
+
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
-    
+
     // Create list items
     let mut list_children = Vec::new();
-    
+
     for (idx, item_text) in items.iter().enumerate() {
         let item_node = create_list_item(
             &format!("{}_item_{}", id, idx),
@@ -855,9 +923,9 @@ pub fn create_bullet_list(
             builder,
             container_width,
         )?;
-        
+
         list_children.push(item_node);
-        
+
         // Add spacing between items (except after last item)
         if idx < items.len() - 1 {
             let item_spacer = builder.new_spacer(
@@ -871,14 +939,14 @@ pub fn create_bullet_list(
             list_children.push(item_spacer);
         }
     }
-    
+
     // Wrap all items in a vertical stack
     let list_vstack = builder.new_vstack(
         format!("{}_list", id),
         list_children,
         HorizontalAlignment::Left,
     );
-    
+
     // Add spacing after the entire list
     let bottom_spacer = builder.new_spacer(
         format!("{}_bottom_spacer", id),
@@ -888,13 +956,13 @@ pub fn create_bullet_list(
             direction: SpacerDirection::Vertical,
         },
     );
-    
+
     let list_with_spacing = builder.new_vstack(
         id.to_string(),
         vec![list_vstack, bottom_spacer],
         HorizontalAlignment::Left,
     );
-    
+
     Ok(list_with_spacing)
 }
 
@@ -917,13 +985,9 @@ fn create_list_item(
         line_spacing: TEXT_BASE * 0.4,
         font_weight: FONT_WEIGHT_NORMAL,
     };
-    
-    let marker_node = builder.new_text(
-        format!("{}_marker", id),
-        marker,
-        marker_options,
-    );
-    
+
+    let marker_node = builder.new_text(format!("{}_marker", id), marker, marker_options);
+
     // Create text content
     let mut text_options = TextOptions {
         font_family: FONT_SANS.to_string(),
@@ -934,14 +998,11 @@ fn create_list_item(
         ..Default::default()
     };
 
-    text_options.line_width = calculate_optimal_line_width(&builder, text, &text_options, container_width);
-    
-    let text_node = builder.new_text(
-        format!("{}_text", id),
-        text,
-        text_options,
-    );
-    
+    text_options.line_width =
+        calculate_optimal_line_width(&builder, text, &text_options, container_width);
+
+    let text_node = builder.new_text(format!("{}_text", id), text, text_options);
+
     // Wrap text in a box to control width
     let text_box_options = BoxOptions {
         fill_color: Fill::Color("transparent".to_string()),
@@ -953,29 +1014,25 @@ fn create_list_item(
         height_behavior: SizeBehavior::Content,
         horizontal_alignment: HorizontalAlignment::Left,
     };
-    
-    let text_box = builder.new_box(
-        format!("{}_text_box", id),
-        text_node,
-        text_box_options,
-    );
 
-     let spacer = builder.new_spacer(
+    let text_box = builder.new_box(format!("{}_text_box", id), text_node, text_box_options);
+
+    let spacer = builder.new_spacer(
         format!("{}_spacer", id),
         SpacerOptions {
             width: SPACE_XS,
             height: 0.0,
             direction: SpacerDirection::Horizontal,
         },
-    ); 
-    
+    );
+
     // Create horizontal stack with marker and text
     let item_hstack = builder.new_hstack(
         format!("{}_hstack", id),
         vec![marker_node, spacer, text_box],
         VerticalAlignment::Top,
     );
-    
+
     Ok(item_hstack)
 }
 
