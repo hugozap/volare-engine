@@ -1,0 +1,61 @@
+{"id":"root","type":"document","content_id":"main_content", "header_id":"title"}
+{"id":"main_content","type":"document.vstack","children":["intro_section","notation_section","common_section","data_structures_section","sorting_section","searching_section","rules_section"],"h_align":"left"}
+{"id":"title","type":"document.title","variant":"large","text":"Algorithm Complexity Quick Reference"}
+{"id":"intro_section","type":"document.section","title":"Big O Notation","columns":["intro_content"]}
+{"id":"intro_content","type":"document.text","text":"Big O notation describes the upper bound of algorithm performance as input size grows. It focuses on the dominant term and ignores constants and lower-order terms."}
+{"id":"notation_section","type":"document.section","title":"Common Complexities","meta":"From Best to Worst","columns":["notation_col1","notation_col2"]}
+{"id":"notation_col1","type":"document.vstack","children":["fast_title","fast_props"],"h_align":"left"}
+{"id":"fast_title","type":"document.text","variant":"emphasized","text":"Excellent to Good"}
+{"id":"fast_props","type":"document.properties","properties":[["O(1)","Constant - Array access, hash lookup"],["O(log n)","Logarithmic - Binary search, balanced tree"],["O(n)","Linear - Simple loop, linear search"],["O(n log n)","Linearithmic - Efficient sorting (merge, heap)"]]}
+{"id":"notation_col2","type":"document.vstack","children":["slow_title","slow_props"],"h_align":"left"}
+{"id":"slow_title","type":"document.text","variant":"emphasized","text":"Fair to Poor"}
+{"id":"slow_props","type":"document.properties","properties":[["O(n²)","Quadratic - Nested loops, bubble sort"],["O(n³)","Cubic - Triple nested loops"],["O(2ⁿ)","Exponential - Recursive fibonacci, subsets"],["O(n!)","Factorial - Permutations, traveling salesman"]]}
+{"id":"common_section","type":"document.section","title":"Time vs Space","columns":["time_col","space_col"]}
+{"id":"time_col","type":"document.vstack","children":["time_title","time_info","time_examples"],"h_align":"left"}
+{"id":"time_title","type":"document.text","variant":"emphasized","text":"Time Complexity"}
+{"id":"time_info","type":"document.text","variant":"small","text":"Measures how runtime grows with input size. Focuses on number of operations executed."}
+{"id":"time_examples","type":"document.bullet_list","items":["Single loop: O(n)","Nested loops: O(n²)","Divide and conquer: O(log n)","Recursive calls: Analyze recurrence"]}
+{"id":"space_col","type":"document.vstack","children":["space_title","space_info","space_examples"],"h_align":"left"}
+{"id":"space_title","type":"document.text","variant":"emphasized","text":"Space Complexity"}
+{"id":"space_info","type":"document.text","variant":"small","text":"Measures memory usage growth with input size. Includes auxiliary space and call stack."}
+{"id":"space_examples","type":"document.bullet_list","items":["In-place algorithm: O(1)","Extra array: O(n)","Recursive depth: O(depth)","Hash table storage: O(n)"]}
+{"id":"data_structures_section","type":"document.section","title":"Data Structures","columns":["ds_col1","ds_col2"]}
+{"id":"ds_col1","type":"document.vstack","children":["array_title","array_ops","list_title","list_ops","stack_title","stack_ops"],"h_align":"left"}
+{"id":"array_title","type":"document.text","variant":"emphasized","text":"Array / Dynamic Array"}
+{"id":"array_ops","type":"document.properties","properties":[["Access","O(1)"],["Search","O(n)"],["Insert (end)","O(1) amortized"],["Insert (middle)","O(n)"],["Delete","O(n)"]]}
+{"id":"list_title","type":"document.text","variant":"emphasized","text":"Linked List"}
+{"id":"list_ops","type":"document.properties","properties":[["Access","O(n)"],["Search","O(n)"],["Insert (front)","O(1)"],["Insert (end)","O(n) or O(1) with tail"],["Delete","O(n)"]]}
+{"id":"stack_title","type":"document.text","variant":"emphasized","text":"Stack / Queue"}
+{"id":"stack_ops","type":"document.properties","properties":[["Push/Enqueue","O(1)"],["Pop/Dequeue","O(1)"],["Peek","O(1)"],["Search","O(n)"]]}
+{"id":"ds_col2","type":"document.vstack","children":["hash_title","hash_ops","tree_title","tree_ops","heap_title","heap_ops"],"h_align":"left"}
+{"id":"hash_title","type":"document.text","variant":"emphasized","text":"Hash Table"}
+{"id":"hash_ops","type":"document.properties","properties":[["Insert","O(1) average"],["Delete","O(1) average"],["Search","O(1) average"],["Worst case","O(n) with collisions"]]}
+{"id":"tree_title","type":"document.text","variant":"emphasized","text":"Binary Search Tree (Balanced)"}
+{"id":"tree_ops","type":"document.properties","properties":[["Insert","O(log n)"],["Delete","O(log n)"],["Search","O(log n)"],["Unbalanced worst","O(n)"]]}
+{"id":"heap_title","type":"document.text","variant":"emphasized","text":"Binary Heap"}
+{"id":"heap_ops","type":"document.properties","properties":[["Insert","O(log n)"],["Delete max/min","O(log n)"],["Get max/min","O(1)"],["Heapify","O(n)"]]}
+{"id":"sorting_section","type":"document.section","title":"Sorting Algorithms","columns":["sort_col1","sort_col2"]}
+{"id":"sort_col1","type":"document.vstack","children":["efficient_title","efficient_sorts","simple_title","simple_sorts"],"h_align":"left"}
+{"id":"efficient_title","type":"document.text","variant":"emphasized","text":"Efficient Sorts O(n log n)"}
+{"id":"efficient_sorts","type":"document.properties","properties":[["Merge Sort","O(n log n) time, O(n) space, stable"],["Quick Sort","O(n log n) avg, O(n²) worst, O(log n) space"],["Heap Sort","O(n log n) time, O(1) space, not stable"]]}
+{"id":"simple_title","type":"document.text","variant":"emphasized","text":"Simple Sorts O(n²)"}
+{"id":"simple_sorts","type":"document.properties","properties":[["Bubble Sort","O(n²) time, O(1) space, stable"],["Selection Sort","O(n²) time, O(1) space, not stable"],["Insertion Sort","O(n²) time, O(1) space, stable, good for small n"]]}
+{"id":"sort_col2","type":"document.vstack","children":["special_title","special_sorts","sort_notes_title","sort_notes"],"h_align":"left"}
+{"id":"special_title","type":"document.text","variant":"emphasized","text":"Special Purpose Sorts"}
+{"id":"special_sorts","type":"document.properties","properties":[["Counting Sort","O(n+k) time, O(k) space, integers only"],["Radix Sort","O(d*n) time, O(n+k) space, digits/strings"],["Bucket Sort","O(n+k) avg, O(n²) worst, uniform distribution"]]}
+{"id":"sort_notes_title","type":"document.text","variant":"emphasized","text":"Notes"}
+{"id":"sort_notes","type":"document.bullet_list","items":["Stable: maintains relative order of equal elements","In-place: uses O(1) or O(log n) extra space","Quick sort is often fastest in practice"]}
+{"id":"searching_section","type":"document.section","title":"Searching Algorithms","columns":["search_col1","search_col2"]}
+{"id":"search_col1","type":"document.vstack","children":["basic_search_title","basic_search"],"h_align":"left"}
+{"id":"basic_search_title","type":"document.text","variant":"emphasized","text":"Basic Search"}
+{"id":"basic_search","type":"document.properties","properties":[["Linear Search","O(n) time, O(1) space, unsorted data"],["Binary Search","O(log n) time, O(1) space, sorted data"],["Jump Search","O(√n) time, sorted arrays"],["Interpolation","O(log log n) avg, uniformly distributed"]]}
+{"id":"search_col2","type":"document.vstack","children":["graph_search_title","graph_search"],"h_align":"left"}
+{"id":"graph_search_title","type":"document.text","variant":"emphasized","text":"Graph Search"}
+{"id":"graph_search","type":"document.properties","properties":[["DFS (Depth First)","O(V+E) time, O(V) space"],["BFS (Breadth First)","O(V+E) time, O(V) space"],["Dijkstra","O((V+E) log V) with heap"],["A* Search","O(E) with good heuristic"],["Bellman-Ford","O(VE) time, handles negative weights"]]}
+{"id":"rules_section","type":"document.section","title":"Analysis Rules","columns":["rules_col1","rules_col2"]}
+{"id":"rules_col1","type":"document.vstack","children":["basic_rules_title","basic_rules"],"h_align":"left"}
+{"id":"basic_rules_title","type":"document.text","variant":"emphasized","text":"Basic Rules"}
+{"id":"basic_rules","type":"document.bullet_list","items":["Drop constants: O(2n) → O(n)","Drop lower terms: O(n² + n) → O(n²)","Sequential: O(A + B) for separate operations","Nested: O(A * B) for nested operations","Logarithm base doesn't matter: O(log₂n) ≈ O(logₙn)"]}
+{"id":"rules_col2","type":"document.vstack","children":["analysis_tips_title","analysis_tips"],"h_align":"left"}
+{"id":"analysis_tips_title","type":"document.text","variant":"emphasized","text":"Analysis Tips"}
+{"id":"analysis_tips","type":"document.bullet_list","items":["Count loops: each nested loop multiplies complexity","Recursive: solve recurrence relation or use Master Theorem","Amortized: average cost over sequence of operations","Best vs Average vs Worst case matter","Consider both time and space trade-offs"]}

@@ -608,7 +608,10 @@ impl DiagramBuilder {
         for i in 0..cols {
             let line_id = format!("{}-col-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
+                stroke_color: options.border_color.clone(),
+                stroke_width: 1.0,
+            });
             self.lines.insert(line_id.clone(), line);
             col_lines.push(line_id.clone());
         }
@@ -617,7 +620,10 @@ impl DiagramBuilder {
         for i in 0..num_rows + 1 {
             let line_id = format!("{}-row-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
+                stroke_color: options.border_color.clone(),
+                stroke_width: 1.0,
+            });
             self.lines.insert(line_id.clone(), line);
             row_lines.push(line_id.clone());
         }
@@ -630,7 +636,7 @@ impl DiagramBuilder {
             header_id.clone(),
             RectOptions {
                 fill_color: Fill::Color(options.header_fill_color.clone()),
-                stroke_color: String::from("black"),
+                stroke_color: options.border_color.clone(),
                 stroke_width: 1.0,
                 ..Default::default()
             },
