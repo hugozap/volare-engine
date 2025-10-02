@@ -260,9 +260,9 @@ pub fn create_document_text(
     });
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
-    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+    let max_width = get_width(attrs, &["width"], WIDTH_SM);
 
-    document_text(id, builder, variant, content, container_width)
+    document_text(id, builder, variant, content, max_width)
 }
 
 pub fn document_text(
@@ -270,7 +270,7 @@ pub fn document_text(
     builder: &mut DiagramBuilder,
     variant: String,
     content: String,
-    container_width: f32,
+    max_width: f32,
 ) -> Result<DiagramTreeNode, String> {
     let mut toptions = match variant.as_str() {
         "xlarge" => TextOptions {
@@ -308,17 +308,21 @@ pub fn document_text(
         },
     };
 
+    // we need to calculate the line width for the max width
+
+    toptions.line_width = calculate_optimal_line_width(&builder, &content, &toptions, max_width);
+
     toptions.line_spacing = toptions.font_size * 0.4;
 
     let text = builder.new_text(format!("{}_text", id.clone()), content.as_str(), toptions);
-    let w_size = SizeBehavior::Fixed(container_width);
+
     let coptions = BoxOptions {
         fill_color: Fill::Color("transparent".to_string()),
         stroke_color: "transparent".to_string(),
         stroke_width: 0.0,
         padding: 0.0,
         border_radius: 0.0,
-        width_behavior: w_size,
+        width_behavior: SizeBehavior::Content,
         height_behavior: SizeBehavior::Content,
         horizontal_alignment: HorizontalAlignment::Left,
     };

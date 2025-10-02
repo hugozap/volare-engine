@@ -30,7 +30,7 @@ columns can also be sections for composing more complex layouts
 A component used to present information in a table based with two columns, first column is the attribute name, and second column is the attribute value
 
 ```
-{"id":"properties-car", "type":"properties", "items"=[{"name":"mileage", "value":"15000}]}
+{"id":"properties-car", "type":"properties", "properties"=[["name", "mustang"], ["value":"3000"]]}
 ```
 
 ## document.text

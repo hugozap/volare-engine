@@ -119,7 +119,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     session.set_size(shape_box.entity.clone(), box_width, box_height);
 }
 
-fn calculate_optimal_line_width(
+pub fn calculate_optimal_line_width(
     session: &DiagramBuilder,
     text: &str,
     text_options: &TextOptions,
