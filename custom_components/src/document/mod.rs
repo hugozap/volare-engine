@@ -426,6 +426,15 @@ fn document_title(
             ..TextOptions::default()
         },
 
+        "h5" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_BASE,
+            text_color: SECONDARY_TEXT.to_string(),
+            line_spacing: TEXT_BASE * 0.1,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+
         _ => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_2XL,
@@ -624,7 +633,7 @@ pub fn create_properties(
             title_id.as_str(),
             builder,
             // TODO: usar enum
-            "h4".to_string(),
+            "h5".to_string(),
             title,
             WIDTH_PROPERTY_PANEL,
         );
