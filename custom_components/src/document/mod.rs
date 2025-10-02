@@ -532,18 +532,29 @@ pub fn create_hstack(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
-    let children = get_array_attr(attrs, "children").or(Some([].to_vec()));
-    hstack(id, builder, parser, children.unwrap())
+    let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
+
+    let mut children = Vec::<DiagramTreeNode>::new();
+    for (_, elem) in children_ids.unwrap().iter().enumerate() {
+        let child_elem = parser.build(elem.as_str(), builder).ok();
+        if let Some(elem) = child_elem {
+            children.push(elem);
+        }
+    }
+
+    hstack(id, builder, parser, children)
 }
 
-fn hstack(id: &str, builder: &mut DiagramBuilder, parser: &JsonLinesParser, children: Vec<String>) -> Result<DiagramTreeNode, String> {
+fn hstack(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+    children: Vec<DiagramTreeNode>,
+) -> Result<DiagramTreeNode, String> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
     for (ix, elem) in children.iter().enumerate() {
-        let child_elem = parser.build(elem.as_str(), builder).ok();
-        if let Some(elem) = child_elem {
-            final_children.push(elem);
-        }
+        final_children.push(elem.clone());
         //add spacer
         let spacer_id = format!("{}_spacer_{}", id, ix);
         let spacer = builder.new_spacer(
