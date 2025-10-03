@@ -74,7 +74,7 @@ A bullet point list of elements with good typography and spacing settings
 ```
 
 
-## numbered-list
+## numbered-list (NOT IMPLEMENTED YET)
 
 A numbered list of elements with good typography and spacing settings
 
@@ -82,7 +82,7 @@ A numbered list of elements with good typography and spacing settings
 {"id":"item-list", "type":"numbered-list", "items":["first","second","third"]}
 ```
 
-## card
+## card (NOT IMPLEMENTED YET)
 
 attributes
 
@@ -92,11 +92,11 @@ attributes
 - content_id: (if other element should be instantiated in the content area)
 
 
-## quote-block
+## quote-block (NOT IMPLEMENTED YET)
 
 Left border emphasis for important information
 
-## code-block
+## code-block (NOT IMPLEMENTED YET)
 
 Monospace content with background differentiation
 
