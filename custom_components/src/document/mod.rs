@@ -590,7 +590,7 @@ pub fn create_properties(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     let properties = get_properties(attrs, &["properties", "items"]);
-    let title = get_string_attr(attrs, &["title"], "");
+    let title = get_string_attr(attrs, &["title","meta"], "");
 
     let table_opts = TableOptions {
         cell_padding: SPACE_SM,
@@ -629,11 +629,11 @@ pub fn create_properties(
     } else {
         let title_id = format!("{}_title", id);
         // Return a document.vstack with the title and the table
-        let title = document_title(
+        let title = document_text(
             title_id.as_str(),
             builder,
             // TODO: usar enum
-            "h5".to_string(),
+            "meta".to_string(),
             title,
             WIDTH_PROPERTY_PANEL,
         );
