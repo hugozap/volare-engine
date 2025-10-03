@@ -30,16 +30,22 @@ columns can also be sections for composing more complex layouts
 A component used to present information in a table based with two columns, first column is the attribute name, and second column is the attribute value
 
 ```
-{"id":"properties-car", "type":"properties", "properties"=[["name", "mustang"], ["value":"3000"]]}
+{"id":"properties-car", "type":"properties", "meta":"Car Properties", "properties"=[["name", "mustang"], ["value":"3000"]]}
 ```
+
+Attributes:
+- properties: A list of two value lists (first is name of the property and second is the value, both strings)
+- meta: (optional) a short text that is display on top of the element to give some context to the reader.
 
 ## document.text
 
 A text paragraph with good default typography settings with optional title
 
 ```
-{"id":"explanation", "type":"document.text", "variant":"default|large|small|subtle|emphasized "text":"the content" "title": "paragraph title"}
+{"id":"explanation", "type":"document.text", "variant":"default|large|small|subtle|emphasized "text":"the content" "title": "paragraph title", "width":"sm|md|lg|xl|full|<number>"}
 ```
+
+Variants: 
 
 default: Standard content blocks
 large: Hero sections or main headings
@@ -47,15 +53,26 @@ small: Compact spaces or secondary information
 subtle: Labels or supporting content
 emphasized: Important callouts or quotes
 
-typeface: Helvetica
+width (optional)
+
+Any of the following strings or 
+"sm" : Small width (approx 480px)
+"md" : Medium width (approx 640px)
+"lg" : Large (840px)
+"xl" : X-Large (1024)
+"full": 1200
+
+width can also be a number e.g "300"
+
 
 ## bullet-list
 
 A bullet point list of elements with good typography and spacing settings
 
 ```
-{"id":"item-list", "type":"bullet-list", "items":["first","second","third"]}
+{"id":"item-list", "type":"bullet-list", "meta":"A useful list" "items":["first","second","third"]}
 ```
+
 
 ## numbered-list
 

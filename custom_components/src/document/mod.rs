@@ -530,7 +530,6 @@ fn vstack(
     Ok(builder.new_vstack(id.to_string(), final_children, HorizontalAlignment::Left))
 }
 
-
 /**
  * Creates a vstack with horizontal alignment set to left
  * and spacers between elements for better layout.
@@ -590,7 +589,7 @@ pub fn create_properties(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     let properties = get_properties(attrs, &["properties", "items"]);
-    let title = get_string_attr(attrs, &["title","meta"], "");
+    let title = get_string_attr(attrs, &["title", "meta"], "");
 
     let table_opts = TableOptions {
         cell_padding: SPACE_SM,
@@ -621,7 +620,6 @@ pub fn create_properties(
         .filter_map(|v| v.ok())
         .collect();
 
-
     let table_id = format!("{}_table", id);
     let table = builder.new_table(table_id.clone(), cell_texts, 2, table_opts);
     if title.len() == 0 {
@@ -637,8 +635,11 @@ pub fn create_properties(
             title,
             WIDTH_PROPERTY_PANEL,
         );
-        //TODO: revisar uso de unwrap aqui, 
-        let stack_children = vec![title,Ok(table)].iter().filter_map(|e| e.clone().ok()).collect();
+        //TODO: revisar uso de unwrap aqui,
+        let stack_children = vec![title, Ok(table)]
+            .iter()
+            .filter_map(|e| e.clone().ok())
+            .collect();
         return vstack(id, builder, parser, stack_children);
     }
 }
@@ -825,18 +826,7 @@ fn create_section_header(
             );
             header_children.push(meta_spacer);
         }
-
-        let meta_options = TextOptions {
-            font_family: FONT_SANS.to_string(),
-            font_size: TEXT_XS,
-            text_color: MUTED_TEXT.to_string(),
-            line_width: 100,
-            line_spacing: LINE_HEIGHT_NORMAL,
-            font_weight: 400,
-        };
-
-        let meta_node = builder.new_text(format!("{}_meta", id), meta, meta_options);
-
+        let meta_node = create_meta_text(builder, format!("{}_meta", id).as_str(), meta);
         header_children.push(meta_node);
     }
 
@@ -848,6 +838,18 @@ fn create_section_header(
     );
 
     Ok(header_vstack)
+}
+
+fn create_meta_text(builder: &mut DiagramBuilder, id: &str, text: &str) -> DiagramTreeNode {
+    let meta_options = TextOptions {
+        font_family: FONT_SANS.to_string(),
+        font_size: TEXT_XS,
+        text_color: MUTED_TEXT.to_string(),
+        line_width: 100,
+        line_spacing: LINE_HEIGHT_NORMAL,
+        font_weight: 400,
+    };
+    builder.new_text(id.to_string(), text, meta_options)
 }
 
 /**
@@ -933,10 +935,11 @@ pub fn create_bullet_list(
     id: &str,
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
-    parser: &JsonLinesParser,
+    _: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     // Extract items array
     let items = get_array_attr(attrs, "items");
+    let meta = get_string_attr(attrs, &["meta"], "");
 
     if items.is_none() {
         return Err("bullet-list requires 'items' attribute with at least one item".to_string());
@@ -990,11 +993,15 @@ pub fn create_bullet_list(
         },
     );
 
-    let list_with_spacing = builder.new_vstack(
-        id.to_string(),
-        vec![list_vstack, bottom_spacer],
-        HorizontalAlignment::Left,
-    );
+    let mut list_children = vec![list_vstack, bottom_spacer];
+
+    if meta.len() > 0 {
+        let meta_node = create_meta_text(builder, format!("{}_meta", id).as_str(), &meta);
+        list_children.insert(0, meta_node);
+    }
+
+    let list_with_spacing =
+        builder.new_vstack(id.to_string(), list_children, HorizontalAlignment::Left);
 
     Ok(list_with_spacing)
 }
