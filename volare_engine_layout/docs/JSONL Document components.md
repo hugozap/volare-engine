@@ -1,5 +1,6 @@
+# JSONL Diagram Specification (high level document components)
 
-These components are higher level elements used to present information with good typography and spacing settings.
+These components are higher level elements used to present information with good typography and spacing settings. 
 
 ## document
 

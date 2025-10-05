@@ -111,3 +111,8 @@ impl VolareEngine {
 pub fn greet(name: &str) {
     web_sys::console::log_1(&format!("Hello, {}! Volare Engine ready.", name).into());
 }
+
+#[wasm_bindgen]
+pub fn generate_transformations_jsonl_prompt(input:&str, current_jsonl:&str) -> String {
+    volare_engine_layout::generate_transformations_jsonl_prompt(input, current_jsonl)
+}
