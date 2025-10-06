@@ -27,12 +27,15 @@ Inserts a complete new element with all its attributes.
 ```jsonl
 {"action":"add","item":{...complete element definition...}}
 ```
+Note:
+New elements only will be visible in the final document if they are referenced by their parent (with exception of the root element). An update operation for the parent element is usually needed.
 
 ### UPDATE Operation
 Modifies existing element attributes. Only the `id` and attributes to change are needed.
 ```jsonl
 {"action":"update","item":{"id":"element_id","attribute1":"new_value"}}
 ```
+Note: If needed, when updating, the "type" of the element can be updated too (e.g when converting a root element that was text into a container).
 
 ### DELETE Operation
 Removes an element. Only the `id` is required.
@@ -230,6 +233,7 @@ When given a user request and current document:
    - Choose minimal set of operations (add/update/delete) to fulfill request
    - Ensure IDs are unique (check current document)
    - Update parent `children` arrays when adding/removing elements
+   - Ensure the "type" is correct when updating an element, update it if needed too.
 
 3. **Generate Valid JSONL**:
    - One complete JSON object per line
@@ -242,6 +246,9 @@ When given a user request and current document:
    - Create unique, descriptive IDs (check existing IDs first)
    - Build proper parent-child relationships via `children` arrays
    - Preserve existing attributes when updating (only change what's requested)
+   - For document and section layouts prefer the higher level elements listed in "JSONL Document components Specification". 
+   - Always use a `document` element for the root container with header,content and footer elements
+   - Use `document.section` for logically grouping components.
 
 5. **Output Format**: 
    - Output ONLY the JSONL operations, no explanations unless requested
@@ -250,8 +257,10 @@ When given a user request and current document:
 
 Generate clear, semantic IDs and choose the most appropriate element types and layout containers for the user's description.
 
-IMPORTANT NOTE! : This task is about generating the **transformations** which have a different format than the document definition languange as they contain "action" and the items are defined inside the "item" field. ALL jsonl elements should have an `action` and an `item` field!
+ IMPORTANT NOTE! : This task is about generating the **transformations** which have a different format than the document definition languange as they contain "action" and the items are defined inside the "item" field. ALL jsonl elements should have an `action` and an `item` field!
 
 Example line for a a valid transformation:
 {"action":"add","item":{"id":"root","type":"vstack","children":["header","content"]}}
 
+NOTE ABOUT ADDITIONS:
+When creating "add" actions keep in mind that usually we have to update a reference to the new element in other element and we would have to create an "update" action too. Some elements are referenced in attributes like header_id (for a document element for example) while others are a member of the `children` vector (refer to spec). Please make sure to add update operations if needed.

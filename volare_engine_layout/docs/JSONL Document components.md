@@ -1,10 +1,11 @@
-# JSONL Diagram Specification (high level document components)
+# JSONL Document components Specification (high level document components)
 
 These components are higher level elements used to present information with good typography and spacing settings. 
 
 ## document
 
-the root document container, 
+the root document container
+**Always use the `document` element as the root**
 
 attributes
 - header_id (optional)
@@ -26,12 +27,12 @@ The section provides a multi column layout, the columns attribute contains the a
 
 columns can also be sections for composing more complex layouts
 
-## properties
+## document.properties
 
 A component used to present information in a table based with two columns, first column is the attribute name, and second column is the attribute value
 
 ```
-{"id":"properties-car", "type":"properties", "meta":"Car Properties", "properties"=[["name", "mustang"], ["value":"3000"]]}
+{"id":"properties-car", "type":"document.properties", "meta":"Car Properties", "properties"=[["name", "mustang"], ["value":"3000"]]}
 ```
 
 Attributes:
@@ -66,16 +67,16 @@ Any of the following strings or
 width can also be a number e.g "300"
 
 
-## bullet-list
+## document.bullet_list
 
 A bullet point list of elements with good typography and spacing settings
 
 ```
-{"id":"item-list", "type":"bullet-list", "meta":"A useful list" "items":["first","second","third"]}
+{"id":"item-list", "type":"document.bullet_list", "meta":"A useful list" "items":["first","second","third"]}
 ```
 
 
-## numbered-list (NOT IMPLEMENTED YET)
+## numbered-list (NOT IMPLEMENTED YET!)
 
 A numbered list of elements with good typography and spacing settings
 
@@ -83,7 +84,7 @@ A numbered list of elements with good typography and spacing settings
 {"id":"item-list", "type":"numbered-list", "items":["first","second","third"]}
 ```
 
-## card (NOT IMPLEMENTED YET)
+## card (NOT IMPLEMENTED YET!)
 
 attributes
 

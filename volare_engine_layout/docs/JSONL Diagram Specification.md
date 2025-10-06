@@ -1,7 +1,9 @@
-# JSONL Diagram Specification
+# JSONL Diagram Specification (base components)
 v1.1 - 
 
-This specification describes the JSON Lines format for creating diagrams using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+This specification describes the JSON Lines format for creating documnts using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+
+
 
 ## Basic Structure
 
