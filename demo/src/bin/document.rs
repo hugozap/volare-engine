@@ -15,14 +15,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&output_dir)?;
 
     let input = r##"
-{"id":"doc","type":"document","header_id":"header","content_id":"content","footer_id":"footer"}
-{"id":"header","type":"document.title","text":"Partes del Motor de una Motocicleta","variant":"h1","width":"800"}
-{"id":"content","type":"table","cols":2,"children":["cilindro_cell"],"border_color":"#333","border_width":1,"cell_padding":15}
-{"id":"cilindro_cell","type":"vstack","children":["cilindro_title","cilindro_props"],"h_align":"left"}
-{"id":"cilindro_title","type":"document.title","text":"Cilindro","variant":"h3","width":"350"}
-{"id":"cilindro_props","type":"document.properties","properties":[["Función","Contiene el pistón y la combustión"],["Material","Aluminio o hierro fundido"],["Tipo","Monocilíndrico o multicilíndrico"],["Refrigeración","Aire o líquido"]]}
-{"id":"footer","type":"document.text","text":"Cada componente del motor trabaja en sincronía para convertir la energía química del combustible en movimiento mecánico.","variant":"subtle","width":"800"}
-"##;
+{"id":"doc_root","content_id":"main_section","footer_id":"footer","header_id":"header","type":"document"}
+{"id":"header","text":"Failure Modes and Effects Analysis (FMEA) example for a centrifugal pump system — sample entries showing Severity (S), Occurrence (O), Detection (D), RPN and recommended actions.","title":"FMEA Matrix — Reliability Example","type":"document.text","variant":"large","width":"full"}
+{"id":"main_section","columns":["left_panel","fmea_container"],"meta":"Pump System — Reliability Engineering","title":"FMEA Overview","type":"document.section"}
+{"id":"left_panel","background":"#fbfbfb","children":["overview_text","key_points"],"padding":12,"type":"box"}
+{"id":"overview_text","text":"This FMEA matrix covers a simplified set of failure modes for a centrifugal pump assembly used in process industries. The table includes severity (S), occurrence (O), detection (D), resulting RPN, and recommended mitigations.","title":"Scope","type":"document.text","variant":"default","width":"md"}
+{"id":"key_points","items":["System: Centrifugal Pump Assembly","Focus: Reliability and maintenance prioritization","Metrics: Severity (1-10), Occurrence (1-10), Detection (1-10), RPN = S×O×D","Actions: Design, Maintenance, and Monitoring recommendations"],"meta":"Key Points","type":"document.bullet_list"}
+{"id":"f_head_c1","content":"Item","font_size":12,"type":"text"}
+{"id":"f_head_c2","content":"Function","font_size":12,"type":"text"}
+{"id":"f_head_c3","content":"Failure Mode","font_size":12,"type":"text"}
+{"id":"f_head_c4","content":"Effect","font_size":12,"type":"text"}
+{"id":"f_head_c5","content":"S","font_size":12,"type":"text"}
+{"id":"f_head_c6","content":"Cause","font_size":12,"type":"text"}
+{"id":"f_head_c7","content":"O","font_size":12,"type":"text"}
+{"id":"f_head_c8","content":"D","font_size":12,"type":"text"}
+{"id":"f_head_c9","content":"RPN","font_size":12,"type":"text"}
+{"id":"f_head_c10","content":"Recommended Action","font_size":12,"type":"text"}
+{"id":"f_r1_c1","content":"1 - Pump Seal","font_size":11,"type":"text"}
+{"id":"f_r1_c2","content":"Prevent leakage / contain fluid","font_size":11,"type":"text"}
+{"id":"f_r1_c3","content":"Seal wear / degradation","font_size":11,"type":"text"}
+{"id":"f_r1_c4","content":"Fluid leakage, potential system downtime","font_size":11,"type":"text"}
+{"id":"f_r1_c5","content":"7","font_size":11,"type":"text"}
+{"id":"f_r1_c6","content":"Abrasive particles, chemical attack","font_size":11,"type":"text"}
+{"id":"f_r1_c7","content":"5","font_size":11,"type":"text"}
+{"id":"f_r1_c8","content":"4","font_size":11,"type":"text"}
+{"id":"f_r1_c9","content":"140","font_size":11,"type":"text"}
+{"id":"f_r1_c10","content":"Specify harder seal material; implement seal inspection & replacement schedule","font_size":11,"type":"text"}
+{"id":"f_r2_c1","content":"2 - Motor Bearings","font_size":11,"type":"text"}
+{"id":"f_r2_c2","content":"Support shaft rotation, reduce friction","font_size":11,"type":"text"}
+{"id":"f_r2_c3","content":"Bearing wear / spalling","font_size":11,"type":"text"}
+{"id":"f_r2_c4","content":"Increased vibration, overheating, premature failure","font_size":11,"type":"text"}
+{"id":"f_r2_c5","content":"6","font_size":11,"type":"text"}
+{"id":"f_r2_c6","content":"Insufficient lubrication, contamination","font_size":11,"type":"text"}
+{"id":"f_r2_c7","content":"4","font_size":11,"type":"text"}
+{"id":"f_r2_c8","content":"3","font_size":11,"type":"text"}
+{"id":"f_r2_c9","content":"72","font_size":11,"type":"text"}
+{"id":"f_r2_c10","content":"Establish lubrication schedule; install contamination controls and vibration monitoring","font_size":11,"type":"text"}
+{"id":"f_r3_c1","content":"3 - Shaft Coupling","font_size":11,"type":"text"}
+{"id":"f_r3_c2","content":"Transmit torque between motor and pump","font_size":11,"type":"text"}
+{"id":"f_r3_c3","content":"Misalignment / coupling wear","font_size":11,"type":"text"}
+{"id":"f_r3_c4","content":"Excessive vibration, torque loss, potential shaft damage","font_size":11,"type":"text"}
+{"id":"f_r3_c5","content":"7","font_size":11,"type":"text"}
+{"id":"f_r3_c6","content":"Improper installation, thermal expansion","font_size":11,"type":"text"}
+{"id":"f_r3_c7","content":"3","font_size":11,"type":"text"}
+{"id":"f_r3_c8","content":"5","font_size":11,"type":"text"}
+{"id":"f_r3_c9","content":"105","font_size":11,"type":"text"}
+{"id":"f_r3_c10","content":"Perform alignment checks at installation and scheduled intervals; use torque monitoring","font_size":11,"type":"text"}
+{"id":"fmea_table","border_color":"#cccccc","border_width":1,"cell_padding":8,"children":["f_head_c1","f_head_c2","f_head_c3","f_head_c4","f_head_c5","f_head_c6","f_head_c7","f_head_c8","f_head_c9","f_head_c10","f_r1_c1","f_r1_c2","f_r1_c3","f_r1_c4","f_r1_c5","f_r1_c6","f_r1_c7","f_r1_c8","f_r1_c9","f_r1_c10","f_r2_c1","f_r2_c2","f_r2_c3","f_r2_c4","f_r2_c5","f_r2_c6","f_r2_c7","f_r2_c8","f_r2_c9","f_r2_c10","f_r3_c1","f_r3_c2","f_r3_c3","f_r3_c4","f_r3_c5","f_r3_c6","f_r3_c7","f_r3_c8","f_r3_c9","f_r3_c10"],"cols":10,"fill_color":"#ffffff","type":"table"}
+{"id":"actions_title","content":"Recommended Actions & Owners","font_size":12,"type":"text"}
+{"id":"actions_list","items":["Seal material spec review — Engineering","Seal inspection & replacement — Maintenance","Lubrication schedule & contamination controls — Maintenance","Alignment checks & torque monitoring — Installation Team"],"meta":"Top Actions","type":"document.bullet_list"}
+{"id":"action_box","background":"#f6f8ff","border_color":"#d6e0ff","border_width":1,"children":["actions_title","actions_list"],"padding":10,"type":"box","width":300}
+{"id":"fmea_container","children":["fmea_table","action_box"],"constraints":[{"entities":["fmea_table","action_box"],"type":"align_top"},{"entities":["action_box","fmea_table"],"type":"right_of"},{"entities":["fmea_table","action_box"],"spacing":20.0,"type":"horizontal_spacing"},{"entities":["fmea_table","main_section"],"type":"align_left"}],"type":"constraint_container"}
+{"id":"footer","text":"Sample FMEA matrix — values are illustrative. Use this template to expand system coverage and track actions, owners and dates.","type":"document.text","variant":"subtle","width":"full"}
+    "##;
 
  // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();

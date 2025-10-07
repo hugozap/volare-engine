@@ -42,9 +42,9 @@ pub fn generate_transformations_jsonl_prompt(user_input: &str, current_jsonl: &s
     // Combine the specifications
     let complete_spec = format!(
         "{}\n\n## Document Components\n\n{}\n\n## Diagram Elements\n\n{}",
-        LLM_TRANSFORM_OPS_SPEC,
         COMPONENTS_DOC,
-        DIAGRAM_SPEC
+        DIAGRAM_SPEC,
+        LLM_TRANSFORM_OPS_SPEC,
     );
     
     // Build the complete prompt by injecting the spec and user inputs

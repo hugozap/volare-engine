@@ -6,6 +6,7 @@ use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
 use serde_json::{Map, Value};
+use anyhow::{bail, Result};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -1327,7 +1328,7 @@ pub type CustomComponentFactory = Arc<
             &Map<String, Value>,
             &mut crate::DiagramBuilder,
             &JsonLinesParser,
-        ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+        ) -> Result<crate::diagram_builder::DiagramTreeNode>
         + Send
         + Sync,
 >;
@@ -1352,7 +1353,7 @@ impl CustomComponentRegistry {
                 &Map<String, Value>,
                 &mut crate::DiagramBuilder,
                 &JsonLinesParser,
-            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            ) -> Result<crate::diagram_builder::DiagramTreeNode>
             + Send
             + Sync
             + 'static,
@@ -1369,10 +1370,10 @@ impl CustomComponentRegistry {
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
         parser: &JsonLinesParser,
-    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
+    ) -> Result<crate::diagram_builder::DiagramTreeNode> {
         match self.factories.get(component_type) {
             Some(factory) => factory(id, attributes, builder, parser),
-            None => Err(format!("Unknown custom component type: {}", component_type)),
+            None => bail!("Unknown custom component type: {}", component_type)
         }
     }
 
@@ -1396,7 +1397,7 @@ impl CustomComponentRegistry {
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
                     &JsonLinesParser,
-                ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+                ) -> Result<crate::diagram_builder::DiagramTreeNode>
                 + Send
                 + Sync,
         >,

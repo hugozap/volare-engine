@@ -1,7 +1,9 @@
-# JSONL Diagram Specification
+# JSONL Diagram Specification (base components)
 v1.1 - 
 
-This specification describes the JSON Lines format for creating diagrams using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+This specification describes the JSON Lines format for creating documnts using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+
+
 
 ## Basic Structure
 
@@ -39,7 +41,7 @@ Renders text content with styling options.
 Wraps another element with padding, background, and border.
 
 **Required Attributes:**
-- `children` (array) - Array with exactly one child element ID
+- `children` (array) - Array with **exactly** one child element ID
 
 **Optional Attributes:**
 - `padding` (number) - Inner padding (default: 0)
@@ -54,6 +56,8 @@ Wraps another element with padding, background, and border.
 ```json
 {"id":"container","type":"box","padding":10,"background":"lightblue","children":["text1"]}
 ```
+
+NOTE: **The children array of a box MUST have only one element**
 
 ### Rectangle (`"type": "rect"`)
 Draws a rectangle shape.
@@ -377,6 +381,8 @@ This creates a document layout with header, sidebar navigation, main content are
 
 ## Overview
 This JSONL format is designed specifically for declaring constraint layout containers in your system. Since constraints are only supported within constraint layout containers, the format focuses on defining the container and its child entities with their associated constraints.
+
+Note: Constraints can **ONLY** be used with a `constraint_container` container type
 
 ## Container Declaration Format
 

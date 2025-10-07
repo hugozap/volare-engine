@@ -18,6 +18,8 @@ use crate::{
     SimpleConstraint,
 };
 
+use anyhow::{bail, Context, Result};
+
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
     pub entities: Vec<EntityID>,
@@ -137,7 +139,11 @@ impl DiagramBuilder {
         self.images.clear();
         self.polylines.clear();
         self.free_containers.clear();
+        self.constraint_layout_containers.clear();
         self.arcs.clear();
+        self.constraint_systems.clear();
+        self.images.clear();
+        self.transforms.clear();
 
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
@@ -161,7 +167,7 @@ impl DiagramBuilder {
                 &serde_json::Map<String, serde_json::Value>,
                 &mut DiagramBuilder,
                 &JsonLinesParser,
-            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            ) -> Result<crate::diagram_builder::DiagramTreeNode>
             + Send
             + Sync
             + 'static,
@@ -184,12 +190,9 @@ impl DiagramBuilder {
         component_type: &str,
         attrs: &serde_json::Map<String, serde_json::Value>,
         lines_parser: &JsonLinesParser,
-    ) -> Result<DiagramTreeNode, String> {
+    ) -> Result<DiagramTreeNode> {
         if !self.custom_components.has_component(component_type) {
-            return Err(format!(
-                "Custom component '{}' not registered",
-                component_type
-            ));
+            bail!("Custom component '{}' not registered", component_type);
         }
 
         let factory = { self.custom_components.get(component_type).unwrap().clone() };
@@ -608,10 +611,15 @@ impl DiagramBuilder {
         for i in 0..cols {
             let line_id = format!("{}-col-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
-                stroke_color: options.border_color.clone(),
-                stroke_width: 1.0,
-            });
+            let line = ShapeLine::new(
+                line_id.clone(),
+                (0.0, 0.0),
+                (0.0, 0.0),
+                LineOptions {
+                    stroke_color: options.border_color.clone(),
+                    stroke_width: 1.0,
+                },
+            );
             self.lines.insert(line_id.clone(), line);
             col_lines.push(line_id.clone());
         }
@@ -620,10 +628,15 @@ impl DiagramBuilder {
         for i in 0..num_rows + 1 {
             let line_id = format!("{}-row-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
-                stroke_color: options.border_color.clone(),
-                stroke_width: 1.0,
-            });
+            let line = ShapeLine::new(
+                line_id.clone(),
+                (0.0, 0.0),
+                (0.0, 0.0),
+                LineOptions {
+                    stroke_color: options.border_color.clone(),
+                    stroke_width: 1.0,
+                },
+            );
             self.lines.insert(line_id.clone(), line);
             row_lines.push(line_id.clone());
         }
@@ -650,7 +663,11 @@ impl DiagramBuilder {
             col_lines.clone(),
             row_lines.clone(),
             cols,
-            if options.with_header { Some(header_id.clone())} else {None},
+            if options.with_header {
+                Some(header_id.clone())
+            } else {
+                None
+            },
             options.clone(),
         );
 
@@ -823,7 +840,7 @@ impl DiagramBuilder {
         &self.lines[&id]
     }
 
-     pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
+    pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
         self.lines.get_mut(&id)
     }
 
@@ -903,7 +920,7 @@ impl DiagramBuilder {
                     &serde_json::Map<String, serde_json::Value>,
                     &mut DiagramBuilder,
                     &JsonLinesParser,
-                ) -> Result<DiagramTreeNode, String>
+                ) -> Result<DiagramTreeNode>
                 + Send
                 + Sync,
         >,
@@ -949,11 +966,11 @@ mod component_registration_tests {
     /// Custom Component 1: Badge
     /// Creates a rounded pill-shaped element with text
     fn create_badge_component(
-        id : &str,
+        id: &str,
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
         parser: &JsonLinesParser,
-    ) -> Result<DiagramTreeNode, String> {
+    ) -> Result<DiagramTreeNode> {
         println!("🏷️  Creating badge component with attrs: {:?}", attrs);
 
         // Extract attributes
@@ -1028,7 +1045,7 @@ mod component_registration_tests {
 
         let parser = JsonLinesParser::new();
 
-        let result = builder.create_custom_component("b1","badge", &attrs, &parser);
+        let result = builder.create_custom_component("b1", "badge", &attrs, &parser);
         assert!(result.is_ok());
         let badge_node = result.unwrap();
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);

@@ -3832,6 +3832,274 @@ version = 3
 name = "layout-base"
 version = "0.1.0"
 
+===/docs/LLM Transform Operations SPEC.md===
+# JSONL Visual Engine - Natural Language to Operations Converter
+
+You are a specialized assistant that converts natural language descriptions into JSONL-formatted operations for a visual layout engine. Your task is to generate valid JSONL documents where each line represents an operation that adds, updates, or deletes visual elements.
+
+## Input Format
+
+You will receive two inputs:
+
+1. **User Request**: Natural language description of what to do
+2. **Current Document**: The existing JSONL document (may be empty for new documents)
+
+## Output Format
+
+Each line must be a single, complete JSON object with NO formatting, NO blank lines, and NO extra whitespace:
+
+```jsonl
+{"action":"add","item":{"id":"root","type":"vstack","children":["header","content"]}}
+{"action":"add","item":{"id":"header","type":"text","content":"Hello World","font_size":24}}
+{"action":"update","item":{"id":"header","color":"blue"}}
+{"action":"delete","item":{"id":"unwanted_element"}}
+```
+
+## Operation Types
+
+### ADD Operation
+Inserts a complete new element with all its attributes.
+```jsonl
+{"action":"add","item":{...complete element definition...}}
+```
+Note:
+New elements only will be visible in the final document if they are referenced by their parent (with exception of the root element). An update operation for the parent element is usually needed.
+
+### UPDATE Operation
+Modifies existing element attributes. Only the `id` and attributes to change are needed.
+```jsonl
+{"action":"update","item":{"id":"element_id","attribute1":"new_value"}}
+```
+Note: If needed, when updating, the "type" of the element can be updated too (e.g when converting a root element that was text into a container).
+
+### DELETE Operation
+Removes an element. Only the `id` is required.
+```jsonl
+{"action":"delete","item":{"id":"element_id"}}
+```
+
+## Critical Rules
+
+1. **STRICT JSONL FORMAT**: One complete JSON object per line, no blank lines
+2. **ROOT ELEMENT REQUIREMENT**: 
+   - **If Current Document is EMPTY**: The first operation MUST be an `add` operation for the root container element
+   - **If Current Document EXISTS**: Analyze existing elements and generate appropriate operations (add/update/delete)
+   - The root element is typically named "root" but check the current document to confirm
+3. **UNIQUE IDs**: Every element must have a unique `id` attribute (check current document for existing IDs)
+4. **VALID CHILDREN**: Container elements reference children by ID in `children` array (children can be defined later)
+5. **ONE ROOT ONLY**: Only one root element per document
+6. **PRESERVE CONTEXT**: When modifying existing elements, preserve attributes not mentioned in the user request
+
+## JSONL Entity Specification
+
+[PLACEHOLDER_FOR_COMPLETE_JSONL_SPEC]
+
+IMPORTANT NOTE! : This task is about generating the **transformations** which have a different format than the document definition languange as they contain "action" and the items are defined inside the "item" field.
+
+Example:
+
+{"action":"add","item":{"id":"root","type":"vstack","children":["header","content"]}}
+
+
+
+
+## Examples
+
+### Example 1: New Document (Empty Current Document)
+**User Request**: "Create a document with a title and a paragraph"
+**Current Document**: (empty)
+
+**Output**:
+```jsonl
+{"action":"add","item":{"id":"root","type":"vstack","children":["title","para"],"h_align":"left"}}
+{"action":"add","item":{"id":"title","type":"text","content":"Document Title","font_size":24,"color":"#333"}}
+{"action":"add","item":{"id":"para","type":"text","content":"This is the paragraph text.","font_size":12,"color":"#666"}}
+```
+
+### Example 2: Update Existing Element
+**User Request**: "Change the title color to green and make it bigger"
+**Current Document**:
+```jsonl
+{"id":"root","type":"vstack","children":["title","para"],"h_align":"left"}
+{"id":"title","type":"text","content":"Document Title","font_size":24,"color":"#333"}
+{"id":"para","type":"text","content":"This is the paragraph text.","font_size":12,"color":"#666"}
+```
+
+**Output**:
+```jsonl
+{"action":"update","item":{"id":"title","color":"green","font_size":32}}
+```
+
+### Example 3: Add to Existing Document
+**User Request**: "Add a footer with copyright text"
+**Current Document**:
+```jsonl
+{"id":"root","type":"vstack","children":["header","body"],"h_align":"stretch"}
+{"id":"header","type":"box","background":"#2c3e50","padding":15,"children":["header_text"]}
+{"id":"header_text","type":"text","content":"Dashboard","font_size":20,"color":"white"}
+{"id":"body","type":"text","content":"Main content","font_size":14}
+```
+
+**Output**:
+```jsonl
+{"action":"add","item":{"id":"footer","type":"text","content":"© 2024 Company","font_size":10,"color":"gray"}}
+{"action":"update","item":{"id":"root","children":["header","body","footer"]}}
+```
+
+### Example 4: Delete Elements
+**User Request**: "Remove the sidebar"
+**Current Document**:
+```jsonl
+{"id":"root","type":"hstack","children":["sidebar","main"],"v_align":"top"}
+{"id":"sidebar","type":"box","width":200,"children":["nav"]}
+{"id":"nav","type":"text","content":"Navigation"}
+{"id":"main","type":"box","children":["content"]}
+{"id":"content","type":"text","content":"Main content"}
+```
+
+**Output**:
+```jsonl
+{"action":"delete","item":{"id":"sidebar"}}
+{"action":"delete","item":{"id":"nav"}}
+{"action":"update","item":{"id":"root","children":["main"]}}
+```
+
+### Example 5: Complex Dashboard (New Document)
+**User Request**: "Create a dashboard with header, sidebar, and main content area"
+**Current Document**: (empty)
+User: "Create a dashboard with header, sidebar, and main content area"
+
+Output:
+```jsonl
+{"action":"add","item":{"id":"root","type":"vstack","children":["header","body"],"h_align":"stretch"}}
+{"action":"add","item":{"id":"header","type":"box","background":"#2c3e50","padding":15,"children":["header_text"]}}
+{"action":"add","item":{"id":"header_text","type":"text","content":"Dashboard","font_size":20,"color":"white"}}
+{"action":"add","item":{"id":"body","type":"hstack","children":["sidebar","main"],"v_align":"top"}}
+{"action":"add","item":{"id":"sidebar","type":"box","background":"#ecf0f1","padding":10,"width":200,"children":["nav"]}}
+{"action":"add","item":{"id":"nav","type":"vstack","children":["nav1","nav2","nav3"],"h_align":"left"}}
+{"action":"add","item":{"id":"nav1","type":"text","content":"Home","color":"#2c3e50"}}
+{"action":"add","item":{"id":"nav2","type":"text","content":"Settings","color":"#2c3e50"}}
+{"action":"add","item":{"id":"nav3","type":"text","content":"Profile","color":"#2c3e50"}}
+{"action":"add","item":{"id":"main","type":"box","padding":20,"background":"white","children":["main_content"]}}
+{"action":"add","item":{"id":"main_content","type":"text","content":"Main content goes here","font_size":14}}
+```
+
+### Example 6: Layout with Boxes (New Document)
+**User Request**: "Make a horizontal layout with two colored boxes, red on left and blue on right"
+**Current Document**: (empty)
+
+**Output**:
+```jsonl
+{"action":"add","item":{"id":"root","type":"hstack","children":["box1","box2"],"spacing":10}}
+{"action":"add","item":{"id":"box1","type":"rect","width":100,"height":100,"fill":"red"}}
+{"action":"add","item":{"id":"box2","type":"rect","width":100,"height":100,"fill":"blue"}}
+```
+
+### Example 7: Multiple Updates
+**User Request**: "Make all text blue and increase font sizes by 2"
+**Current Document**:
+```jsonl
+{"id":"root","type":"vstack","children":["title","subtitle","body"]}
+{"id":"title","type":"text","content":"Title","font_size":24,"color":"black"}
+{"id":"subtitle","type":"text","content":"Subtitle","font_size":18,"color":"black"}
+{"id":"body","type":"text","content":"Body text","font_size":12,"color":"black"}
+```
+
+**Output**:
+```jsonl
+{"action":"update","item":{"id":"title","color":"blue","font_size":26}}
+{"action":"update","item":{"id":"subtitle","color":"blue","font_size":20}}
+{"action":"update","item":{"id":"body","color":"blue","font_size":14}}
+```
+
+## Document Context
+
+When processing requests, analyze the **Current Document** to understand:
+
+1. **Empty Document**:
+   - No existing elements
+   - First line MUST be: `{"action":"add","item":{"id":"root","type":"...","children":[...]}}`
+   - Build complete structure from scratch
+
+2. **Existing Document**:
+   - Parse existing elements and their IDs
+   - Identify the root element (usually `"id":"root"` in first line)
+   - Check existing children arrays to understand structure
+   - Generate minimal operations to fulfill user request
+   - When adding elements to containers, update their `children` array
+   - When deleting elements, also remove them from parent's `children` array and delete orphaned descendants
+
+3. **Operation Guidelines**:
+   - **ADD**: Create new elements with unique IDs (check existing IDs to avoid conflicts)
+   - **UPDATE**: Modify only the attributes mentioned in user request; preserve others
+   - **DELETE**: Remove element and clean up all references to it (children arrays, etc.)
+
+## Analyzing Current Document
+
+When the current document is provided:
+
+1. **Parse all element IDs** to avoid creating duplicates
+2. **Identify parent-child relationships** via `children` arrays
+3. **Understand layout structure** (stack types, containers, positioning)
+4. **Determine what exists** vs what needs to be added/modified/removed
+5. **Generate minimal operations** - only change what's necessary
+
+## Important Notes
+
+- Always generate **valid, strict JSONL** (one object per line, no blank lines)
+- The **first line must always be the root element**
+- Container elements (`vstack`, `hstack`, `box`, `free_container`, etc.) use `children` arrays with IDs
+- For positioning, use appropriate containers or `x`, `y` coordinates in `free_container`
+- Color values can be named colors ("red", "blue") or hex codes ("#FF0000")
+- Text wrapping uses `line_width` attribute
+- Spacing between elements in stacks uses `spacing` attribute
+- Element alignment uses `h_align` (left/center/right/stretch) and `v_align` (top/center/bottom/stretch)
+
+## Your Task
+
+When given a user request and current document:
+
+1. **Analyze Current Document**:
+   - If empty → Creating NEW document, start with root
+   - If exists → Parse existing elements, IDs, and structure
+   - Identify what elements exist and what needs to change
+
+2. **Determine Operations**:
+   - Choose minimal set of operations (add/update/delete) to fulfill request
+   - Ensure IDs are unique (check current document)
+   - Update parent `children` arrays when adding/removing elements
+   - Ensure the "type" is correct when updating an element, update it if needed too.
+
+3. **Generate Valid JSONL**:
+   - One complete JSON object per line
+   - No blank lines, no extra whitespace
+   - For EMPTY documents: First line is always `{"action":"add","item":{"id":"root",...}}`
+   - For EXISTING documents: Only generate operations that make requested changes
+
+4. **Use Appropriate Structure**:
+   - Choose correct element types and attributes from specification
+   - Create unique, descriptive IDs (check existing IDs first)
+   - Build proper parent-child relationships via `children` arrays
+   - Preserve existing attributes when updating (only change what's requested)
+   - For document and section layouts prefer the higher level elements listed in "JSONL Document components Specification". 
+   - Always use a `document` element for the root container with header,content and footer elements
+   - Use `document.section` for logically grouping components.
+
+5. **Output Format**: 
+   - Output ONLY the JSONL operations, no explanations unless requested
+   - Each operation should be atomic and complete
+   - Operations should be ordered logically (add children before referencing them in parent)
+
+Generate clear, semantic IDs and choose the most appropriate element types and layout containers for the user's description.
+
+ IMPORTANT NOTE! : This task is about generating the **transformations** which have a different format than the document definition languange as they contain "action" and the items are defined inside the "item" field. ALL jsonl elements should have an `action` and an `item` field!
+
+Example line for a a valid transformation:
+{"action":"add","item":{"id":"root","type":"vstack","children":["header","content"]}}
+
+NOTE ABOUT ADDITIONS:
+When creating "add" actions keep in mind that usually we have to update a reference to the new element in other element and we would have to create an "update" action too. Some elements are referenced in attributes like header_id (for a document element for example) while others are a member of the `children` vector (refer to spec). Please make sure to add update operations if needed.
+
 ===/docs/the-diagram-tree-spec.md===
 # The diagram Tree.
 
@@ -3936,12 +4204,14 @@ The properties do affect layout and are used by rendering.
 
 
 ===/docs/JSONL Document components.md===
+# JSONL Document components Specification (high level document components)
 
-These components are higher level elements used to present information with good typography and spacing settings.
+These components are higher level elements used to present information with good typography and spacing settings. 
 
 ## document
 
-the root document container, 
+the root document container
+**Always use the `document` element as the root**
 
 attributes
 - header_id (optional)
@@ -3963,21 +4233,27 @@ The section provides a multi column layout, the columns attribute contains the a
 
 columns can also be sections for composing more complex layouts
 
-## properties
+## document.properties
 
 A component used to present information in a table based with two columns, first column is the attribute name, and second column is the attribute value
 
 ```
-{"id":"properties-car", "type":"properties", "items"=[{"name":"mileage", "value":"15000}]}
+{"id":"properties-car", "type":"document.properties", "meta":"Car Properties", "properties"=[["name", "mustang"], ["value":"3000"]]}
 ```
+
+Attributes:
+- properties: A list of two value lists (first is name of the property and second is the value, both strings)
+- meta: (optional) a short text that is display on top of the element to give some context to the reader.
 
 ## document.text
 
 A text paragraph with good default typography settings with optional title
 
 ```
-{"id":"explanation", "type":"document.text", "variant":"default|large|small|subtle|emphasized "text":"the content" "title": "paragraph title"}
+{"id":"explanation", "type":"document.text", "variant":"default|large|small|subtle|emphasized "text":"the content" "title": "paragraph title", "width":"sm|md|lg|xl|full|<number>"}
 ```
+
+Variants: 
 
 default: Standard content blocks
 large: Hero sections or main headings
@@ -3985,17 +4261,28 @@ small: Compact spaces or secondary information
 subtle: Labels or supporting content
 emphasized: Important callouts or quotes
 
-typeface: Helvetica
+width (optional)
 
-## bullet-list
+Any of the following strings or 
+"sm" : Small width (approx 480px)
+"md" : Medium width (approx 640px)
+"lg" : Large (840px)
+"xl" : X-Large (1024)
+"full": 1200
+
+width can also be a number e.g "300"
+
+
+## document.bullet_list
 
 A bullet point list of elements with good typography and spacing settings
 
 ```
-{"id":"item-list", "type":"bullet-list", "items":["first","second","third"]}
+{"id":"item-list", "type":"document.bullet_list", "meta":"A useful list" "items":["first","second","third"]}
 ```
 
-## numbered-list
+
+## numbered-list (NOT IMPLEMENTED YET!)
 
 A numbered list of elements with good typography and spacing settings
 
@@ -4003,7 +4290,7 @@ A numbered list of elements with good typography and spacing settings
 {"id":"item-list", "type":"numbered-list", "items":["first","second","third"]}
 ```
 
-## card
+## card (NOT IMPLEMENTED YET!)
 
 attributes
 
@@ -4013,20 +4300,22 @@ attributes
 - content_id: (if other element should be instantiated in the content area)
 
 
-## quote-block
+## quote-block (NOT IMPLEMENTED YET)
 
 Left border emphasis for important information
 
-## code-block
+## code-block (NOT IMPLEMENTED YET)
 
 Monospace content with background differentiation
 
 
 ===/docs/JSONL Diagram Specification.md===
-# JSONL Diagram Specification
+# JSONL Diagram Specification (base components)
 v1.1 - 
 
-This specification describes the JSON Lines format for creating diagrams using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+This specification describes the JSON Lines format for creating documnts using the Volare Layout Engine. Each line in a JSONL file represents a single entity with its properties.
+
+
 
 ## Basic Structure
 
@@ -4722,6 +5011,68 @@ Please use this components to get smart defaults for spacing and typography
 {"id":"mini_avatar_3","type":"image","src":"https://api.dicebear.com/7.x/miniavs/svg?seed=test3","width":40,"height":40}
 {"id":"footer","type":"box","padding":10,"background":"#95a5a6","children":["footer_text"]}
 {"id":"footer_text","type":"text","content":"🌐 Images loaded from: picsum.photos (photos) • dicebear.com (avatars)","font_size":12,"color":"#2c3e50"}
+===/docs/examples/documents/algorithmic-complexity-reference.jsonl===
+{"id":"root","type":"document","content_id":"main_content", "header_id":"title"}
+{"id":"main_content","type":"document.vstack","children":["intro_section","notation_section","common_section","data_structures_section","sorting_section","searching_section","rules_section"],"h_align":"left"}
+{"id":"title","type":"document.title","variant":"large","text":"Algorithm Complexity Quick Reference"}
+{"id":"intro_section","type":"document.section","title":"Big O Notation","columns":["intro_content"]}
+{"id":"intro_content","type":"document.text","text":"Big O notation describes the upper bound of algorithm performance as input size grows. It focuses on the dominant term and ignores constants and lower-order terms."}
+{"id":"notation_section","type":"document.section","title":"Common Complexities","meta":"From Best to Worst","columns":["notation_col1","notation_col2"]}
+{"id":"notation_col1","type":"document.vstack","children":["fast_title","fast_props"],"h_align":"left"}
+{"id":"fast_title","type":"document.text","variant":"emphasized","text":"Excellent to Good"}
+{"id":"fast_props","type":"document.properties","properties":[["O(1)","Constant - Array access, hash lookup"],["O(log n)","Logarithmic - Binary search, balanced tree"],["O(n)","Linear - Simple loop, linear search"],["O(n log n)","Linearithmic - Efficient sorting (merge, heap)"]]}
+{"id":"notation_col2","type":"document.vstack","children":["slow_title","slow_props"],"h_align":"left"}
+{"id":"slow_title","type":"document.text","variant":"emphasized","text":"Fair to Poor"}
+{"id":"slow_props","type":"document.properties","properties":[["O(n²)","Quadratic - Nested loops, bubble sort"],["O(n³)","Cubic - Triple nested loops"],["O(2ⁿ)","Exponential - Recursive fibonacci, subsets"],["O(n!)","Factorial - Permutations, traveling salesman"]]}
+{"id":"common_section","type":"document.section","title":"Time vs Space","columns":["time_col","space_col"]}
+{"id":"time_col","type":"document.vstack","children":["time_title","time_info","time_examples"],"h_align":"left"}
+{"id":"time_title","type":"document.text","variant":"emphasized","text":"Time Complexity"}
+{"id":"time_info","type":"document.text","variant":"small","text":"Measures how runtime grows with input size. Focuses on number of operations executed."}
+{"id":"time_examples","type":"document.bullet_list","items":["Single loop: O(n)","Nested loops: O(n²)","Divide and conquer: O(log n)","Recursive calls: Analyze recurrence"]}
+{"id":"space_col","type":"document.vstack","children":["space_title","space_info","space_examples"],"h_align":"left"}
+{"id":"space_title","type":"document.text","variant":"emphasized","text":"Space Complexity"}
+{"id":"space_info","type":"document.text","variant":"small","text":"Measures memory usage growth with input size. Includes auxiliary space and call stack."}
+{"id":"space_examples","type":"document.bullet_list","items":["In-place algorithm: O(1)","Extra array: O(n)","Recursive depth: O(depth)","Hash table storage: O(n)"]}
+{"id":"data_structures_section","type":"document.section","title":"Data Structures","columns":["ds_col1","ds_col2"]}
+{"id":"ds_col1","type":"document.vstack","children":["array_title","array_ops","list_title","list_ops","stack_title","stack_ops"],"h_align":"left"}
+{"id":"array_title","type":"document.text","variant":"emphasized","text":"Array / Dynamic Array"}
+{"id":"array_ops","type":"document.properties","properties":[["Access","O(1)"],["Search","O(n)"],["Insert (end)","O(1) amortized"],["Insert (middle)","O(n)"],["Delete","O(n)"]]}
+{"id":"list_title","type":"document.text","variant":"emphasized","text":"Linked List"}
+{"id":"list_ops","type":"document.properties","properties":[["Access","O(n)"],["Search","O(n)"],["Insert (front)","O(1)"],["Insert (end)","O(n) or O(1) with tail"],["Delete","O(n)"]]}
+{"id":"stack_title","type":"document.text","variant":"emphasized","text":"Stack / Queue"}
+{"id":"stack_ops","type":"document.properties","properties":[["Push/Enqueue","O(1)"],["Pop/Dequeue","O(1)"],["Peek","O(1)"],["Search","O(n)"]]}
+{"id":"ds_col2","type":"document.vstack","children":["hash_title","hash_ops","tree_title","tree_ops","heap_title","heap_ops"],"h_align":"left"}
+{"id":"hash_title","type":"document.text","variant":"emphasized","text":"Hash Table"}
+{"id":"hash_ops","type":"document.properties","properties":[["Insert","O(1) average"],["Delete","O(1) average"],["Search","O(1) average"],["Worst case","O(n) with collisions"]]}
+{"id":"tree_title","type":"document.text","variant":"emphasized","text":"Binary Search Tree (Balanced)"}
+{"id":"tree_ops","type":"document.properties","properties":[["Insert","O(log n)"],["Delete","O(log n)"],["Search","O(log n)"],["Unbalanced worst","O(n)"]]}
+{"id":"heap_title","type":"document.text","variant":"emphasized","text":"Binary Heap"}
+{"id":"heap_ops","type":"document.properties","properties":[["Insert","O(log n)"],["Delete max/min","O(log n)"],["Get max/min","O(1)"],["Heapify","O(n)"]]}
+{"id":"sorting_section","type":"document.section","title":"Sorting Algorithms","columns":["sort_col1","sort_col2"]}
+{"id":"sort_col1","type":"document.vstack","children":["efficient_title","efficient_sorts","simple_title","simple_sorts"],"h_align":"left"}
+{"id":"efficient_title","type":"document.text","variant":"emphasized","text":"Efficient Sorts O(n log n)"}
+{"id":"efficient_sorts","type":"document.properties","properties":[["Merge Sort","O(n log n) time, O(n) space, stable"],["Quick Sort","O(n log n) avg, O(n²) worst, O(log n) space"],["Heap Sort","O(n log n) time, O(1) space, not stable"]]}
+{"id":"simple_title","type":"document.text","variant":"emphasized","text":"Simple Sorts O(n²)"}
+{"id":"simple_sorts","type":"document.properties","properties":[["Bubble Sort","O(n²) time, O(1) space, stable"],["Selection Sort","O(n²) time, O(1) space, not stable"],["Insertion Sort","O(n²) time, O(1) space, stable, good for small n"]]}
+{"id":"sort_col2","type":"document.vstack","children":["special_title","special_sorts","sort_notes_title","sort_notes"],"h_align":"left"}
+{"id":"special_title","type":"document.text","variant":"emphasized","text":"Special Purpose Sorts"}
+{"id":"special_sorts","type":"document.properties","properties":[["Counting Sort","O(n+k) time, O(k) space, integers only"],["Radix Sort","O(d*n) time, O(n+k) space, digits/strings"],["Bucket Sort","O(n+k) avg, O(n²) worst, uniform distribution"]]}
+{"id":"sort_notes_title","type":"document.text","variant":"emphasized","text":"Notes"}
+{"id":"sort_notes","type":"document.bullet_list","items":["Stable: maintains relative order of equal elements","In-place: uses O(1) or O(log n) extra space","Quick sort is often fastest in practice"]}
+{"id":"searching_section","type":"document.section","title":"Searching Algorithms","columns":["search_col1","search_col2"]}
+{"id":"search_col1","type":"document.vstack","children":["basic_search_title","basic_search"],"h_align":"left"}
+{"id":"basic_search_title","type":"document.text","variant":"emphasized","text":"Basic Search"}
+{"id":"basic_search","type":"document.properties","properties":[["Linear Search","O(n) time, O(1) space, unsorted data"],["Binary Search","O(log n) time, O(1) space, sorted data"],["Jump Search","O(√n) time, sorted arrays"],["Interpolation","O(log log n) avg, uniformly distributed"]]}
+{"id":"search_col2","type":"document.vstack","children":["graph_search_title","graph_search"],"h_align":"left"}
+{"id":"graph_search_title","type":"document.text","variant":"emphasized","text":"Graph Search"}
+{"id":"graph_search","type":"document.properties","properties":[["DFS (Depth First)","O(V+E) time, O(V) space"],["BFS (Breadth First)","O(V+E) time, O(V) space"],["Dijkstra","O((V+E) log V) with heap"],["A* Search","O(E) with good heuristic"],["Bellman-Ford","O(VE) time, handles negative weights"]]}
+{"id":"rules_section","type":"document.section","title":"Analysis Rules","columns":["rules_col1","rules_col2"]}
+{"id":"rules_col1","type":"document.vstack","children":["basic_rules_title","basic_rules"],"h_align":"left"}
+{"id":"basic_rules_title","type":"document.text","variant":"emphasized","text":"Basic Rules"}
+{"id":"basic_rules","type":"document.bullet_list","items":["Drop constants: O(2n) → O(n)","Drop lower terms: O(n² + n) → O(n²)","Sequential: O(A + B) for separate operations","Nested: O(A * B) for nested operations","Logarithm base doesn't matter: O(log₂n) ≈ O(logₙn)"]}
+{"id":"rules_col2","type":"document.vstack","children":["analysis_tips_title","analysis_tips"],"h_align":"left"}
+{"id":"analysis_tips_title","type":"document.text","variant":"emphasized","text":"Analysis Tips"}
+{"id":"analysis_tips","type":"document.bullet_list","items":["Count loops: each nested loop multiplies complexity","Recursive: solve recurrence relation or use Master Theorem","Amortized: average cost over sequence of operations","Best vs Average vs Worst case matter","Consider both time and space trade-offs"]}
 ===/docs/examples/text/text-in-box-auto-wrap.jsonl===
 {"id":"test_box","type":"box","width":400,"padding":20,"children":["long_text"]}
 {"id":"long_text","type":"text","content":"This is a very long text that should automatically wrap to fit within the 400px box width with 20px padding on each side."}
@@ -4847,7 +5198,7 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     session.set_size(shape_box.entity.clone(), box_width, box_height);
 }
 
-fn calculate_optimal_line_width(
+pub fn calculate_optimal_line_width(
     session: &DiagramBuilder,
     text: &str,
     text_options: &TextOptions,
@@ -5977,7 +6328,7 @@ impl ConstraintSystem {
                 let vars1 = self.variables.get(&id1).expect("Entity not found");
                 let vars2 = self.variables.get(&id2).expect("Entity not found");
                 self.solver
-                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x + vars2.width)
+                    .add_constraint(vars1.x | GE(REQUIRED) | vars2.x + vars2.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
             }
 
@@ -5985,7 +6336,7 @@ impl ConstraintSystem {
                 let vars1 = self.variables.get(&id1).expect("Entity not found");
                 let vars2 = self.variables.get(&id2).expect("Entity not found");
                 self.solver
-                    .add_constraint(vars1.x | EQ(REQUIRED) | vars2.x - vars1.width)
+                    .add_constraint(vars1.x | LE(REQUIRED) | vars2.x - vars1.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add leftOf constraint: {:?}", e))?;
             }
 
@@ -6356,8 +6707,66 @@ pub mod parser;
 pub mod transform;
 pub mod theme;
 
+/// Generates a complete LLM prompt for converting natural language to JSONL operations
+/// 
+/// # Arguments
+/// * `user_input` - The natural language request from the user
+/// * `current_jsonl` - The current JSONL document (empty string for new documents)
+/// 
+/// # Returns
+/// A formatted string containing the complete prompt ready to send to an LLM
+/// 
+/// # Example
+/// ```
+/// let user_request = "Create a document with a title and paragraph";
+/// let current_doc = ""; // empty for new document
+/// let prompt = generate_jsonl_prompt(user_request, current_doc);
+/// // Send prompt to LLM...
+/// ```
+pub fn generate_transformations_jsonl_prompt(user_input: &str, current_jsonl: &str) -> String {
+    // Embed the documentation files at compile time
+    const LLM_TRANSFORM_OPS_SPEC: &str = include_str!("../docs/LLM Transform Operations SPEC.md");
+    const COMPONENTS_DOC: &str = include_str!("../docs/JSONL Document components.md");
+    const DIAGRAM_SPEC: &str = include_str!("../docs/JSONL Diagram Specification.md");
+    
+    // Combine the specifications
+    let complete_spec = format!(
+        "{}\n\n## Document Components\n\n{}\n\n## Diagram Elements\n\n{}",
+        COMPONENTS_DOC,
+        DIAGRAM_SPEC,
+        LLM_TRANSFORM_OPS_SPEC,
+    );
+    
+    // Build the complete prompt by injecting the spec and user inputs
+    let prompt = format!(
+r#"{}
+
+## Current Task
+
+**User Request:**
+{}
+
+**Current Document:**
+{}
+
+Please generate the JSONL operations to fulfill this request. Output ONLY the JSONL operations, one per line, with no additional formatting or explanation.
+"#,
+        complete_spec,
+        user_input,
+        if current_jsonl.trim().is_empty() {
+            "(empty)"
+        } else {
+            current_jsonl
+        }
+    );
+    
+    prompt
+}
+
 #[cfg(test)]
 mod tests;
+
+
 
 ===/src/theme.rs===
 pub struct Theme {
@@ -10061,7 +10470,11 @@ impl DiagramBuilder {
         self.images.clear();
         self.polylines.clear();
         self.free_containers.clear();
+        self.constraint_layout_containers.clear();
         self.arcs.clear();
+        self.constraint_systems.clear();
+        self.images.clear();
+        self.transforms.clear();
 
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
@@ -10532,7 +10945,10 @@ impl DiagramBuilder {
         for i in 0..cols {
             let line_id = format!("{}-col-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
+                stroke_color: options.border_color.clone(),
+                stroke_width: 1.0,
+            });
             self.lines.insert(line_id.clone(), line);
             col_lines.push(line_id.clone());
         }
@@ -10541,7 +10957,10 @@ impl DiagramBuilder {
         for i in 0..num_rows + 1 {
             let line_id = format!("{}-row-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions::new());
+            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
+                stroke_color: options.border_color.clone(),
+                stroke_width: 1.0,
+            });
             self.lines.insert(line_id.clone(), line);
             row_lines.push(line_id.clone());
         }
@@ -10554,7 +10973,7 @@ impl DiagramBuilder {
             header_id.clone(),
             RectOptions {
                 fill_color: Fill::Color(options.header_fill_color.clone()),
-                stroke_color: String::from("black"),
+                stroke_color: options.border_color.clone(),
                 stroke_width: 1.0,
                 ..Default::default()
             },
@@ -11019,11 +11438,12 @@ use std::fmt::format;
 
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_ACCENT, BG_PRIMARY, DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT,
-    FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED,
-    LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL,
-    SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS,
-    WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY, WIDTH_SM, WIDTH_XL,
+    BG_ACCENT, BG_PRIMARY, BG_SECONDARY, BORDER_LIGHT_COLOR, DOCUMENT_WIDTH_DEFAULT, FONT_SANS,
+    FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, FONT_WEIGHT_NORMAL,
+    LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL,
+    PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL,
+    TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY_PANEL,
+    WIDTH_SM, WIDTH_XL,
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -11120,7 +11540,7 @@ pub mod style {
     pub const WIDTH_LG: Float = 800.0; // Large documents
     pub const WIDTH_XL: Float = 1024.0; // Extra large documents
     pub const WIDTH_FULL: Float = 1200.0; // Full width documents
-    pub const WIDTH_PROPERTY: Float = 85.0; // For property field names/values
+    pub const WIDTH_PROPERTY_PANEL: Float = 85.0; // For property field names/values
 
     // Border radius
     pub const RADIUS_SM: Float = 4.0;
@@ -11278,9 +11698,9 @@ pub fn create_document_text(
     });
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
-    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+    let max_width = get_width(attrs, &["width"], WIDTH_SM);
 
-    document_text(id, builder, variant, content, container_width)
+    document_text(id, builder, variant, content, max_width)
 }
 
 pub fn document_text(
@@ -11288,7 +11708,7 @@ pub fn document_text(
     builder: &mut DiagramBuilder,
     variant: String,
     content: String,
-    container_width: f32,
+    max_width: f32,
 ) -> Result<DiagramTreeNode, String> {
     let mut toptions = match variant.as_str() {
         "xlarge" => TextOptions {
@@ -11297,7 +11717,7 @@ pub fn document_text(
             text_color: PRIMARY_TEXT.to_string(),
             ..TextOptions::default()
         },
-        "large" => TextOptions {
+        "large" | "emphasized" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_LG,
             text_color: PRIMARY_TEXT.to_string(),
@@ -11326,21 +11746,58 @@ pub fn document_text(
         },
     };
 
+    // we need to calculate the line width for the max width
+
+    toptions.line_width = calculate_optimal_line_width(&builder, &content, &toptions, max_width);
+
     toptions.line_spacing = toptions.font_size * 0.4;
 
     let text = builder.new_text(format!("{}_text", id.clone()), content.as_str(), toptions);
-    let w_size = SizeBehavior::Fixed(container_width);
+
     let coptions = BoxOptions {
         fill_color: Fill::Color("transparent".to_string()),
         stroke_color: "transparent".to_string(),
         stroke_width: 0.0,
         padding: 0.0,
         border_radius: 0.0,
-        width_behavior: w_size,
+        width_behavior: SizeBehavior::Content,
         height_behavior: SizeBehavior::Content,
         horizontal_alignment: HorizontalAlignment::Left,
     };
     let container = builder.new_box(format!("{}_text_container", id), text, coptions);
+
+    // if variant is emphasized add left line
+    if variant == "emphasized" {
+        let left_line = builder.new_rectangle(
+            format!("{}_left_line", id),
+            RectOptions {
+                stroke_width: 1.0,
+                width_behavior: SizeBehavior::Fixed(1.0),
+                stroke_color: PRIMARY_TEXT.to_owned(),
+                fill_color: Fill::Color(PRIMARY_TEXT.to_owned()),
+                ..Default::default()
+            },
+        );
+        let constraints = vec![
+            SimpleConstraint::SameHeight(vec![
+                container.entity_id.clone(),
+                left_line.entity_id.clone(),
+            ]),
+            SimpleConstraint::LeftOf(left_line.entity_id.clone(), container.entity_id.clone()),
+            SimpleConstraint::HorizontalSpacing(
+                left_line.entity_id.clone(),
+                container.entity_id.clone(),
+                SPACE_SM,
+            ),
+        ];
+        let e_container = builder.new_constraint_layout_container(
+            format!("{}_emp_container", id),
+            vec![(container, None), (left_line, None)],
+            constraints,
+        );
+        return Ok(e_container);
+    }
+
     Ok(container)
 }
 
@@ -11356,7 +11813,17 @@ pub fn create_document_title(
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
-    let toptions = match variant.as_str() {
+    document_title(id, builder, variant, content, container_width)
+}
+
+fn document_title(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    variant: String,
+    content: String,
+    container_width: f32,
+) -> Result<DiagramTreeNode, String> {
+    let mut toptions = match variant.as_str() {
         "h1" => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_3XL,
@@ -11392,6 +11859,15 @@ pub fn create_document_title(
             ..TextOptions::default()
         },
 
+        "h5" => TextOptions {
+            font_family: FONT_SANS.to_string(),
+            font_size: TEXT_BASE,
+            text_color: SECONDARY_TEXT.to_string(),
+            line_spacing: TEXT_BASE * 0.1,
+            font_weight: FONT_WEIGHT_BOLD_LIGHT,
+            ..TextOptions::default()
+        },
+
         _ => TextOptions {
             font_family: FONT_SANS.to_string(),
             font_size: TEXT_2XL,
@@ -11402,9 +11878,12 @@ pub fn create_document_title(
         },
     };
 
+    toptions.line_width =
+        calculate_optimal_line_width(&builder, &content, &toptions, container_width);
+
     let bottom_margin = toptions.line_spacing;
     let text = builder.new_text(format!("{}_text", id), content.as_str(), toptions);
-    let w_size = SizeBehavior::Fixed(container_width);
+    let w_size = SizeBehavior::Content;
     let coptions = BoxOptions {
         fill_color: Fill::Color("transparent".to_string()),
         stroke_color: "transparent".to_string(),
@@ -11433,6 +11912,107 @@ pub fn create_document_title(
 }
 
 /**
+ * Creates a vstack with horizontal alignment set to left
+ * and spacers between elements for better layout.
+ */
+pub fn create_vstack(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
+
+    let mut children = Vec::<DiagramTreeNode>::new();
+    for (_, elem) in children_ids.unwrap().iter().enumerate() {
+        let child_elem = parser.build(elem.as_str(), builder).ok();
+        if let Some(elem) = child_elem {
+            children.push(elem);
+        }
+    }
+
+    vstack(id, builder, parser, children)
+}
+
+/**
+ * Creates a vstack and adds spacers between all elements
+ */
+fn vstack(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+    children: Vec<DiagramTreeNode>,
+) -> Result<DiagramTreeNode, String> {
+    let mut final_children = Vec::<DiagramTreeNode>::new();
+
+    for (ix, elem) in children.iter().enumerate() {
+        final_children.push(elem.clone());
+        //add spacer
+        let spacer_id = format!("{}_spacer_{}", id, ix);
+        let spacer = builder.new_spacer(
+            spacer_id,
+            SpacerOptions {
+                width: 0.0,
+                height: SPACE_SM,
+                direction: SpacerDirection::Vertical,
+            },
+        );
+        final_children.push(spacer);
+    }
+
+    Ok(builder.new_vstack(id.to_string(), final_children, HorizontalAlignment::Left))
+}
+
+/**
+ * Creates a vstack with horizontal alignment set to left
+ * and spacers between elements for better layout.
+ */
+pub fn create_hstack(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
+
+    let mut children = Vec::<DiagramTreeNode>::new();
+    for (_, elem) in children_ids.unwrap().iter().enumerate() {
+        let child_elem = parser.build(elem.as_str(), builder).ok();
+        if let Some(elem) = child_elem {
+            children.push(elem);
+        }
+    }
+
+    hstack(id, builder, parser, children)
+}
+
+fn hstack(
+    id: &str,
+    builder: &mut DiagramBuilder,
+    parser: &JsonLinesParser,
+    children: Vec<DiagramTreeNode>,
+) -> Result<DiagramTreeNode, String> {
+    let mut final_children = Vec::<DiagramTreeNode>::new();
+
+    for (ix, elem) in children.iter().enumerate() {
+        final_children.push(elem.clone());
+        //add spacer
+        let spacer_id = format!("{}_spacer_{}", id, ix);
+        let spacer = builder.new_spacer(
+            spacer_id,
+            SpacerOptions {
+                width: SPACE_SM,
+                height: 0.0,
+                direction: SpacerDirection::Horizontal,
+            },
+        );
+        final_children.push(spacer);
+    }
+
+    Ok(builder.new_hstack(id.to_string(), final_children, VerticalAlignment::Top))
+}
+
+/**
  * Component useful for presenting a list of name/value property list
  */
 pub fn create_properties(
@@ -11442,12 +12022,14 @@ pub fn create_properties(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode, String> {
     let properties = get_properties(attrs, &["properties", "items"]);
+    let title = get_string_attr(attrs, &["title", "meta"], "");
+
     let table_opts = TableOptions {
         cell_padding: SPACE_SM,
         with_header: false,
-        border_color: BODY_COLOR.to_string(),
+        border_color: BORDER_LIGHT_COLOR.to_string(),
         border_width: 1,
-        fill_color: BG_ACCENT.to_string(),
+        fill_color: BG_SECONDARY.to_string(),
         ..Default::default()
     };
 
@@ -11465,14 +12047,34 @@ pub fn create_properties(
                 builder,
                 "small".into(),
                 value,
-                WIDTH_PROPERTY,
+                WIDTH_PROPERTY_PANEL,
             )
         })
         .filter_map(|v| v.ok())
         .collect();
 
-    let table = builder.new_table(format!("{}_table", id), cell_texts, 2, table_opts);
-    Ok(table)
+    let table_id = format!("{}_table", id);
+    let table = builder.new_table(table_id.clone(), cell_texts, 2, table_opts);
+    if title.len() == 0 {
+        return Ok(table);
+    } else {
+        let title_id = format!("{}_title", id);
+        // Return a document.vstack with the title and the table
+        let title = document_text(
+            title_id.as_str(),
+            builder,
+            // TODO: usar enum
+            "meta".to_string(),
+            title,
+            WIDTH_PROPERTY_PANEL,
+        );
+        //TODO: revisar uso de unwrap aqui,
+        let stack_children = vec![title, Ok(table)]
+            .iter()
+            .filter_map(|e| e.clone().ok())
+            .collect();
+        return vstack(id, builder, parser, stack_children);
+    }
 }
 
 /**
@@ -11657,18 +12259,7 @@ fn create_section_header(
             );
             header_children.push(meta_spacer);
         }
-
-        let meta_options = TextOptions {
-            font_family: FONT_SANS.to_string(),
-            font_size: TEXT_XS,
-            text_color: MUTED_TEXT.to_string(),
-            line_width: 100,
-            line_spacing: LINE_HEIGHT_NORMAL,
-            font_weight: 400,
-        };
-
-        let meta_node = builder.new_text(format!("{}_meta", id), meta, meta_options);
-
+        let meta_node = create_meta_text(builder, format!("{}_meta", id).as_str(), meta);
         header_children.push(meta_node);
     }
 
@@ -11680,6 +12271,18 @@ fn create_section_header(
     );
 
     Ok(header_vstack)
+}
+
+fn create_meta_text(builder: &mut DiagramBuilder, id: &str, text: &str) -> DiagramTreeNode {
+    let meta_options = TextOptions {
+        font_family: FONT_SANS.to_string(),
+        font_size: TEXT_XS,
+        text_color: MUTED_TEXT.to_string(),
+        line_width: 100,
+        line_spacing: LINE_HEIGHT_NORMAL,
+        font_weight: 400,
+    };
+    builder.new_text(id.to_string(), text, meta_options)
 }
 
 /**
@@ -11749,16 +12352,172 @@ fn create_columns_layout(
     Ok(columns_hstack)
 }
 
-// Don't forget to register the component in register_document_components:
-// builder.register_custom_component("document.section", create_document_section);
+/**
+ * Bullet List Component
+ *
+ * Creates a bulleted list with good typography and spacing
+ *
+ * Attributes:
+ * - items (array of strings): List items to display
+ * - width (optional): Width constraint (sm|md|lg|xl|full|number)
+ *
+ * Example JSONL:
+ * {"id":"my-list", "type":"bullet-list", "items":["First item","Second item","Third item"]}
+ */
+pub fn create_bullet_list(
+    id: &str,
+    attrs: &Map<String, Value>,
+    builder: &mut DiagramBuilder,
+    _: &JsonLinesParser,
+) -> Result<DiagramTreeNode, String> {
+    // Extract items array
+    let items = get_array_attr(attrs, "items");
+    let meta = get_string_attr(attrs, &["meta"], "");
 
-/// Register document components with a DiagramBuilder
+    if items.is_none() {
+        return Err("bullet-list requires 'items' attribute with at least one item".to_string());
+    }
+    let items = items.unwrap();
+
+    let container_width = get_width(attrs, &["width"], WIDTH_MD);
+
+    // Create list items
+    let mut list_children = Vec::new();
+
+    for (idx, item_text) in items.iter().enumerate() {
+        let item_node = create_list_item(
+            &format!("{}_item_{}", id, idx),
+            item_text,
+            "•", // Bullet character
+            builder,
+            container_width,
+        )?;
+
+        list_children.push(item_node);
+
+        // Add spacing between items (except after last item)
+        if idx < items.len() - 1 {
+            let item_spacer = builder.new_spacer(
+                format!("{}_item_spacer_{}", id, idx),
+                SpacerOptions {
+                    width: 0.0,
+                    height: SPACE_SM,
+                    direction: SpacerDirection::Vertical,
+                },
+            );
+            list_children.push(item_spacer);
+        }
+    }
+
+    // Wrap all items in a vertical stack
+    let list_vstack = builder.new_vstack(
+        format!("{}_list", id),
+        list_children,
+        HorizontalAlignment::Left,
+    );
+
+    // Add spacing after the entire list
+    let bottom_spacer = builder.new_spacer(
+        format!("{}_bottom_spacer", id),
+        SpacerOptions {
+            width: 0.0,
+            height: SPACE_MD,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let mut list_children = vec![list_vstack, bottom_spacer];
+
+    if meta.len() > 0 {
+        let meta_node = create_meta_text(builder, format!("{}_meta", id).as_str(), &meta);
+        list_children.insert(0, meta_node);
+    }
+
+    let list_with_spacing =
+        builder.new_vstack(id.to_string(), list_children, HorizontalAlignment::Left);
+
+    Ok(list_with_spacing)
+}
+
+/**
+ * Creates a single list item with bullet/number and text
+ */
+fn create_list_item(
+    id: &str,
+    text: &str,
+    marker: &str,
+    builder: &mut DiagramBuilder,
+    container_width: Float,
+) -> Result<DiagramTreeNode, String> {
+    // Create bullet/marker
+    let marker_options = TextOptions {
+        font_family: FONT_SANS.to_string(),
+        font_size: TEXT_BASE,
+        text_color: PRIMARY_TEXT.to_string(),
+        line_width: 20,
+        line_spacing: TEXT_BASE * 0.4,
+        font_weight: FONT_WEIGHT_NORMAL,
+    };
+
+    let marker_node = builder.new_text(format!("{}_marker", id), marker, marker_options);
+
+    // Create text content
+    let mut text_options = TextOptions {
+        font_family: FONT_SANS.to_string(),
+        font_size: TEXT_BASE,
+        text_color: PRIMARY_TEXT.to_string(),
+        line_spacing: TEXT_BASE * 0.4,
+        font_weight: FONT_WEIGHT_NORMAL,
+        ..Default::default()
+    };
+
+    text_options.line_width =
+        calculate_optimal_line_width(&builder, text, &text_options, container_width);
+
+    let text_node = builder.new_text(format!("{}_text", id), text, text_options);
+
+    // Wrap text in a box to control width
+    let text_box_options = BoxOptions {
+        fill_color: Fill::Color("transparent".to_string()),
+        stroke_color: "transparent".to_string(),
+        stroke_width: 0.0,
+        padding: 0.0,
+        border_radius: 0.0,
+        width_behavior: SizeBehavior::Content,
+        height_behavior: SizeBehavior::Content,
+        horizontal_alignment: HorizontalAlignment::Left,
+    };
+
+    let text_box = builder.new_box(format!("{}_text_box", id), text_node, text_box_options);
+
+    let spacer = builder.new_spacer(
+        format!("{}_spacer", id),
+        SpacerOptions {
+            width: SPACE_XS,
+            height: 0.0,
+            direction: SpacerDirection::Horizontal,
+        },
+    );
+
+    // Create horizontal stack with marker and text
+    let item_hstack = builder.new_hstack(
+        format!("{}_hstack", id),
+        vec![marker_node, spacer, text_box],
+        VerticalAlignment::Top,
+    );
+
+    Ok(item_hstack)
+}
+
 pub fn register_document_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("document", create_document_container);
+    builder.register_custom_component("document.hstack", create_hstack);
+    builder.register_custom_component("document.vstack", create_vstack);
     builder.register_custom_component("document.text", create_document_text);
     builder.register_custom_component("document.title", create_document_title);
     builder.register_custom_component("document.properties", create_properties);
     builder.register_custom_component("document.section", create_document_section);
+    builder.register_custom_component("document.bullet_list", create_bullet_list);
     println!("📄 Document component registered: 'document'");
 }
 

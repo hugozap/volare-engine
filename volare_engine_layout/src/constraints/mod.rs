@@ -1,5 +1,5 @@
 use crate::components::*;
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use cassowary::strength::{MEDIUM, REQUIRED, STRONG, WEAK};
 use cassowary::{AddEditVariableError, Constraint, Solver, Variable, WeightedRelation::*};
 use std::collections::HashMap;
@@ -45,12 +45,12 @@ pub enum SimpleConstraint {
     /// All entities should have the same size. First is reference.
     SameSize(Vec<EntityID>),
 
-     ProportionalWidth(EntityID, EntityID, Float),
+    ProportionalWidth(EntityID, EntityID, Float),
     /// First entity's height is proportional to second entity's height by the given ratio
     ProportionalHeight(EntityID, EntityID, Float),
     /// Maintain a specific aspect ratio (width/height) for an entity
     AspectRatio(EntityID, Float),
-    
+
     /// Fix an entity's width to a specific value
     FixedWidth(EntityID, Float),
     /// Fix an entity's height to a specific value
@@ -123,30 +123,49 @@ impl ConstraintSystem {
 
     pub fn add_constraint(&mut self, constraint: SimpleConstraint) -> Result<()> {
         match constraint {
-
             SimpleConstraint::FixedPosition(entity, x, y) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity);
+                if vars.is_none() {
+                    bail!("entity not registered in constraint system {}", entity);
+                }
+
+                let vars = vars.unwrap();
                 self.solver
                     .add_constraint(vars.x | EQ(REQUIRED) | x)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed position x constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed position x constraint: {:?}", e)
+                    })?;
                 self.solver
                     .add_constraint(vars.y | EQ(REQUIRED) | y)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed position y constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed position y constraint: {:?}", e)
+                    })?;
             }
 
-
-           SimpleConstraint::AlignLeft(entities) => {
+            SimpleConstraint::AlignLeft(entities) => {
                 if entities.len() < 2 {
                     return Err(anyhow::anyhow!("AlignLeft requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self.variables.get(reference);
+
+                if ref_vars.is_none() {
+                    bail!("entity not registered in constraint system {}", reference);
+                }
+
+                let ref_vars = ref_vars.unwrap();
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity);
+                    if vars.is_none() {
+                        bail!("entity not registered in constraint system {}", entity);
+                    }
+                    let vars = vars.unwrap();
                     self.solver
                         .add_constraint(vars.x | EQ(REQUIRED) | ref_vars.x)
-                        .map_err(|e| anyhow::anyhow!("Failed to add align left constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align left constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -155,15 +174,20 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignRight requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference).context(format!("entity not registered in constrain system {}", reference))?;
+                  
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(
-                            (vars.x + vars.width) | EQ(REQUIRED) | (ref_vars.x + ref_vars.width)
+                            (vars.x + vars.width) | EQ(REQUIRED) | (ref_vars.x + ref_vars.width),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align right constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align right constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -172,13 +196,18 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignTop requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.y | EQ(REQUIRED) | ref_vars.y)
-                        .map_err(|e| anyhow::anyhow!("Failed to add align top constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align top constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -187,90 +216,115 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignBottom requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(
-                            (vars.y + vars.height) | EQ(REQUIRED) | (ref_vars.y + ref_vars.height)
+                            (vars.y + vars.height) | EQ(REQUIRED) | (ref_vars.y + ref_vars.height),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align bottom constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align bottom constraint: {:?}", e)
+                        })?;
                 }
             }
 
             SimpleConstraint::AlignCenterHorizontal(entities) => {
                 if entities.len() < 2 {
-                    return Err(anyhow::anyhow!("AlignCenterHorizontal requires at least 2 entities"));
+                    return Err(anyhow::anyhow!(
+                        "AlignCenterHorizontal requires at least 2 entities"
+                    ));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(
                             (vars.x + vars.width * 0.5)
                                 | EQ(REQUIRED)
-                                | (ref_vars.x + ref_vars.width * 0.5)
+                                | (ref_vars.x + ref_vars.width * 0.5),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align center horizontal constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to add align center horizontal constraint: {:?}",
+                                e
+                            )
+                        })?;
                 }
             }
 
             SimpleConstraint::AlignCenterVertical(entities) => {
                 if entities.len() < 2 {
-                    return Err(anyhow::anyhow!("AlignCenterVertical requires at least 2 entities"));
+                    return Err(anyhow::anyhow!(
+                        "AlignCenterVertical requires at least 2 entities"
+                    ));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("Entity not found")?;
                     self.solver
                         .add_constraint(
                             (vars.y + vars.height * 0.5)
                                 | EQ(REQUIRED)
-                                | (ref_vars.y + ref_vars.height * 0.5)
+                                | (ref_vars.y + ref_vars.height * 0.5),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align center vertical constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to add align center vertical constraint: {:?}",
+                                e
+                            )
+                        })?;
                 }
             }
 
             SimpleConstraint::RightOf(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.x | GE(REQUIRED) | vars2.x + vars2.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
             }
 
             SimpleConstraint::LeftOf(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.x | LE(REQUIRED) | vars2.x - vars1.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add leftOf constraint: {:?}", e))?;
             }
 
             SimpleConstraint::Below(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y + vars2.height)
                     .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
             SimpleConstraint::Above(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y - vars2.height)
                     .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
 
             SimpleConstraint::HorizontalSpacing(id1, id2, spacing) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // Horizontal spacing: gap between right edge of first and left edge of second
                 // x2 = x1 + width1 + spacing
                 self.solver
@@ -281,8 +335,8 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::VerticalSpacing(id1, id2, spacing) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // Vertical spacing: gap between bottom edge of first and top edge of second
                 // y2 = y1 + height1 + spacing
                 self.solver
@@ -293,32 +347,40 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::FixedWidth(entity, width) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.width | EQ(REQUIRED) | width)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed width constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed width constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::FixedHeight(entity, height) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.height | EQ(REQUIRED) | height)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed height constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed height constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::FixedSize(entity, width, height) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.width | EQ(REQUIRED) | width)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed size width constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed size width constraint: {:?}", e)
+                    })?;
                 self.solver
                     .add_constraint(vars.height | EQ(REQUIRED) | height)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed size height constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed size height constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::FixedDistance(id1, id2, distance) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
 
                 // Fixed distance between centers of two entities
                 // Distance = sqrt((cx2 - cx1)² + (cy2 - cy1)²)
@@ -400,18 +462,23 @@ impl ConstraintSystem {
                         anyhow::anyhow!("Failed to add manhattan distance constraint: {:?}", e)
                     })?;
             }
-             SimpleConstraint::SameWidth(entities) => {
+            SimpleConstraint::SameWidth(entities) => {
                 if entities.len() < 2 {
                     return Err(anyhow::anyhow!("SameWidth requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.width | EQ(REQUIRED) | ref_vars.width)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same width constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same width constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -420,13 +487,18 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("SameHeight requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.height | EQ(REQUIRED) | ref_vars.height)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same height constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -435,22 +507,29 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("SameSize requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.width | EQ(REQUIRED) | ref_vars.width)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same size width constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same size width constraint: {:?}", e)
+                        })?;
                     self.solver
                         .add_constraint(vars.height | EQ(REQUIRED) | ref_vars.height)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same size height constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same size height constraint: {:?}", e)
+                        })?;
                 }
             }
 
             SimpleConstraint::ProportionalWidth(id1, id2, ratio) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // First entity's width = second entity's width * ratio
                 // width1 = width2 * ratio
                 self.solver
@@ -461,8 +540,8 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::ProportionalHeight(id1, id2, ratio) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // First entity's height = second entity's height * ratio
                 // height1 = height2 * ratio
                 self.solver
@@ -473,7 +552,7 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::AspectRatio(id, ratio) => {
-                let vars = self.variables.get(&id).expect("Entity not found");
+                let vars = self.variables.get(&id).context("entity not found")?;
                 // Maintain aspect ratio: width / height = ratio
                 // Rearranged: width = height * ratio
                 self.solver
@@ -484,7 +563,7 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::StackHorizontal(entities, spacing) => {
-                 let spacing = spacing.unwrap_or(0.0);
+                let spacing = spacing.unwrap_or(0.0);
                 if entities.is_empty() {
                     return Err(anyhow::anyhow!(
                         "StackHorizontal requires at least 1 entity"
@@ -497,11 +576,11 @@ impl ConstraintSystem {
                     let prev_vars = self
                         .variables
                         .get(&entities[i - 1])
-                        .expect("Previous entity not found");
+                        .context("Previous entity not found")?;
                     let curr_vars = self
                         .variables
                         .get(&entities[i])
-                        .expect("Current entity not found");
+                        .context("Current entity not found")?;
 
                     // Current entity starts where previous entity ends plus spacing
                     self.solver
@@ -515,7 +594,7 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::StackVertical(entities, spacing) => {
-                 let spacing = spacing.unwrap_or(0.0);
+                let spacing = spacing.unwrap_or(0.0);
                 if entities.is_empty() {
                     return Err(anyhow::anyhow!("StackVertical requires at least 1 entity"));
                 }
@@ -526,11 +605,11 @@ impl ConstraintSystem {
                     let prev_vars = self
                         .variables
                         .get(&entities[i - 1])
-                        .expect("Previous entity not found");
+                        .context("Previous entity not found")?;
                     let curr_vars = self
                         .variables
                         .get(&entities[i])
-                        .expect("Current entity not found");
+                        .context("Current entity not found")?;
 
                     // Current entity starts where previous entity ends plus spacing
                     self.solver
