@@ -20,6 +20,7 @@ use crate::*;
 use serde_json::{from_value, Map, Value};
 use uuid::fmt::Simple;
 use uuid::uuid;
+use anyhow::{bail, Result};
 
 /// Document Style Constants
 /// These constants define a consistent design system for document components
@@ -183,7 +184,7 @@ pub fn create_document_container(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut children = Vec::new();
     let header_id = get_string_attr(attrs, &["header_id"], "");
     let content_id = get_string_attr(attrs, &["content_id"], "");
@@ -207,19 +208,25 @@ pub fn create_document_container(
         children.push(header_container);
     }
 
-    if let Ok(content_child) = parser.build(&content_id, builder) {
-        let mut content_options = BoxOptions::new();
-        content_options.padding = PADDING_NORMAL;
-        content_options.fill_color = Fill::Color(BG_PRIMARY.to_string());
-        content_options.stroke_width = 0.0;
-        content_options.stroke_color = BG_PRIMARY.to_string();
+    match parser.build(&content_id, builder) {
+        Ok(content_child) => {
+            let mut content_options = BoxOptions::new();
+            content_options.padding = PADDING_NORMAL;
+            content_options.fill_color = Fill::Color(BG_PRIMARY.to_string());
+            content_options.stroke_width = 0.0;
+            content_options.stroke_color = BG_PRIMARY.to_string();
 
-        let content_container = builder.new_box(
-            format!("{}_content_container", &id),
-            content_child,
-            content_options,
-        );
-        children.push(content_container);
+            let content_container = builder.new_box(
+                format!("{}_content_container", &id),
+                content_child,
+                content_options,
+            );
+            children.push(content_container);
+        }
+        Err(err) => {
+            println!("Error with parser.build {}, {}", content_id, err);
+            bail!(err.to_string());
+        }
     }
 
     if let Ok(footer_child) = parser.build(&footer_id, builder) {
@@ -234,6 +241,7 @@ pub fn create_document_container(
             footer_child,
             footer_options,
         );
+
         children.push(footer_container);
     }
 
@@ -259,7 +267,7 @@ pub fn create_document_text(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     attrs.clone().iter().for_each(|(k, v)| {
         println!("k,v: {},{}", k, v);
     });
@@ -276,7 +284,7 @@ pub fn document_text(
     variant: String,
     content: String,
     max_width: f32,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut toptions = match variant.as_str() {
         "xlarge" => TextOptions {
             font_family: FONT_SANS.to_string(),
@@ -376,7 +384,7 @@ pub fn create_document_title(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
@@ -389,7 +397,7 @@ fn document_title(
     variant: String,
     content: String,
     container_width: f32,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut toptions = match variant.as_str() {
         "h1" => TextOptions {
             font_family: FONT_SANS.to_string(),
@@ -487,7 +495,7 @@ pub fn create_vstack(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
 
     let mut children = Vec::<DiagramTreeNode>::new();
@@ -509,7 +517,7 @@ fn vstack(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
     children: Vec<DiagramTreeNode>,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
     for (ix, elem) in children.iter().enumerate() {
@@ -539,7 +547,7 @@ pub fn create_hstack(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
 
     let mut children = Vec::<DiagramTreeNode>::new();
@@ -558,7 +566,7 @@ fn hstack(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
     children: Vec<DiagramTreeNode>,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
     for (ix, elem) in children.iter().enumerate() {
@@ -587,7 +595,7 @@ pub fn create_properties(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let properties = get_properties(attrs, &["properties", "items"]);
     let title = get_string_attr(attrs, &["title", "meta"], "");
 
@@ -635,12 +643,13 @@ pub fn create_properties(
             title,
             WIDTH_PROPERTY_PANEL,
         );
-        //TODO: revisar uso de unwrap aqui,
-        let stack_children = vec![title, Ok(table)]
-            .iter()
-            .filter_map(|e| e.clone().ok())
-            .collect();
-        return vstack(id, builder, parser, stack_children);
+
+        let mut children = Vec::<DiagramTreeNode>::new();
+        if let Ok(title) = title {
+            children.push(title)
+        }
+        children.push(table);
+        return vstack(id, builder, parser, children);
     }
 }
 
@@ -717,7 +726,7 @@ pub fn create_document_section(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut section_children = Vec::new();
 
     // Extract attributes
@@ -784,7 +793,7 @@ fn create_section_header(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
     width: Float,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut header_children = Vec::new();
 
     // Create title if present using document.title component
@@ -860,7 +869,7 @@ fn create_columns_layout(
     column_ids: &[String],
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut column_nodes = Vec::new();
 
     for (idx, column_id) in column_ids.iter().enumerate() {
@@ -906,7 +915,7 @@ fn create_columns_layout(
     }
 
     if column_nodes.is_empty() {
-        return Err("No valid columns found in section".to_string());
+        bail!("No valid columns found in section");
     }
 
     // Create horizontal stack for columns
@@ -936,13 +945,13 @@ pub fn create_bullet_list(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     _: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     // Extract items array
     let items = get_array_attr(attrs, "items");
     let meta = get_string_attr(attrs, &["meta"], "");
 
     if items.is_none() {
-        return Err("bullet-list requires 'items' attribute with at least one item".to_string());
+        bail!("bullet-list requires 'items' attribute with at least one item");
     }
     let items = items.unwrap();
 
@@ -1015,7 +1024,7 @@ fn create_list_item(
     marker: &str,
     builder: &mut DiagramBuilder,
     container_width: Float,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     // Create bullet/marker
     let marker_options = TextOptions {
         font_family: FONT_SANS.to_string(),

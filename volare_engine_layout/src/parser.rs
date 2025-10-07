@@ -6,6 +6,8 @@ use std::io::{BufRead, BufReader, Write};
 
 use crate::transform::Transform;
 use crate::{components::*, diagram_builder::*, DiagramBuilder, SimpleConstraint};
+use anyhow::{Context, Result,Error, bail};
+use thiserror::Error;
 
 /// Simplified JSON Lines entity with only essential fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,44 +96,29 @@ pub enum ConstraintDeclaration {
 
 fn convert_constraint_declaration(
     decl: &ConstraintDeclaration,
-) -> Result<SimpleConstraint, JsonLinesError> {
+) -> Result<SimpleConstraint> {
     match decl {
         ConstraintDeclaration::AlignLeft { entities } => {
-            Ok(SimpleConstraint::AlignLeft(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignLeft(entities.to_vec()))
         }
         ConstraintDeclaration::AlignRight { entities } => {
-            Ok(SimpleConstraint::AlignRight(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignRight(entities.to_vec()))
         }
         ConstraintDeclaration::AlignTop { entities } => {
-            Ok(SimpleConstraint::AlignTop(
-              entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignTop(entities.to_vec()))
         }
         ConstraintDeclaration::AlignBottom { entities } => {
-            Ok(SimpleConstraint::AlignBottom(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignBottom(entities.to_vec()))
         }
         ConstraintDeclaration::AlignCenterHorizontal { entities } => {
-
-            Ok(SimpleConstraint::AlignCenterHorizontal(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignCenterHorizontal(entities.to_vec()))
         }
         ConstraintDeclaration::AlignCenterVertical { entities } => {
-            Ok(SimpleConstraint::AlignCenterVertical(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignCenterVertical(entities.to_vec()))
         }
         ConstraintDeclaration::RightOf { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "right_of requires exactly 2 entities".to_string(),
-                ));
+                bail!("right_of requires exactly 2 entities");
             }
             Ok(SimpleConstraint::RightOf(
                 entities[0].clone(),
@@ -140,9 +127,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::LeftOf { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "left_of requires exactly 2 entities".to_string(),
-                ));
+                bail!("left_of requires exactly 2 entities");
             }
             Ok(SimpleConstraint::LeftOf(
                 entities[0].clone(),
@@ -151,9 +136,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::Above { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "above requires exactly 2 entities".to_string(),
-                ));
+                bail!("above requires exactly 2 entities")
             }
             Ok(SimpleConstraint::Above(
                 entities[0].clone(),
@@ -162,9 +145,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::Below { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "below requires exactly 2 entities".to_string(),
-                ));
+                bail!("below requires exactly 2 entities");
             }
             Ok(SimpleConstraint::Below(
                 entities[0].clone(),
@@ -173,9 +154,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::HorizontalSpacing { entities, spacing } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "horizontal_spacing requires exactly 2 entities".to_string(),
-                ));
+               bail!("horizontal_spacing requires exactly 2 entities");
             }
             Ok(SimpleConstraint::HorizontalSpacing(
                 entities[0].clone(),
@@ -185,9 +164,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::VerticalSpacing { entities, spacing } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "vertical_spacing requires exactly 2 entities".to_string(),
-                ));
+                bail!("vertical_spacing requires exactly 2 entities");
             }
             Ok(SimpleConstraint::VerticalSpacing(
                 entities[0].clone(),
@@ -197,9 +174,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::StackHorizontal { entities, spacing } => {
             if entities.len() < 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "stack_horizontal requires at least 2 entities".to_string(),
-                ));
+               bail!("stack_horizontal requires at least 2 entities");
             }
             Ok(SimpleConstraint::StackHorizontal(
                 entities.clone(),
@@ -208,17 +183,16 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::StackVertical { entities, spacing } => {
             if entities.len() < 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "stack_vertical requires at least 2 entities".to_string(),
-                ));
+                bail!("stack_vertical requires at least 2 entities");
             }
-            Ok(SimpleConstraint::StackVertical(entities.clone(), Some(*spacing)))
+            Ok(SimpleConstraint::StackVertical(
+                entities.clone(),
+                Some(*spacing),
+            ))
         }
         ConstraintDeclaration::FixedDistance { entities, distance } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "fixed_distance requires exactly 2 entities".to_string(),
-                ));
+                bail!("fixed_distance requires exactly 2 entities");
             }
             Ok(SimpleConstraint::FixedDistance(
                 entities[0].clone(),
@@ -227,26 +201,17 @@ fn convert_constraint_declaration(
             ))
         }
         ConstraintDeclaration::SameWidth { entities } => {
-    
-            Ok(SimpleConstraint::SameWidth(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::SameWidth(entities.to_vec()))
         }
         ConstraintDeclaration::SameHeight { entities } => {
-            Ok(SimpleConstraint::SameHeight(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::SameHeight(entities.to_vec()))
         }
         ConstraintDeclaration::SameSize { entities } => {
-            Ok(SimpleConstraint::SameSize(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::SameSize(entities.to_vec()))
         }
         ConstraintDeclaration::ProportionalWidth { entities, ratio } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "proportional_width requires exactly 2 entities".to_string(),
-                ));
+                bail!("proportional_width requires exactly 2 entities");
             }
             Ok(SimpleConstraint::ProportionalWidth(
                 entities[0].clone(),
@@ -256,9 +221,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::ProportionalHeight { entities, ratio } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "proportional_height requires exactly 2 entities".to_string(),
-                ));
+                bail!("proportional_height requires exactly 2 entities");
             }
             Ok(SimpleConstraint::ProportionalHeight(
                 entities[0].clone(),
@@ -580,7 +543,7 @@ impl JsonLinesParser {
         &self,
         root_id: &str,
         builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode, JsonLinesError> {
+    ) -> Result<DiagramTreeNode> {
         self.build_entity(root_id, builder)
     }
 
@@ -588,8 +551,7 @@ impl JsonLinesParser {
         &self,
         entity_id: &str,
         builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode, JsonLinesError> {
-
+    ) -> Result<DiagramTreeNode> {
         println!("*** building entity {} ***", entity_id);
         let entity = self
             .entities
@@ -601,12 +563,10 @@ impl JsonLinesParser {
         let attributes = entity.attributes.clone();
         println!("Attributes length {}", attributes.len());
 
-
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
             return builder
                 .create_custom_component(&entity_id, &component_type, &attributes, &self)
-                .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 
         // Handle built-in components using attribute helpers
@@ -635,9 +595,7 @@ impl JsonLinesParser {
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
-                    return Err(JsonLinesError::MissingAttribute(
-                        "content or text".to_string(),
-                    ));
+                   bail!("Missing attribute content or text");
                 }
 
                 let options = TextOptions {
@@ -647,7 +605,12 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
-                    font_weight: str::parse(&get_string_attr(&entity.attributes, &["font_weight"], "400")).unwrap(),
+                    font_weight: str::parse(&get_string_attr(
+                        &entity.attributes,
+                        &["font_weight"],
+                        "400",
+                    ))
+                    .unwrap(),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
@@ -664,9 +627,7 @@ impl JsonLinesParser {
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
                 if children.len() != 1 {
-                    return Err(JsonLinesError::InvalidStructure(
-                        "Box must have exactly one child".to_string(),
-                    ));
+                    bail!("Box must have exactly one child");
                 }
 
                 let child = self.build_entity(&children[0], builder)?;
@@ -724,15 +685,23 @@ impl JsonLinesParser {
                 let children = get_array_attr(&entity.attributes, "children")
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
-                let child_nodes: Result<Vec<_>, _> = children
+                let child_nodes: Vec<_> = children
                     .iter()
-                    .map(|child_id| self.build_entity(child_id, builder))
+                    .filter_map(|child_id| {
+                        match self.build_entity(child_id, builder) {
+                            Ok(node) => Some(node),
+                            Err(e) => {
+                                eprintln!("Warning: Failed to build child '{}': {}", child_id, e);
+                                None // Skip this child, continue with others
+                            }
+                        }
+                    })
                     .collect();
 
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_vstack(entity_id.to_string(), child_nodes?, halign))
+                Ok(builder.new_vstack(entity_id.to_string(), child_nodes, halign))
             }
 
             "hstack" => {
@@ -752,29 +721,46 @@ impl JsonLinesParser {
                 let children = get_array_attr(&entity.attributes, "children")
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
-                let child_nodes: Result<Vec<_>, _> = children
+                let child_nodes: Vec<_> = children
                     .iter()
-                    .map(|child_id| self.build_entity(child_id, builder))
+                    .filter_map(|child_id| {
+                        match self.build_entity(child_id, builder) {
+                            Ok(node) => Some(node),
+                            Err(e) => {
+                                eprintln!("Warning: Failed to build child '{}': {}", child_id, e);
+                                None // Skip this child, continue with others
+                            }
+                        }
+                    })
                     .collect();
 
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_hstack(entity_id.to_string(), child_nodes?, valign))
+                Ok(builder.new_hstack(entity_id.to_string(), child_nodes, valign))
             }
 
             "group" => {
                 let children = get_array_attr(&entity.attributes, "children")
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
-                let child_nodes: Result<Vec<_>, _> = children
+                let child_nodes: Vec<_> = children
                     .iter()
-                    .map(|child_id| self.build_entity(child_id, builder))
+                    .filter_map(|child_id| {
+                        match self.build_entity(child_id, builder) {
+                            Ok(node) => Some(node),
+                            Err(e) => {
+                                eprintln!("Warning: Failed to build child '{}': {}", child_id, e);
+                                None // Skip this child, continue with others
+                            }
+                        }
+                    })
                     .collect();
+
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_group(entity_id.to_string(), child_nodes?))
+                Ok(builder.new_group(entity_id.to_string(), child_nodes))
             }
 
             "rect" => {
@@ -986,7 +972,7 @@ impl JsonLinesParser {
                 } else {
                     Err(JsonLinesError::MissingAttribute(
                         "src or file_path".to_string(),
-                    ))
+                    ).into())
                 }
             }
 
@@ -1087,23 +1073,25 @@ impl JsonLinesParser {
                 }
 
                 let mut children_with_pos = Vec::new();
+
                 for child_id in children {
                     let _child_entity = self
                         .entities
                         .get(&child_id)
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
 
-                    let child_node = self.build_entity(&child_id, builder)?;
-                    let pos = builder.get_container_relative_position(&child_id);
+                    if let Ok(child_node) = self.build_entity(&child_id, builder) {
+                        let pos = builder.get_container_relative_position(&child_id);
 
-                    // For constraint containers, position is optional (constraints determine positioning)
-                    let suggest_pos = if pos.x != 0.0 || pos.y != 0.0 {
-                        Some(pos)
-                    } else {
-                        None
-                    };
+                        // For constraint containers, position is optional (constraints determine positioning)
+                        let suggest_pos = if pos.x != 0.0 || pos.y != 0.0 {
+                            Some(pos)
+                        } else {
+                            None
+                        };
 
-                    children_with_pos.push((child_node, suggest_pos));
+                        children_with_pos.push((child_node, suggest_pos));
+                    }
                 }
 
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
@@ -1116,7 +1104,7 @@ impl JsonLinesParser {
             }
             _ => Err(JsonLinesError::UnknownEntityType(
                 entity.entity_type.clone(),
-            )),
+            ).into()),
         }
     }
 
@@ -1314,7 +1302,8 @@ impl JsonLinesBuilder {
     }
 }
 
-#[derive(Debug)]
+
+#[derive( Debug)]
 pub enum JsonLinesError {
     ParseError { line: usize, message: String },
     EntityNotFound(String),
@@ -1399,7 +1388,7 @@ mod tests {
         fn test_component(
             attrs: &Map<String, Value>,
             _builder: &mut DiagramBuilder,
-        ) -> Result<DiagramTreeNode, String> {
+        ) -> Result<DiagramTreeNode> {
             // Should be able to access any attribute
             assert!(attrs.contains_key("custom_prop"));
             assert!(attrs.contains_key("width"));
@@ -1604,7 +1593,7 @@ impl JsonLinesParser {
         &mut self,
         entity_id: &str,
         builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode, JsonLinesError> {
+    ) -> Result<DiagramTreeNode> {
         println!("🏗️ Building entity: {}", entity_id);
 
         let entity = self
