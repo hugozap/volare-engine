@@ -110,6 +110,9 @@ pub fn create_ishikawa(
                     vec![
                         BranchItem::new("Falta cursos".to_string()),
                         BranchItem::new("Sin presupuesto".to_string()),
+                        BranchItem::new("Otro item".to_string()),
+                        BranchItem::new("otro más".to_string()),
+                        BranchItem::new("Sin presupuesto 22".to_string()),
                     ],
                 ),
                 BranchItem::new("Alta rotación".to_string()),
@@ -172,7 +175,6 @@ pub fn create_ishikawa(
 
         // Vertical constraint: branch above spine
         constraints.push(SimpleConstraint::Above(branch_id.clone(), spine_id.clone()));
-
     }
 
     // Bottom branches
@@ -191,7 +193,6 @@ pub fn create_ishikawa(
 
         // Vertical constraint: branch below spine
         constraints.push(SimpleConstraint::Below(branch_id.clone(), spine_id.clone()));
-
     }
 
     // Distribuir horizontalmente las ramas SUPERIORES
