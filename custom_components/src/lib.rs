@@ -6,6 +6,7 @@ pub use volare_engine_layout::*;
 
 // Component modules
 pub mod document;
+pub mod diagrams;
 // You can add more component domains here as you create them:
 // pub mod business_process;
 // pub mod technical_diagrams;
@@ -18,5 +19,7 @@ pub mod document;
 pub fn register_all_components(builder: &mut DiagramBuilder) {
    
     document::register_document_components(builder);
+    diagrams::register_diagram_components(builder);
+
     println!("All component libraries registered successfully!");
 }
