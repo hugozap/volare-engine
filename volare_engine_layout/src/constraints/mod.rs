@@ -174,10 +174,10 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignRight requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self
-                    .variables
-                    .get(reference).context(format!("entity not registered in constrain system {}", reference))?;
-                  
+                let ref_vars = self.variables.get(reference).context(format!(
+                    "entity not registered in constrain system {}",
+                    reference
+                ))?;
 
                 for entity in entities.iter().skip(1) {
                     let vars = self.variables.get(entity).context("entity not found")?;
@@ -317,11 +317,11 @@ impl ConstraintSystem {
             SimpleConstraint::Above(id1, id2) => {
                 let vars1 = self.variables.get(&id1).context("entity not found")?;
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
+                // id1 está arriba de id2: id1.y + id1.height = id2.y
                 self.solver
-                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y - vars2.height)
-                    .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
+                    .add_constraint((vars1.y + vars1.height) | EQ(REQUIRED) | vars2.y)
+                    .map_err(|e| anyhow::anyhow!("Failed to add above constraint: {:?}", e))?;
             }
-
             SimpleConstraint::HorizontalSpacing(id1, id2, spacing) => {
                 let vars1 = self.variables.get(&id1).context("entity not found")?;
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
