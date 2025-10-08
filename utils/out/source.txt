@@ -2853,14 +2853,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&output_dir)?;
 
     let input = r##"
-{"id":"doc","type":"document","header_id":"header","content_id":"content","footer_id":"footer"}
-{"id":"header","type":"document.title","text":"Partes del Motor de una Motocicleta","variant":"h1","width":"800"}
-{"id":"content","type":"table","cols":2,"children":["cilindro_cell"],"border_color":"#333","border_width":1,"cell_padding":15}
-{"id":"cilindro_cell","type":"vstack","children":["cilindro_title","cilindro_props"],"h_align":"left"}
-{"id":"cilindro_title","type":"document.title","text":"Cilindro","variant":"h3","width":"350"}
-{"id":"cilindro_props","type":"document.properties","properties":[["Función","Contiene el pistón y la combustión"],["Material","Aluminio o hierro fundido"],["Tipo","Monocilíndrico o multicilíndrico"],["Refrigeración","Aire o líquido"]]}
-{"id":"footer","type":"document.text","text":"Cada componente del motor trabaja en sincronía para convertir la energía química del combustible en movimiento mecánico.","variant":"subtle","width":"800"}
-"##;
+{"id":"root","type":"document","header_id":"header","content_id":"content","footer_id":"footer"}
+{"id":"header","type":"document.text","text":"Cause & Effect (Ishikawa) Diagram — Example","variant":"large","width":"full"}
+{"id":"content","type":"document.section","title":"Fishbone Diagram — Constraint Layout Example","meta":"Example data illustrating primary causes and sub-causes","columns":["diagram_container"]}
+{"id":"footer","type":"document.text","text":"Generated example fishbone diagram — problem, primary causes, and sub-causes.","variant":"small","width":"full"}
+{"id":"spine","type":"rect","width":700,"height":6,"fill":"#333","border_radius":3,"x":100,"y":297}
+{"id":"problem_box","type":"rect","width":200,"height":80,"fill":"#ffdddd","border_color":"#cc6666","border_width":2,"border_radius":8,"x":820,"y":257}
+{"id":"problem_text","type":"text","content":"Late Deliveries","font_size":16,"color":"#800000","line_width":180,"x":920,"y":297,"text_anchor":"middle"}
+{"id":"bone_u1_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-35,"x":250,"y":210,"transform_origin":"right center"}
+{"id":"bone_u1_label","type":"text","content":"People","font_size":13,"color":"#333","font_weight":"bold","x":120,"y":165}
+{"id":"bone_u1_c1","type":"text","content":"Staff shortages","font_size":10,"color":"#444","x":70,"y":185}
+{"id":"bone_u1_c2","type":"text","content":"Insufficient training","font_size":10,"color":"#444","x":70,"y":198}
+{"id":"bone_u2_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-23,"x":320,"y":245,"transform_origin":"right center"}
+{"id":"bone_u2_label","type":"text","content":"Process","font_size":13,"color":"#333","font_weight":"bold","x":180,"y":215}
+{"id":"bone_u2_c1","type":"text","content":"Complex approvals","font_size":10,"color":"#444","x":120,"y":232}
+{"id":"bone_u2_c2","type":"text","content":"Unclear workflows","font_size":10,"color":"#444","x":120,"y":245}
+{"id":"bone_u3_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-15,"x":400,"y":270,"transform_origin":"right center"}
+{"id":"bone_u3_label","type":"text","content":"Equipment","font_size":13,"color":"#333","font_weight":"bold","x":260,"y":250}
+{"id":"bone_u3_c1","type":"text","content":"Tool breakdowns","font_size":10,"color":"#444","x":200,"y":265}
+{"id":"bone_u3_c2","type":"text","content":"Maintenance delays","font_size":10,"color":"#444","x":200,"y":278}
+{"id":"bone_u4_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-8,"x":540,"y":288,"transform_origin":"right center"}
+{"id":"bone_u4_label","type":"text","content":"Materials","font_size":13,"color":"#333","font_weight":"bold","x":400,"y":275}
+{"id":"bone_u4_c1","type":"text","content":"Supplier delays","font_size":10,"color":"#444","x":350,"y":288}
+{"id":"bone_u4_c2","type":"text","content":"Quality issues","font_size":10,"color":"#444","x":350,"y":301}
+{"id":"bone_l1_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":35,"x":250,"y":384,"transform_origin":"right center"}
+{"id":"bone_l1_label","type":"text","content":"Measurements","font_size":13,"color":"#333","font_weight":"bold","x":100,"y":415}
+{"id":"bone_l1_c1","type":"text","content":"Poor KPIs","font_size":10,"color":"#444","x":70,"y":395}
+{"id":"bone_l1_c2","type":"text","content":"Infrequent monitoring","font_size":10,"color":"#444","x":70,"y":408}
+{"id":"bone_l2_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":23,"x":320,"y":349,"transform_origin":"right center"}
+{"id":"bone_l2_label","type":"text","content":"Environment","font_size":13,"color":"#333","font_weight":"bold","x":160,"y":365}
+{"id":"bone_l2_c1","type":"text","content":"Site constraints","font_size":10,"color":"#444","x":120,"y":348}
+{"id":"bone_l2_c2","type":"text","content":"Logistics bottlenecks","font_size":10,"color":"#444","x":120,"y":361}
+{"id":"bone_l3_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":15,"x":400,"y":324,"transform_origin":"right center"}
+{"id":"bone_l3_label","type":"text","content":"Methods","font_size":13,"color":"#333","font_weight":"bold","x":260,"y":335}
+{"id":"bone_l3_c1","type":"text","content":"Manual handoffs","font_size":10,"color":"#444","x":200,"y":318}
+{"id":"bone_l3_c2","type":"text","content":"Lack of standard work","font_size":10,"color":"#444","x":200,"y":331}
+{"id":"bone_l4_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":8,"x":540,"y":306,"transform_origin":"right center"}
+{"id":"bone_l4_label","type":"text","content":"Management","font_size":13,"color":"#333","font_weight":"bold","x":380,"y":315}
+{"id":"bone_l4_c1","type":"text","content":"Unrealistic deadlines","font_size":10,"color":"#444","x":350,"y":295}
+{"id":"bone_l4_c2","type":"text","content":"Poor communication","font_size":10,"color":"#444","x":350,"y":308}
+{"id":"diagram_container","type":"vstack","children":["spine","problem_box","problem_text","bone_u1_line","bone_u1_label","bone_u1_c1","bone_u1_c2","bone_u2_line","bone_u2_label","bone_u2_c1","bone_u2_c2","bone_u3_line","bone_u3_label","bone_u3_c1","bone_u3_c2","bone_u4_line","bone_u4_label","bone_u4_c1","bone_u4_c2","bone_l1_line","bone_l1_label","bone_l1_c1","bone_l1_c2","bone_l2_line","bone_l2_label","bone_l2_c1","bone_l2_c2","bone_l3_line","bone_l3_label","bone_l3_c1","bone_l3_c2","bone_l4_line","bone_l4_label","bone_l4_c1","bone_l4_c2"]} "##;
 
  // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
@@ -3821,6 +3853,7 @@ textwrap = "0.16.2"
 cassowary = "0.3"
 anyhow = "1.0.99"
 uuid = { version = "1.8", features = ["v4"] }
+thiserror = "2.0.17"
 
 
 ===/Cargo.lock===
@@ -4353,7 +4386,7 @@ Renders text content with styling options.
 Wraps another element with padding, background, and border.
 
 **Required Attributes:**
-- `children` (array) - Array with exactly one child element ID
+- `children` (array) - Array with **exactly** one child element ID
 
 **Optional Attributes:**
 - `padding` (number) - Inner padding (default: 0)
@@ -4368,6 +4401,8 @@ Wraps another element with padding, background, and border.
 ```json
 {"id":"container","type":"box","padding":10,"background":"lightblue","children":["text1"]}
 ```
+
+NOTE: **The children array of a box MUST have only one element**
 
 ### Rectangle (`"type": "rect"`)
 Draws a rectangle shape.
@@ -4691,6 +4726,8 @@ This creates a document layout with header, sidebar navigation, main content are
 
 ## Overview
 This JSONL format is designed specifically for declaring constraint layout containers in your system. Since constraints are only supported within constraint layout containers, the format focuses on defining the container and its child entities with their associated constraints.
+
+Note: Constraints can **ONLY** be used with a `constraint_container` container type
 
 ## Container Declaration Format
 
@@ -6086,7 +6123,7 @@ fn test_box_fixed_size() {
 
 ===/src/constraints/mod.rs===
 use crate::components::*;
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use cassowary::strength::{MEDIUM, REQUIRED, STRONG, WEAK};
 use cassowary::{AddEditVariableError, Constraint, Solver, Variable, WeightedRelation::*};
 use std::collections::HashMap;
@@ -6132,12 +6169,12 @@ pub enum SimpleConstraint {
     /// All entities should have the same size. First is reference.
     SameSize(Vec<EntityID>),
 
-     ProportionalWidth(EntityID, EntityID, Float),
+    ProportionalWidth(EntityID, EntityID, Float),
     /// First entity's height is proportional to second entity's height by the given ratio
     ProportionalHeight(EntityID, EntityID, Float),
     /// Maintain a specific aspect ratio (width/height) for an entity
     AspectRatio(EntityID, Float),
-    
+
     /// Fix an entity's width to a specific value
     FixedWidth(EntityID, Float),
     /// Fix an entity's height to a specific value
@@ -6210,30 +6247,49 @@ impl ConstraintSystem {
 
     pub fn add_constraint(&mut self, constraint: SimpleConstraint) -> Result<()> {
         match constraint {
-
             SimpleConstraint::FixedPosition(entity, x, y) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity);
+                if vars.is_none() {
+                    bail!("entity not registered in constraint system {}", entity);
+                }
+
+                let vars = vars.unwrap();
                 self.solver
                     .add_constraint(vars.x | EQ(REQUIRED) | x)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed position x constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed position x constraint: {:?}", e)
+                    })?;
                 self.solver
                     .add_constraint(vars.y | EQ(REQUIRED) | y)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed position y constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed position y constraint: {:?}", e)
+                    })?;
             }
 
-
-           SimpleConstraint::AlignLeft(entities) => {
+            SimpleConstraint::AlignLeft(entities) => {
                 if entities.len() < 2 {
                     return Err(anyhow::anyhow!("AlignLeft requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self.variables.get(reference);
+
+                if ref_vars.is_none() {
+                    bail!("entity not registered in constraint system {}", reference);
+                }
+
+                let ref_vars = ref_vars.unwrap();
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity);
+                    if vars.is_none() {
+                        bail!("entity not registered in constraint system {}", entity);
+                    }
+                    let vars = vars.unwrap();
                     self.solver
                         .add_constraint(vars.x | EQ(REQUIRED) | ref_vars.x)
-                        .map_err(|e| anyhow::anyhow!("Failed to add align left constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align left constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -6242,15 +6298,20 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignRight requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference).context(format!("entity not registered in constrain system {}", reference))?;
+                  
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(
-                            (vars.x + vars.width) | EQ(REQUIRED) | (ref_vars.x + ref_vars.width)
+                            (vars.x + vars.width) | EQ(REQUIRED) | (ref_vars.x + ref_vars.width),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align right constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align right constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -6259,13 +6320,18 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignTop requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.y | EQ(REQUIRED) | ref_vars.y)
-                        .map_err(|e| anyhow::anyhow!("Failed to add align top constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align top constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -6274,90 +6340,115 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignBottom requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(
-                            (vars.y + vars.height) | EQ(REQUIRED) | (ref_vars.y + ref_vars.height)
+                            (vars.y + vars.height) | EQ(REQUIRED) | (ref_vars.y + ref_vars.height),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align bottom constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add align bottom constraint: {:?}", e)
+                        })?;
                 }
             }
 
             SimpleConstraint::AlignCenterHorizontal(entities) => {
                 if entities.len() < 2 {
-                    return Err(anyhow::anyhow!("AlignCenterHorizontal requires at least 2 entities"));
+                    return Err(anyhow::anyhow!(
+                        "AlignCenterHorizontal requires at least 2 entities"
+                    ));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(
                             (vars.x + vars.width * 0.5)
                                 | EQ(REQUIRED)
-                                | (ref_vars.x + ref_vars.width * 0.5)
+                                | (ref_vars.x + ref_vars.width * 0.5),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align center horizontal constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to add align center horizontal constraint: {:?}",
+                                e
+                            )
+                        })?;
                 }
             }
 
             SimpleConstraint::AlignCenterVertical(entities) => {
                 if entities.len() < 2 {
-                    return Err(anyhow::anyhow!("AlignCenterVertical requires at least 2 entities"));
+                    return Err(anyhow::anyhow!(
+                        "AlignCenterVertical requires at least 2 entities"
+                    ));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("Entity not found")?;
                     self.solver
                         .add_constraint(
                             (vars.y + vars.height * 0.5)
                                 | EQ(REQUIRED)
-                                | (ref_vars.y + ref_vars.height * 0.5)
+                                | (ref_vars.y + ref_vars.height * 0.5),
                         )
-                        .map_err(|e| anyhow::anyhow!("Failed to add align center vertical constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to add align center vertical constraint: {:?}",
+                                e
+                            )
+                        })?;
                 }
             }
 
             SimpleConstraint::RightOf(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.x | GE(REQUIRED) | vars2.x + vars2.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add rightOf constraint: {:?}", e))?;
             }
 
             SimpleConstraint::LeftOf(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.x | LE(REQUIRED) | vars2.x - vars1.width)
                     .map_err(|e| anyhow::anyhow!("Failed to add leftOf constraint: {:?}", e))?;
             }
 
             SimpleConstraint::Below(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y + vars2.height)
                     .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
             SimpleConstraint::Above(id1, id2) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
                     .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y - vars2.height)
                     .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
 
             SimpleConstraint::HorizontalSpacing(id1, id2, spacing) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // Horizontal spacing: gap between right edge of first and left edge of second
                 // x2 = x1 + width1 + spacing
                 self.solver
@@ -6368,8 +6459,8 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::VerticalSpacing(id1, id2, spacing) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // Vertical spacing: gap between bottom edge of first and top edge of second
                 // y2 = y1 + height1 + spacing
                 self.solver
@@ -6380,32 +6471,40 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::FixedWidth(entity, width) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.width | EQ(REQUIRED) | width)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed width constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed width constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::FixedHeight(entity, height) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.height | EQ(REQUIRED) | height)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed height constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed height constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::FixedSize(entity, width, height) => {
-                let vars = self.variables.get(&entity).expect("Entity not found");
+                let vars = self.variables.get(&entity).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.width | EQ(REQUIRED) | width)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed size width constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed size width constraint: {:?}", e)
+                    })?;
                 self.solver
                     .add_constraint(vars.height | EQ(REQUIRED) | height)
-                    .map_err(|e| anyhow::anyhow!("Failed to add fixed size height constraint: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed size height constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::FixedDistance(id1, id2, distance) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
 
                 // Fixed distance between centers of two entities
                 // Distance = sqrt((cx2 - cx1)² + (cy2 - cy1)²)
@@ -6487,18 +6586,23 @@ impl ConstraintSystem {
                         anyhow::anyhow!("Failed to add manhattan distance constraint: {:?}", e)
                     })?;
             }
-             SimpleConstraint::SameWidth(entities) => {
+            SimpleConstraint::SameWidth(entities) => {
                 if entities.len() < 2 {
                     return Err(anyhow::anyhow!("SameWidth requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.width | EQ(REQUIRED) | ref_vars.width)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same width constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same width constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -6507,13 +6611,18 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("SameHeight requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.height | EQ(REQUIRED) | ref_vars.height)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same height constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
+                        })?;
                 }
             }
 
@@ -6522,22 +6631,29 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("SameSize requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self.variables.get(reference).expect("Reference entity not found");
-                
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
                 for entity in entities.iter().skip(1) {
-                    let vars = self.variables.get(entity).expect("Entity not found");
+                    let vars = self.variables.get(entity).context("entity not found")?;
                     self.solver
                         .add_constraint(vars.width | EQ(REQUIRED) | ref_vars.width)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same size width constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same size width constraint: {:?}", e)
+                        })?;
                     self.solver
                         .add_constraint(vars.height | EQ(REQUIRED) | ref_vars.height)
-                        .map_err(|e| anyhow::anyhow!("Failed to add same size height constraint: {:?}", e))?;
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same size height constraint: {:?}", e)
+                        })?;
                 }
             }
 
             SimpleConstraint::ProportionalWidth(id1, id2, ratio) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // First entity's width = second entity's width * ratio
                 // width1 = width2 * ratio
                 self.solver
@@ -6548,8 +6664,8 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::ProportionalHeight(id1, id2, ratio) => {
-                let vars1 = self.variables.get(&id1).expect("Entity not found");
-                let vars2 = self.variables.get(&id2).expect("Entity not found");
+                let vars1 = self.variables.get(&id1).context("entity not found")?;
+                let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // First entity's height = second entity's height * ratio
                 // height1 = height2 * ratio
                 self.solver
@@ -6560,7 +6676,7 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::AspectRatio(id, ratio) => {
-                let vars = self.variables.get(&id).expect("Entity not found");
+                let vars = self.variables.get(&id).context("entity not found")?;
                 // Maintain aspect ratio: width / height = ratio
                 // Rearranged: width = height * ratio
                 self.solver
@@ -6571,7 +6687,7 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::StackHorizontal(entities, spacing) => {
-                 let spacing = spacing.unwrap_or(0.0);
+                let spacing = spacing.unwrap_or(0.0);
                 if entities.is_empty() {
                     return Err(anyhow::anyhow!(
                         "StackHorizontal requires at least 1 entity"
@@ -6584,11 +6700,11 @@ impl ConstraintSystem {
                     let prev_vars = self
                         .variables
                         .get(&entities[i - 1])
-                        .expect("Previous entity not found");
+                        .context("Previous entity not found")?;
                     let curr_vars = self
                         .variables
                         .get(&entities[i])
-                        .expect("Current entity not found");
+                        .context("Current entity not found")?;
 
                     // Current entity starts where previous entity ends plus spacing
                     self.solver
@@ -6602,7 +6718,7 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::StackVertical(entities, spacing) => {
-                 let spacing = spacing.unwrap_or(0.0);
+                let spacing = spacing.unwrap_or(0.0);
                 if entities.is_empty() {
                     return Err(anyhow::anyhow!("StackVertical requires at least 1 entity"));
                 }
@@ -6613,11 +6729,11 @@ impl ConstraintSystem {
                     let prev_vars = self
                         .variables
                         .get(&entities[i - 1])
-                        .expect("Previous entity not found");
+                        .context("Previous entity not found")?;
                     let curr_vars = self
                         .variables
                         .get(&entities[i])
-                        .expect("Current entity not found");
+                        .context("Current entity not found")?;
 
                     // Current entity starts where previous entity ends plus spacing
                     self.solver
@@ -6934,6 +7050,7 @@ use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
 use serde_json::{Map, Value};
+use anyhow::{bail, Result};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -8255,7 +8372,7 @@ pub type CustomComponentFactory = Arc<
             &Map<String, Value>,
             &mut crate::DiagramBuilder,
             &JsonLinesParser,
-        ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+        ) -> Result<crate::diagram_builder::DiagramTreeNode>
         + Send
         + Sync,
 >;
@@ -8280,7 +8397,7 @@ impl CustomComponentRegistry {
                 &Map<String, Value>,
                 &mut crate::DiagramBuilder,
                 &JsonLinesParser,
-            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            ) -> Result<crate::diagram_builder::DiagramTreeNode>
             + Send
             + Sync
             + 'static,
@@ -8297,10 +8414,10 @@ impl CustomComponentRegistry {
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
         parser: &JsonLinesParser,
-    ) -> Result<crate::diagram_builder::DiagramTreeNode, String> {
+    ) -> Result<crate::diagram_builder::DiagramTreeNode> {
         match self.factories.get(component_type) {
             Some(factory) => factory(id, attributes, builder, parser),
-            None => Err(format!("Unknown custom component type: {}", component_type)),
+            None => bail!("Unknown custom component type: {}", component_type)
         }
     }
 
@@ -8324,7 +8441,7 @@ impl CustomComponentRegistry {
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
                     &JsonLinesParser,
-                ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+                ) -> Result<crate::diagram_builder::DiagramTreeNode>
                 + Send
                 + Sync,
         >,
@@ -8703,6 +8820,8 @@ use std::io::{BufRead, BufReader, Write};
 
 use crate::transform::Transform;
 use crate::{components::*, diagram_builder::*, DiagramBuilder, SimpleConstraint};
+use anyhow::{Context, Result,Error, bail};
+use thiserror::Error;
 
 /// Simplified JSON Lines entity with only essential fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8791,44 +8910,29 @@ pub enum ConstraintDeclaration {
 
 fn convert_constraint_declaration(
     decl: &ConstraintDeclaration,
-) -> Result<SimpleConstraint, JsonLinesError> {
+) -> Result<SimpleConstraint> {
     match decl {
         ConstraintDeclaration::AlignLeft { entities } => {
-            Ok(SimpleConstraint::AlignLeft(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignLeft(entities.to_vec()))
         }
         ConstraintDeclaration::AlignRight { entities } => {
-            Ok(SimpleConstraint::AlignRight(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignRight(entities.to_vec()))
         }
         ConstraintDeclaration::AlignTop { entities } => {
-            Ok(SimpleConstraint::AlignTop(
-              entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignTop(entities.to_vec()))
         }
         ConstraintDeclaration::AlignBottom { entities } => {
-            Ok(SimpleConstraint::AlignBottom(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignBottom(entities.to_vec()))
         }
         ConstraintDeclaration::AlignCenterHorizontal { entities } => {
-
-            Ok(SimpleConstraint::AlignCenterHorizontal(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignCenterHorizontal(entities.to_vec()))
         }
         ConstraintDeclaration::AlignCenterVertical { entities } => {
-            Ok(SimpleConstraint::AlignCenterVertical(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::AlignCenterVertical(entities.to_vec()))
         }
         ConstraintDeclaration::RightOf { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "right_of requires exactly 2 entities".to_string(),
-                ));
+                bail!("right_of requires exactly 2 entities");
             }
             Ok(SimpleConstraint::RightOf(
                 entities[0].clone(),
@@ -8837,9 +8941,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::LeftOf { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "left_of requires exactly 2 entities".to_string(),
-                ));
+                bail!("left_of requires exactly 2 entities");
             }
             Ok(SimpleConstraint::LeftOf(
                 entities[0].clone(),
@@ -8848,9 +8950,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::Above { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "above requires exactly 2 entities".to_string(),
-                ));
+                bail!("above requires exactly 2 entities")
             }
             Ok(SimpleConstraint::Above(
                 entities[0].clone(),
@@ -8859,9 +8959,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::Below { entities } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "below requires exactly 2 entities".to_string(),
-                ));
+                bail!("below requires exactly 2 entities");
             }
             Ok(SimpleConstraint::Below(
                 entities[0].clone(),
@@ -8870,9 +8968,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::HorizontalSpacing { entities, spacing } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "horizontal_spacing requires exactly 2 entities".to_string(),
-                ));
+               bail!("horizontal_spacing requires exactly 2 entities");
             }
             Ok(SimpleConstraint::HorizontalSpacing(
                 entities[0].clone(),
@@ -8882,9 +8978,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::VerticalSpacing { entities, spacing } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "vertical_spacing requires exactly 2 entities".to_string(),
-                ));
+                bail!("vertical_spacing requires exactly 2 entities");
             }
             Ok(SimpleConstraint::VerticalSpacing(
                 entities[0].clone(),
@@ -8894,9 +8988,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::StackHorizontal { entities, spacing } => {
             if entities.len() < 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "stack_horizontal requires at least 2 entities".to_string(),
-                ));
+               bail!("stack_horizontal requires at least 2 entities");
             }
             Ok(SimpleConstraint::StackHorizontal(
                 entities.clone(),
@@ -8905,17 +8997,16 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::StackVertical { entities, spacing } => {
             if entities.len() < 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "stack_vertical requires at least 2 entities".to_string(),
-                ));
+                bail!("stack_vertical requires at least 2 entities");
             }
-            Ok(SimpleConstraint::StackVertical(entities.clone(), Some(*spacing)))
+            Ok(SimpleConstraint::StackVertical(
+                entities.clone(),
+                Some(*spacing),
+            ))
         }
         ConstraintDeclaration::FixedDistance { entities, distance } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "fixed_distance requires exactly 2 entities".to_string(),
-                ));
+                bail!("fixed_distance requires exactly 2 entities");
             }
             Ok(SimpleConstraint::FixedDistance(
                 entities[0].clone(),
@@ -8924,26 +9015,17 @@ fn convert_constraint_declaration(
             ))
         }
         ConstraintDeclaration::SameWidth { entities } => {
-    
-            Ok(SimpleConstraint::SameWidth(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::SameWidth(entities.to_vec()))
         }
         ConstraintDeclaration::SameHeight { entities } => {
-            Ok(SimpleConstraint::SameHeight(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::SameHeight(entities.to_vec()))
         }
         ConstraintDeclaration::SameSize { entities } => {
-            Ok(SimpleConstraint::SameSize(
-                entities.to_vec()
-            ))
+            Ok(SimpleConstraint::SameSize(entities.to_vec()))
         }
         ConstraintDeclaration::ProportionalWidth { entities, ratio } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "proportional_width requires exactly 2 entities".to_string(),
-                ));
+                bail!("proportional_width requires exactly 2 entities");
             }
             Ok(SimpleConstraint::ProportionalWidth(
                 entities[0].clone(),
@@ -8953,9 +9035,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::ProportionalHeight { entities, ratio } => {
             if entities.len() != 2 {
-                return Err(JsonLinesError::ConstraintError(
-                    "proportional_height requires exactly 2 entities".to_string(),
-                ));
+                bail!("proportional_height requires exactly 2 entities");
             }
             Ok(SimpleConstraint::ProportionalHeight(
                 entities[0].clone(),
@@ -9277,7 +9357,7 @@ impl JsonLinesParser {
         &self,
         root_id: &str,
         builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode, JsonLinesError> {
+    ) -> Result<DiagramTreeNode> {
         self.build_entity(root_id, builder)
     }
 
@@ -9285,8 +9365,7 @@ impl JsonLinesParser {
         &self,
         entity_id: &str,
         builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode, JsonLinesError> {
-
+    ) -> Result<DiagramTreeNode> {
         println!("*** building entity {} ***", entity_id);
         let entity = self
             .entities
@@ -9298,12 +9377,10 @@ impl JsonLinesParser {
         let attributes = entity.attributes.clone();
         println!("Attributes length {}", attributes.len());
 
-
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
             return builder
                 .create_custom_component(&entity_id, &component_type, &attributes, &self)
-                .map_err(|e| JsonLinesError::InvalidStructure(e));
         }
 
         // Handle built-in components using attribute helpers
@@ -9332,9 +9409,21 @@ impl JsonLinesParser {
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
-                    return Err(JsonLinesError::MissingAttribute(
-                        "content or text".to_string(),
-                    ));
+                   bail!("Missing attribute content or text");
+                }
+
+                let str_font_weight = &get_string_attr(
+                        &entity.attributes,
+                        &["font_weight"],
+                        "400",
+                    );
+                let f_weight:f32 = match str::parse(&self) => {
+                    Ok(val) => {
+                        val
+                    };
+                    
+
+
                 }
 
                 let options = TextOptions {
@@ -9344,7 +9433,12 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
-                    font_weight: str::parse(&get_string_attr(&entity.attributes, &["font_weight"], "400")).unwrap(),
+                    font_weight: str::parse(&get_string_attr(
+                        &entity.attributes,
+                        &["font_weight"],
+                        "400",
+                    ))
+                    .unwrap(),
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
@@ -9361,9 +9455,7 @@ impl JsonLinesParser {
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
                 if children.len() != 1 {
-                    return Err(JsonLinesError::InvalidStructure(
-                        "Box must have exactly one child".to_string(),
-                    ));
+                    bail!("Box must have exactly one child");
                 }
 
                 let child = self.build_entity(&children[0], builder)?;
@@ -9421,15 +9513,23 @@ impl JsonLinesParser {
                 let children = get_array_attr(&entity.attributes, "children")
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
-                let child_nodes: Result<Vec<_>, _> = children
+                let child_nodes: Vec<_> = children
                     .iter()
-                    .map(|child_id| self.build_entity(child_id, builder))
+                    .filter_map(|child_id| {
+                        match self.build_entity(child_id, builder) {
+                            Ok(node) => Some(node),
+                            Err(e) => {
+                                eprintln!("Warning: Failed to build child '{}': {}", child_id, e);
+                                None // Skip this child, continue with others
+                            }
+                        }
+                    })
                     .collect();
 
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_vstack(entity_id.to_string(), child_nodes?, halign))
+                Ok(builder.new_vstack(entity_id.to_string(), child_nodes, halign))
             }
 
             "hstack" => {
@@ -9449,29 +9549,46 @@ impl JsonLinesParser {
                 let children = get_array_attr(&entity.attributes, "children")
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
-                let child_nodes: Result<Vec<_>, _> = children
+                let child_nodes: Vec<_> = children
                     .iter()
-                    .map(|child_id| self.build_entity(child_id, builder))
+                    .filter_map(|child_id| {
+                        match self.build_entity(child_id, builder) {
+                            Ok(node) => Some(node),
+                            Err(e) => {
+                                eprintln!("Warning: Failed to build child '{}': {}", child_id, e);
+                                None // Skip this child, continue with others
+                            }
+                        }
+                    })
                     .collect();
 
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_hstack(entity_id.to_string(), child_nodes?, valign))
+                Ok(builder.new_hstack(entity_id.to_string(), child_nodes, valign))
             }
 
             "group" => {
                 let children = get_array_attr(&entity.attributes, "children")
                     .ok_or_else(|| JsonLinesError::MissingAttribute("children".to_string()))?;
 
-                let child_nodes: Result<Vec<_>, _> = children
+                let child_nodes: Vec<_> = children
                     .iter()
-                    .map(|child_id| self.build_entity(child_id, builder))
+                    .filter_map(|child_id| {
+                        match self.build_entity(child_id, builder) {
+                            Ok(node) => Some(node),
+                            Err(e) => {
+                                eprintln!("Warning: Failed to build child '{}': {}", child_id, e);
+                                None // Skip this child, continue with others
+                            }
+                        }
+                    })
                     .collect();
+
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_group(entity_id.to_string(), child_nodes?))
+                Ok(builder.new_group(entity_id.to_string(), child_nodes))
             }
 
             "rect" => {
@@ -9683,7 +9800,7 @@ impl JsonLinesParser {
                 } else {
                     Err(JsonLinesError::MissingAttribute(
                         "src or file_path".to_string(),
-                    ))
+                    ).into())
                 }
             }
 
@@ -9784,23 +9901,25 @@ impl JsonLinesParser {
                 }
 
                 let mut children_with_pos = Vec::new();
+
                 for child_id in children {
                     let _child_entity = self
                         .entities
                         .get(&child_id)
                         .ok_or_else(|| JsonLinesError::EntityNotFound(child_id.clone()))?;
 
-                    let child_node = self.build_entity(&child_id, builder)?;
-                    let pos = builder.get_container_relative_position(&child_id);
+                    if let Ok(child_node) = self.build_entity(&child_id, builder) {
+                        let pos = builder.get_container_relative_position(&child_id);
 
-                    // For constraint containers, position is optional (constraints determine positioning)
-                    let suggest_pos = if pos.x != 0.0 || pos.y != 0.0 {
-                        Some(pos)
-                    } else {
-                        None
-                    };
+                        // For constraint containers, position is optional (constraints determine positioning)
+                        let suggest_pos = if pos.x != 0.0 || pos.y != 0.0 {
+                            Some(pos)
+                        } else {
+                            None
+                        };
 
-                    children_with_pos.push((child_node, suggest_pos));
+                        children_with_pos.push((child_node, suggest_pos));
+                    }
                 }
 
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
@@ -9813,7 +9932,7 @@ impl JsonLinesParser {
             }
             _ => Err(JsonLinesError::UnknownEntityType(
                 entity.entity_type.clone(),
-            )),
+            ).into()),
         }
     }
 
@@ -10011,7 +10130,8 @@ impl JsonLinesBuilder {
     }
 }
 
-#[derive(Debug)]
+
+#[derive( Debug)]
 pub enum JsonLinesError {
     ParseError { line: usize, message: String },
     EntityNotFound(String),
@@ -10096,7 +10216,7 @@ mod tests {
         fn test_component(
             attrs: &Map<String, Value>,
             _builder: &mut DiagramBuilder,
-        ) -> Result<DiagramTreeNode, String> {
+        ) -> Result<DiagramTreeNode> {
             // Should be able to access any attribute
             assert!(attrs.contains_key("custom_prop"));
             assert!(attrs.contains_key("width"));
@@ -10301,7 +10421,7 @@ impl JsonLinesParser {
         &mut self,
         entity_id: &str,
         builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode, JsonLinesError> {
+    ) -> Result<DiagramTreeNode> {
         println!("🏗️ Building entity: {}", entity_id);
 
         let entity = self
@@ -10350,6 +10470,8 @@ use crate::{
     components::*, parser::JsonLinesParser, transform::Transform, BoundingBox, ConstraintSystem,
     SimpleConstraint,
 };
+
+use anyhow::{bail, Context, Result};
 
 pub struct DiagramBuilder {
     pub measure_text: Option<fn(&str, &TextOptions) -> (Float, Float)>,
@@ -10498,7 +10620,7 @@ impl DiagramBuilder {
                 &serde_json::Map<String, serde_json::Value>,
                 &mut DiagramBuilder,
                 &JsonLinesParser,
-            ) -> Result<crate::diagram_builder::DiagramTreeNode, String>
+            ) -> Result<crate::diagram_builder::DiagramTreeNode>
             + Send
             + Sync
             + 'static,
@@ -10521,12 +10643,9 @@ impl DiagramBuilder {
         component_type: &str,
         attrs: &serde_json::Map<String, serde_json::Value>,
         lines_parser: &JsonLinesParser,
-    ) -> Result<DiagramTreeNode, String> {
+    ) -> Result<DiagramTreeNode> {
         if !self.custom_components.has_component(component_type) {
-            return Err(format!(
-                "Custom component '{}' not registered",
-                component_type
-            ));
+            bail!("Custom component '{}' not registered", component_type);
         }
 
         let factory = { self.custom_components.get(component_type).unwrap().clone() };
@@ -10945,10 +11064,15 @@ impl DiagramBuilder {
         for i in 0..cols {
             let line_id = format!("{}-col-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
-                stroke_color: options.border_color.clone(),
-                stroke_width: 1.0,
-            });
+            let line = ShapeLine::new(
+                line_id.clone(),
+                (0.0, 0.0),
+                (0.0, 0.0),
+                LineOptions {
+                    stroke_color: options.border_color.clone(),
+                    stroke_width: 1.0,
+                },
+            );
             self.lines.insert(line_id.clone(), line);
             col_lines.push(line_id.clone());
         }
@@ -10957,10 +11081,15 @@ impl DiagramBuilder {
         for i in 0..num_rows + 1 {
             let line_id = format!("{}-row-line-{}", id.clone(), i);
             self.new_entity(line_id.clone(), EntityType::LineShape);
-            let line = ShapeLine::new(line_id.clone(), (0.0, 0.0), (0.0, 0.0), LineOptions {
-                stroke_color: options.border_color.clone(),
-                stroke_width: 1.0,
-            });
+            let line = ShapeLine::new(
+                line_id.clone(),
+                (0.0, 0.0),
+                (0.0, 0.0),
+                LineOptions {
+                    stroke_color: options.border_color.clone(),
+                    stroke_width: 1.0,
+                },
+            );
             self.lines.insert(line_id.clone(), line);
             row_lines.push(line_id.clone());
         }
@@ -10987,7 +11116,11 @@ impl DiagramBuilder {
             col_lines.clone(),
             row_lines.clone(),
             cols,
-            if options.with_header { Some(header_id.clone())} else {None},
+            if options.with_header {
+                Some(header_id.clone())
+            } else {
+                None
+            },
             options.clone(),
         );
 
@@ -11160,7 +11293,7 @@ impl DiagramBuilder {
         &self.lines[&id]
     }
 
-     pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
+    pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
         self.lines.get_mut(&id)
     }
 
@@ -11240,7 +11373,7 @@ impl DiagramBuilder {
                     &serde_json::Map<String, serde_json::Value>,
                     &mut DiagramBuilder,
                     &JsonLinesParser,
-                ) -> Result<DiagramTreeNode, String>
+                ) -> Result<DiagramTreeNode>
                 + Send
                 + Sync,
         >,
@@ -11286,11 +11419,11 @@ mod component_registration_tests {
     /// Custom Component 1: Badge
     /// Creates a rounded pill-shaped element with text
     fn create_badge_component(
-        id : &str,
+        id: &str,
         attrs: &Map<String, Value>,
         builder: &mut DiagramBuilder,
         parser: &JsonLinesParser,
-    ) -> Result<DiagramTreeNode, String> {
+    ) -> Result<DiagramTreeNode> {
         println!("🏷️  Creating badge component with attrs: {:?}", attrs);
 
         // Extract attributes
@@ -11365,7 +11498,7 @@ mod component_registration_tests {
 
         let parser = JsonLinesParser::new();
 
-        let result = builder.create_custom_component("b1","badge", &attrs, &parser);
+        let result = builder.create_custom_component("b1", "badge", &attrs, &parser);
         assert!(result.is_ok());
         let badge_node = result.unwrap();
         assert_eq!(badge_node.entity_type, EntityType::BoxShape);
@@ -11402,6 +11535,8 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 textwrap = "0.16.2"
 uuid = { version = "1.0", features = ["v4", "js"] }
+anyhow = "1.0.99"
+
 
 [lib]
 name = "custom_components"
@@ -11453,6 +11588,7 @@ use crate::*;
 use serde_json::{from_value, Map, Value};
 use uuid::fmt::Simple;
 use uuid::uuid;
+use anyhow::{bail, Result};
 
 /// Document Style Constants
 /// These constants define a consistent design system for document components
@@ -11616,7 +11752,7 @@ pub fn create_document_container(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut children = Vec::new();
     let header_id = get_string_attr(attrs, &["header_id"], "");
     let content_id = get_string_attr(attrs, &["content_id"], "");
@@ -11640,19 +11776,25 @@ pub fn create_document_container(
         children.push(header_container);
     }
 
-    if let Ok(content_child) = parser.build(&content_id, builder) {
-        let mut content_options = BoxOptions::new();
-        content_options.padding = PADDING_NORMAL;
-        content_options.fill_color = Fill::Color(BG_PRIMARY.to_string());
-        content_options.stroke_width = 0.0;
-        content_options.stroke_color = BG_PRIMARY.to_string();
+    match parser.build(&content_id, builder) {
+        Ok(content_child) => {
+            let mut content_options = BoxOptions::new();
+            content_options.padding = PADDING_NORMAL;
+            content_options.fill_color = Fill::Color(BG_PRIMARY.to_string());
+            content_options.stroke_width = 0.0;
+            content_options.stroke_color = BG_PRIMARY.to_string();
 
-        let content_container = builder.new_box(
-            format!("{}_content_container", &id),
-            content_child,
-            content_options,
-        );
-        children.push(content_container);
+            let content_container = builder.new_box(
+                format!("{}_content_container", &id),
+                content_child,
+                content_options,
+            );
+            children.push(content_container);
+        }
+        Err(err) => {
+            println!("Error with parser.build {}, {}", content_id, err);
+            bail!(err.to_string());
+        }
     }
 
     if let Ok(footer_child) = parser.build(&footer_id, builder) {
@@ -11667,6 +11809,7 @@ pub fn create_document_container(
             footer_child,
             footer_options,
         );
+
         children.push(footer_container);
     }
 
@@ -11692,7 +11835,7 @@ pub fn create_document_text(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     attrs.clone().iter().for_each(|(k, v)| {
         println!("k,v: {},{}", k, v);
     });
@@ -11709,7 +11852,7 @@ pub fn document_text(
     variant: String,
     content: String,
     max_width: f32,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut toptions = match variant.as_str() {
         "xlarge" => TextOptions {
             font_family: FONT_SANS.to_string(),
@@ -11809,7 +11952,7 @@ pub fn create_document_title(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let variant = get_string_attr(attrs, &["variant"], "default");
     let content = get_string_attr(attrs, &["text", "content"], "");
     let container_width = get_width(attrs, &["width"], WIDTH_MD);
@@ -11822,7 +11965,7 @@ fn document_title(
     variant: String,
     content: String,
     container_width: f32,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut toptions = match variant.as_str() {
         "h1" => TextOptions {
             font_family: FONT_SANS.to_string(),
@@ -11920,7 +12063,7 @@ pub fn create_vstack(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
 
     let mut children = Vec::<DiagramTreeNode>::new();
@@ -11942,7 +12085,7 @@ fn vstack(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
     children: Vec<DiagramTreeNode>,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
     for (ix, elem) in children.iter().enumerate() {
@@ -11972,7 +12115,7 @@ pub fn create_hstack(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let children_ids = get_array_attr(attrs, "children").or(Some([].to_vec()));
 
     let mut children = Vec::<DiagramTreeNode>::new();
@@ -11991,7 +12134,7 @@ fn hstack(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
     children: Vec<DiagramTreeNode>,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut final_children = Vec::<DiagramTreeNode>::new();
 
     for (ix, elem) in children.iter().enumerate() {
@@ -12020,7 +12163,7 @@ pub fn create_properties(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let properties = get_properties(attrs, &["properties", "items"]);
     let title = get_string_attr(attrs, &["title", "meta"], "");
 
@@ -12068,12 +12211,13 @@ pub fn create_properties(
             title,
             WIDTH_PROPERTY_PANEL,
         );
-        //TODO: revisar uso de unwrap aqui,
-        let stack_children = vec![title, Ok(table)]
-            .iter()
-            .filter_map(|e| e.clone().ok())
-            .collect();
-        return vstack(id, builder, parser, stack_children);
+
+        let mut children = Vec::<DiagramTreeNode>::new();
+        if let Ok(title) = title {
+            children.push(title)
+        }
+        children.push(table);
+        return vstack(id, builder, parser, children);
     }
 }
 
@@ -12150,7 +12294,7 @@ pub fn create_document_section(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut section_children = Vec::new();
 
     // Extract attributes
@@ -12217,7 +12361,7 @@ fn create_section_header(
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
     width: Float,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut header_children = Vec::new();
 
     // Create title if present using document.title component
@@ -12293,7 +12437,7 @@ fn create_columns_layout(
     column_ids: &[String],
     builder: &mut DiagramBuilder,
     parser: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     let mut column_nodes = Vec::new();
 
     for (idx, column_id) in column_ids.iter().enumerate() {
@@ -12339,7 +12483,7 @@ fn create_columns_layout(
     }
 
     if column_nodes.is_empty() {
-        return Err("No valid columns found in section".to_string());
+        bail!("No valid columns found in section");
     }
 
     // Create horizontal stack for columns
@@ -12369,13 +12513,13 @@ pub fn create_bullet_list(
     attrs: &Map<String, Value>,
     builder: &mut DiagramBuilder,
     _: &JsonLinesParser,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     // Extract items array
     let items = get_array_attr(attrs, "items");
     let meta = get_string_attr(attrs, &["meta"], "");
 
     if items.is_none() {
-        return Err("bullet-list requires 'items' attribute with at least one item".to_string());
+        bail!("bullet-list requires 'items' attribute with at least one item");
     }
     let items = items.unwrap();
 
@@ -12448,7 +12592,7 @@ fn create_list_item(
     marker: &str,
     builder: &mut DiagramBuilder,
     container_width: Float,
-) -> Result<DiagramTreeNode, String> {
+) -> Result<DiagramTreeNode> {
     // Create bullet/marker
     let marker_options = TextOptions {
         font_family: FONT_SANS.to_string(),

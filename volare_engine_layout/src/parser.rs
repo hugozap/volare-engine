@@ -598,6 +598,21 @@ impl JsonLinesParser {
                    bail!("Missing attribute content or text");
                 }
 
+
+                // Only support "bold", otherwise return the value or "400" by default
+                let str_font_weight = &get_string_attr(
+                        &entity.attributes,
+                        &["font_weight"],
+                        "400",
+                    );
+                let f_weight:u32  = if let Ok(val) = str::parse::<u32>(&str_font_weight) {
+                    val 
+                } else if str_font_weight == "bold " {
+                    900
+                } else {
+                    400
+                };
+
                 let options = TextOptions {
                     font_size: get_float_attr(&entity.attributes, &["font_size"], 12.0),
                     text_color: get_string_attr(
@@ -605,12 +620,7 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
-                    font_weight: str::parse(&get_string_attr(
-                        &entity.attributes,
-                        &["font_weight"],
-                        "400",
-                    ))
-                    .unwrap(),
+                    font_weight: f_weight,
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),

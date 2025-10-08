@@ -15,59 +15,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&output_dir)?;
 
     let input = r##"
-{"id":"doc_root","content_id":"main_section","footer_id":"footer","header_id":"header","type":"document"}
-{"id":"header","text":"Failure Modes and Effects Analysis (FMEA) example for a centrifugal pump system — sample entries showing Severity (S), Occurrence (O), Detection (D), RPN and recommended actions.","title":"FMEA Matrix — Reliability Example","type":"document.text","variant":"large","width":"full"}
-{"id":"main_section","columns":["left_panel","fmea_container"],"meta":"Pump System — Reliability Engineering","title":"FMEA Overview","type":"document.section"}
-{"id":"left_panel","background":"#fbfbfb","children":["overview_text","key_points"],"padding":12,"type":"box"}
-{"id":"overview_text","text":"This FMEA matrix covers a simplified set of failure modes for a centrifugal pump assembly used in process industries. The table includes severity (S), occurrence (O), detection (D), resulting RPN, and recommended mitigations.","title":"Scope","type":"document.text","variant":"default","width":"md"}
-{"id":"key_points","items":["System: Centrifugal Pump Assembly","Focus: Reliability and maintenance prioritization","Metrics: Severity (1-10), Occurrence (1-10), Detection (1-10), RPN = S×O×D","Actions: Design, Maintenance, and Monitoring recommendations"],"meta":"Key Points","type":"document.bullet_list"}
-{"id":"f_head_c1","content":"Item","font_size":12,"type":"text"}
-{"id":"f_head_c2","content":"Function","font_size":12,"type":"text"}
-{"id":"f_head_c3","content":"Failure Mode","font_size":12,"type":"text"}
-{"id":"f_head_c4","content":"Effect","font_size":12,"type":"text"}
-{"id":"f_head_c5","content":"S","font_size":12,"type":"text"}
-{"id":"f_head_c6","content":"Cause","font_size":12,"type":"text"}
-{"id":"f_head_c7","content":"O","font_size":12,"type":"text"}
-{"id":"f_head_c8","content":"D","font_size":12,"type":"text"}
-{"id":"f_head_c9","content":"RPN","font_size":12,"type":"text"}
-{"id":"f_head_c10","content":"Recommended Action","font_size":12,"type":"text"}
-{"id":"f_r1_c1","content":"1 - Pump Seal","font_size":11,"type":"text"}
-{"id":"f_r1_c2","content":"Prevent leakage / contain fluid","font_size":11,"type":"text"}
-{"id":"f_r1_c3","content":"Seal wear / degradation","font_size":11,"type":"text"}
-{"id":"f_r1_c4","content":"Fluid leakage, potential system downtime","font_size":11,"type":"text"}
-{"id":"f_r1_c5","content":"7","font_size":11,"type":"text"}
-{"id":"f_r1_c6","content":"Abrasive particles, chemical attack","font_size":11,"type":"text"}
-{"id":"f_r1_c7","content":"5","font_size":11,"type":"text"}
-{"id":"f_r1_c8","content":"4","font_size":11,"type":"text"}
-{"id":"f_r1_c9","content":"140","font_size":11,"type":"text"}
-{"id":"f_r1_c10","content":"Specify harder seal material; implement seal inspection & replacement schedule","font_size":11,"type":"text"}
-{"id":"f_r2_c1","content":"2 - Motor Bearings","font_size":11,"type":"text"}
-{"id":"f_r2_c2","content":"Support shaft rotation, reduce friction","font_size":11,"type":"text"}
-{"id":"f_r2_c3","content":"Bearing wear / spalling","font_size":11,"type":"text"}
-{"id":"f_r2_c4","content":"Increased vibration, overheating, premature failure","font_size":11,"type":"text"}
-{"id":"f_r2_c5","content":"6","font_size":11,"type":"text"}
-{"id":"f_r2_c6","content":"Insufficient lubrication, contamination","font_size":11,"type":"text"}
-{"id":"f_r2_c7","content":"4","font_size":11,"type":"text"}
-{"id":"f_r2_c8","content":"3","font_size":11,"type":"text"}
-{"id":"f_r2_c9","content":"72","font_size":11,"type":"text"}
-{"id":"f_r2_c10","content":"Establish lubrication schedule; install contamination controls and vibration monitoring","font_size":11,"type":"text"}
-{"id":"f_r3_c1","content":"3 - Shaft Coupling","font_size":11,"type":"text"}
-{"id":"f_r3_c2","content":"Transmit torque between motor and pump","font_size":11,"type":"text"}
-{"id":"f_r3_c3","content":"Misalignment / coupling wear","font_size":11,"type":"text"}
-{"id":"f_r3_c4","content":"Excessive vibration, torque loss, potential shaft damage","font_size":11,"type":"text"}
-{"id":"f_r3_c5","content":"7","font_size":11,"type":"text"}
-{"id":"f_r3_c6","content":"Improper installation, thermal expansion","font_size":11,"type":"text"}
-{"id":"f_r3_c7","content":"3","font_size":11,"type":"text"}
-{"id":"f_r3_c8","content":"5","font_size":11,"type":"text"}
-{"id":"f_r3_c9","content":"105","font_size":11,"type":"text"}
-{"id":"f_r3_c10","content":"Perform alignment checks at installation and scheduled intervals; use torque monitoring","font_size":11,"type":"text"}
-{"id":"fmea_table","border_color":"#cccccc","border_width":1,"cell_padding":8,"children":["f_head_c1","f_head_c2","f_head_c3","f_head_c4","f_head_c5","f_head_c6","f_head_c7","f_head_c8","f_head_c9","f_head_c10","f_r1_c1","f_r1_c2","f_r1_c3","f_r1_c4","f_r1_c5","f_r1_c6","f_r1_c7","f_r1_c8","f_r1_c9","f_r1_c10","f_r2_c1","f_r2_c2","f_r2_c3","f_r2_c4","f_r2_c5","f_r2_c6","f_r2_c7","f_r2_c8","f_r2_c9","f_r2_c10","f_r3_c1","f_r3_c2","f_r3_c3","f_r3_c4","f_r3_c5","f_r3_c6","f_r3_c7","f_r3_c8","f_r3_c9","f_r3_c10"],"cols":10,"fill_color":"#ffffff","type":"table"}
-{"id":"actions_title","content":"Recommended Actions & Owners","font_size":12,"type":"text"}
-{"id":"actions_list","items":["Seal material spec review — Engineering","Seal inspection & replacement — Maintenance","Lubrication schedule & contamination controls — Maintenance","Alignment checks & torque monitoring — Installation Team"],"meta":"Top Actions","type":"document.bullet_list"}
-{"id":"action_box","background":"#f6f8ff","border_color":"#d6e0ff","border_width":1,"children":["actions_title","actions_list"],"padding":10,"type":"box","width":300}
-{"id":"fmea_container","children":["fmea_table","action_box"],"constraints":[{"entities":["fmea_table","action_box"],"type":"align_top"},{"entities":["action_box","fmea_table"],"type":"right_of"},{"entities":["fmea_table","action_box"],"spacing":20.0,"type":"horizontal_spacing"},{"entities":["fmea_table","main_section"],"type":"align_left"}],"type":"constraint_container"}
-{"id":"footer","text":"Sample FMEA matrix — values are illustrative. Use this template to expand system coverage and track actions, owners and dates.","type":"document.text","variant":"subtle","width":"full"}
-    "##;
+{"id":"root","type":"document","header_id":"header","content_id":"content","footer_id":"footer"}
+{"id":"header","type":"document.text","text":"Cause & Effect (Ishikawa) Diagram — Example","variant":"large","width":"full"}
+{"id":"content","type":"document.section","title":"Fishbone Diagram — Constraint Layout Example","meta":"Example data illustrating primary causes and sub-causes","columns":["diagram_container"]}
+{"id":"footer","type":"document.text","text":"Generated example fishbone diagram — problem, primary causes, and sub-causes.","variant":"small","width":"full"}
+{"id":"spine","type":"rect","width":700,"height":6,"fill":"#333","border_radius":3,"x":100,"y":297}
+{"id":"problem_box","type":"rect","width":200,"height":80,"fill":"#ffdddd","border_color":"#cc6666","border_width":2,"border_radius":8,"x":820,"y":257}
+{"id":"problem_text","type":"text","content":"Late Deliveries","font_size":16,"color":"#800000","line_width":180,"x":920,"y":297,"text_anchor":"middle"}
+{"id":"bone_u1_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-35,"x":250,"y":210,"transform_origin":"right center"}
+{"id":"bone_u1_label","type":"text","content":"People","font_size":13,"color":"#333","font_weight":"bold","x":120,"y":165}
+{"id":"bone_u1_c1","type":"text","content":"Staff shortages","font_size":10,"color":"#444","x":70,"y":185}
+{"id":"bone_u1_c2","type":"text","content":"Insufficient training","font_size":10,"color":"#444","x":70,"y":198}
+{"id":"bone_u2_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-23,"x":320,"y":245,"transform_origin":"right center"}
+{"id":"bone_u2_label","type":"text","content":"Process","font_size":13,"color":"#333","font_weight":"bold","x":180,"y":215}
+{"id":"bone_u2_c1","type":"text","content":"Complex approvals","font_size":10,"color":"#444","x":120,"y":232}
+{"id":"bone_u2_c2","type":"text","content":"Unclear workflows","font_size":10,"color":"#444","x":120,"y":245}
+{"id":"bone_u3_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-15,"x":400,"y":270,"transform_origin":"right center"}
+{"id":"bone_u3_label","type":"text","content":"Equipment","font_size":13,"color":"#333","font_weight":"bold","x":260,"y":250}
+{"id":"bone_u3_c1","type":"text","content":"Tool breakdowns","font_size":10,"color":"#444","x":200,"y":265}
+{"id":"bone_u3_c2","type":"text","content":"Maintenance delays","font_size":10,"color":"#444","x":200,"y":278}
+{"id":"bone_u4_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":-8,"x":540,"y":288,"transform_origin":"right center"}
+{"id":"bone_u4_label","type":"text","content":"Materials","font_size":13,"color":"#333","font_weight":"bold","x":400,"y":275}
+{"id":"bone_u4_c1","type":"text","content":"Supplier delays","font_size":10,"color":"#444","x":350,"y":288}
+{"id":"bone_u4_c2","type":"text","content":"Quality issues","font_size":10,"color":"#444","x":350,"y":301}
+{"id":"bone_l1_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":35,"x":250,"y":384,"transform_origin":"right center"}
+{"id":"bone_l1_label","type":"text","content":"Measurements","font_size":13,"color":"#333","font_weight":"bold","x":100,"y":415}
+{"id":"bone_l1_c1","type":"text","content":"Poor KPIs","font_size":10,"color":"#444","x":70,"y":395}
+{"id":"bone_l1_c2","type":"text","content":"Infrequent monitoring","font_size":10,"color":"#444","x":70,"y":408}
+{"id":"bone_l2_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":23,"x":320,"y":349,"transform_origin":"right center"}
+{"id":"bone_l2_label","type":"text","content":"Environment","font_size":13,"color":"#333","font_weight":"bold","x":160,"y":365}
+{"id":"bone_l2_c1","type":"text","content":"Site constraints","font_size":10,"color":"#444","x":120,"y":348}
+{"id":"bone_l2_c2","type":"text","content":"Logistics bottlenecks","font_size":10,"color":"#444","x":120,"y":361}
+{"id":"bone_l3_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":15,"x":400,"y":324,"transform_origin":"right center"}
+{"id":"bone_l3_label","type":"text","content":"Methods","font_size":13,"color":"#333","font_weight":"bold","x":260,"y":335}
+{"id":"bone_l3_c1","type":"text","content":"Manual handoffs","font_size":10,"color":"#444","x":200,"y":318}
+{"id":"bone_l3_c2","type":"text","content":"Lack of standard work","font_size":10,"color":"#444","x":200,"y":331}
+{"id":"bone_l4_line","type":"rect","width":160,"height":5,"fill":"#666","border_radius":2,"rotation":8,"x":540,"y":306,"transform_origin":"right center"}
+{"id":"bone_l4_label","type":"text","content":"Management","font_size":13,"color":"#333","font_weight":"bold","x":380,"y":315}
+{"id":"bone_l4_c1","type":"text","content":"Unrealistic deadlines","font_size":10,"color":"#444","x":350,"y":295}
+{"id":"bone_l4_c2","type":"text","content":"Poor communication","font_size":10,"color":"#444","x":350,"y":308}
+{"id":"diagram_container","type":"vstack","children":["spine","problem_box","problem_text","bone_u1_line","bone_u1_label","bone_u1_c1","bone_u1_c2","bone_u2_line","bone_u2_label","bone_u2_c1","bone_u2_c2","bone_u3_line","bone_u3_label","bone_u3_c1","bone_u3_c2","bone_u4_line","bone_u4_label","bone_u4_c1","bone_u4_c2","bone_l1_line","bone_l1_label","bone_l1_c1","bone_l1_c2","bone_l2_line","bone_l2_label","bone_l2_c1","bone_l2_c2","bone_l3_line","bone_l3_label","bone_l3_c1","bone_l3_c2","bone_l4_line","bone_l4_label","bone_l4_c1","bone_l4_c2"]} "##;
 
  // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
