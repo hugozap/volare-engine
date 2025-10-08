@@ -60,7 +60,6 @@ impl Category {
         }
     }
 }
-
 pub fn create_ishikawa(
     id: &str,
     attrs: &Map<String, Value>,
@@ -74,15 +73,15 @@ pub fn create_ishikawa(
     let spine_id = format!("{}_spine", id);
     let head_id = format!("{}_head", id);
 
-    // 1. Create spine line (700px width, centered at y=200)
-    let spine_y = 200.0;
-    let spine = builder.new_line(
+    // 1. Create spine as a rectangle that can grow
+    let spine = builder.new_rectangle(
         spine_id.clone(),
-        (0.0, spine_y),
-        (700.0, spine_y),
-        LineOptions {
-            stroke_color: "black".to_string(),
-            stroke_width: 2.0,
+        RectOptions {
+            width_behavior: SizeBehavior::Content,
+            height_behavior: SizeBehavior::Fixed(2.0),
+            fill_color: Fill::Color("black".to_string()),
+            stroke_width: 0.0,
+            ..Default::default()
         },
     );
 
@@ -152,11 +151,13 @@ pub fn create_ishikawa(
     // Create branches
     let mut all_branches = Vec::new();
     let mut constraints = Vec::new();
-    let spacing = 150.0;
 
-    // Top branches - use constraints to position ABOVE the spine
+    // Track branch IDs separately
+    let mut top_branch_ids = Vec::new();
+    let mut bottom_branch_ids = Vec::new();
+
+    // Top branches
     for (i, category) in top_categories.iter().enumerate() {
-        let x = 100.0 + (i as f32 * spacing);
         let branch = create_top_branch(
             &format!("{}_top_{}", id, i),
             &category.name,
@@ -164,18 +165,18 @@ pub fn create_ishikawa(
             category.right_items.clone(),
             builder,
         )?;
-        
+
         let branch_id = branch.entity_id.clone();
-        all_branches.push((branch, Some(Point::new(x, 0.0)))); // Initial position
-        
-        // Constraint: branch should be ABOVE the spine
+        all_branches.push((branch, None));
+        top_branch_ids.push(branch_id.clone());
+
+        // Vertical constraint: branch above spine
         constraints.push(SimpleConstraint::Above(branch_id.clone(), spine_id.clone()));
-        constraints.push(SimpleConstraint::VerticalSpacing(branch_id, spine_id.clone(), 10.0));
+
     }
 
-    // Bottom branches - use constraints to position BELOW the spine
+    // Bottom branches
     for (i, category) in bottom_categories.iter().enumerate() {
-        let x = 100.0 + (i as f32 * spacing);
         let branch = create_bottom_branch(
             &format!("{}_bottom_{}", id, i),
             &category.name,
@@ -183,28 +184,111 @@ pub fn create_ishikawa(
             category.right_items.clone(),
             builder,
         )?;
-        
+
         let branch_id = branch.entity_id.clone();
-        all_branches.push((branch, Some(Point::new(x, 0.0)))); // Initial position
-        
-        // Constraint: branch should be BELOW the spine
+        all_branches.push((branch, None));
+        bottom_branch_ids.push(branch_id.clone());
+
+        // Vertical constraint: branch below spine
         constraints.push(SimpleConstraint::Below(branch_id.clone(), spine_id.clone()));
-        constraints.push(SimpleConstraint::VerticalSpacing(spine_id.clone(), branch_id, 10.0));
+
+    }
+
+    // Distribuir horizontalmente las ramas SUPERIORES
+    if !top_branch_ids.is_empty() {
+        // Primera rama superior alineada con el inicio de la espina
+        constraints.push(SimpleConstraint::AlignLeft(vec![
+            spine_id.clone(),
+            top_branch_ids[0].clone(),
+        ]));
+
+        // Espaciar ramas superiores entre sí
+        if top_branch_ids.len() > 1 {
+            let spacing = 80.0;
+            for i in 1..top_branch_ids.len() {
+                constraints.push(SimpleConstraint::RightOf(
+                    top_branch_ids[i].clone(),
+                    top_branch_ids[i - 1].clone(),
+                ));
+                // constraints.push(SimpleConstraint::HorizontalSpacing(
+                //     top_branch_ids[i - 1].clone(),
+                //     top_branch_ids[i].clone(),
+                //     spacing,
+                // ));
+            }
+        }
+    }
+
+    // Distribuir horizontalmente las ramas INFERIORES
+    if !bottom_branch_ids.is_empty() {
+        // Primera rama inferior alineada con el inicio de la espina
+        constraints.push(SimpleConstraint::AlignLeft(vec![
+            spine_id.clone(),
+            bottom_branch_ids[0].clone(),
+        ]));
+
+        // Espaciar ramas inferiores entre sí
+        if bottom_branch_ids.len() > 1 {
+            let spacing = 80.0;
+            for i in 1..bottom_branch_ids.len() {
+                constraints.push(SimpleConstraint::RightOf(
+                    bottom_branch_ids[i].clone(),
+                    bottom_branch_ids[i - 1].clone(),
+                ));
+                // constraints.push(SimpleConstraint::HorizontalSpacing(
+                //     bottom_branch_ids[i - 1].clone(),
+                //     bottom_branch_ids[i].clone(),
+                //     spacing,
+                // ));
+            }
+        }
+    }
+
+    // La espina termina donde empieza la cabeza
+    constraints.push(SimpleConstraint::AlignRight(vec![
+        spine_id.clone(),
+        head_id.clone(),
+    ]));
+
+    // Última rama superior debe estar a la izquierda de la cabeza
+    if !top_branch_ids.is_empty() {
+        let last_top = &top_branch_ids[top_branch_ids.len() - 1];
+        constraints.push(SimpleConstraint::LeftOf(last_top.clone(), head_id.clone()));
+        // constraints.push(SimpleConstraint::HorizontalSpacing(
+        //     last_top.clone(),
+        //     head_id.clone(),
+        //     50.0,
+        // ));
+    }
+
+    // Última rama inferior debe estar a la izquierda de la cabeza
+    if !bottom_branch_ids.is_empty() {
+        let last_bottom = &bottom_branch_ids[bottom_branch_ids.len() - 1];
+        constraints.push(SimpleConstraint::LeftOf(
+            last_bottom.clone(),
+            head_id.clone(),
+        ));
+        // constraints.push(SimpleConstraint::HorizontalSpacing(
+        //     last_bottom.clone(),
+        //     head_id.clone(),
+        //     50.0,
+        // ));
     }
 
     // 3. Create children with positions
-    let mut children_with_pos = vec![
-        (spine.clone(), Some(Point::new(0.0, 0.0))),
-        (head.clone(), Some(Point::new(700.0, spine_y - 30.0))),
-    ];
+    let mut children_with_pos = vec![(spine.clone(), None), (head.clone(), None)];
     children_with_pos.extend(all_branches);
 
+    // Head positioned at the end of spine
+    constraints.push(SimpleConstraint::RightOf(head_id.clone(), spine_id.clone()));
+    constraints.push(SimpleConstraint::AlignCenterVertical(vec![
+        spine_id.clone(),
+        head_id.clone(),
+    ]));
+
     // 4. Create container with constraints
-    let container = builder.new_constraint_layout_container(
-        id.to_string(),
-        children_with_pos,
-        constraints, // Now we pass the constraints instead of empty vec
-    );
+    let container =
+        builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
 
     Ok(container)
 }
@@ -222,20 +306,15 @@ fn create_top_branch(
     let left_col_id = format!("{}_left_col", id);
     let right_col_id = format!("{}_right_col", id);
 
-    // Calculate line height
-    let left_count = count_items(&left_items);
-    let right_count = count_items(&right_items);
-    let max_items = left_count.max(right_count);
-    let line_height = (max_items as f32 * 30.0).max(80.0);
-
-    // 1. Create vertical line going UP
-    let line = builder.new_line(
+    // 1. Create vertical line as a rectangle (going UP)
+    let line = builder.new_rectangle(
         line_id.clone(),
-        (0.0, 0.0),
-        (0.0, -line_height), // Negative = going up
-        LineOptions {
-            stroke_color: "black".to_string(),
-            stroke_width: 2.0,
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(2.0), // 2px ancho como línea
+            height_behavior: SizeBehavior::Content,   // Altura dinámica
+            fill_color: Fill::Color("black".to_string()),
+            stroke_width: 0.0,
+            ..Default::default()
         },
     );
 
@@ -278,42 +357,30 @@ fn create_top_branch(
     }
 
     // 5. Create vstacks
-    let left_col = builder.new_vstack(
-        left_col_id.clone(),
-        left_nodes,
-        HorizontalAlignment::Right,
-    );
-
-    let right_col = builder.new_vstack(
-        right_col_id.clone(),
-        right_nodes,
-        HorizontalAlignment::Left,
-    );
+    let left_col = builder.new_vstack(left_col_id.clone(), left_nodes, HorizontalAlignment::Right);
+    let right_col =
+        builder.new_vstack(right_col_id.clone(), right_nodes, HorizontalAlignment::Left);
 
     // 6. Create constraint container
     let children_with_pos = vec![
-        (line.clone(), Some(Point::new(0.0, 0.0))),
+        (line.clone(), None),
         (header.clone(), None),
         (left_col.clone(), None),
         (right_col.clone(), None),
     ];
 
     let constraints = vec![
-        // Header above the line (at the top end)
         SimpleConstraint::AlignCenterHorizontal(vec![line_id.clone(), header_id.clone()]),
-        SimpleConstraint::Above(header_id.clone(), line_id.clone()),
-        SimpleConstraint::VerticalSpacing(header_id.clone(), line_id.clone(), 5.0),
-        // Left column to the left of line, aligned at line start (top)
+        SimpleConstraint::Above(header_id.clone(), left_col_id.clone()),
+        SimpleConstraint::Above(header_id.clone(), right_col_id.clone()),
+        // Left column to the left of line, aligned at top (where line connects to spine)
         SimpleConstraint::LeftOf(left_col_id.clone(), line_id.clone()),
-        SimpleConstraint::HorizontalSpacing(left_col_id.clone(), line_id.clone(), 10.0),
-        SimpleConstraint::AlignBottom(vec![line_id.clone(), left_col_id.clone()]),
         // Right column to the right of line
         SimpleConstraint::RightOf(right_col_id.clone(), line_id.clone()),
-        SimpleConstraint::HorizontalSpacing(line_id.clone(), right_col_id.clone(), 10.0),
-        SimpleConstraint::AlignBottom(vec![line_id.clone(), right_col_id.clone()]),
     ];
 
-    let branch = builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
+    let branch =
+        builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
     Ok(branch)
 }
 
@@ -330,20 +397,15 @@ fn create_bottom_branch(
     let left_col_id = format!("{}_left_col", id);
     let right_col_id = format!("{}_right_col", id);
 
-    // Calculate line height
-    let left_count = count_items(&left_items);
-    let right_count = count_items(&right_items);
-    let max_items = left_count.max(right_count);
-    let line_height = (max_items as f32 * 30.0).max(80.0);
-
-    // 1. Create vertical line going DOWN
-    let line = builder.new_line(
+    // 1. Create vertical line as a rectangle (going DOWN)
+    let line = builder.new_rectangle(
         line_id.clone(),
-        (0.0, 0.0),
-        (0.0, line_height), // Positive = going down
-        LineOptions {
-            stroke_color: "black".to_string(),
-            stroke_width: 2.0,
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(2.0), // 2px ancho como línea
+            height_behavior: SizeBehavior::Content,   // Altura dinámica
+            fill_color: Fill::Color("black".to_string()),
+            stroke_width: 0.0,
+            ..Default::default()
         },
     );
 
@@ -386,42 +448,31 @@ fn create_bottom_branch(
     }
 
     // 5. Create vstacks
-    let left_col = builder.new_vstack(
-        left_col_id.clone(),
-        left_nodes,
-        HorizontalAlignment::Right,
-    );
-
-    let right_col = builder.new_vstack(
-        right_col_id.clone(),
-        right_nodes,
-        HorizontalAlignment::Left,
-    );
+    let left_col = builder.new_vstack(left_col_id.clone(), left_nodes, HorizontalAlignment::Right);
+    let right_col =
+        builder.new_vstack(right_col_id.clone(), right_nodes, HorizontalAlignment::Left);
 
     // 6. Create constraint container
     let children_with_pos = vec![
-        (line.clone(), Some(Point::new(0.0, 0.0))),
+        (line.clone(), None),
         (header.clone(), None),
         (left_col.clone(), None),
         (right_col.clone(), None),
     ];
 
     let constraints = vec![
-        // Header below the line (at the bottom end)
+        // Header below the line
         SimpleConstraint::AlignCenterHorizontal(vec![line_id.clone(), header_id.clone()]),
-        SimpleConstraint::Below(header_id.clone(), line_id.clone()),
-        SimpleConstraint::VerticalSpacing(line_id.clone(), header_id.clone(), 5.0),
-        // Left column to the left of line, aligned at line start (top)
+        SimpleConstraint::Below(header_id.clone(), left_col_id.clone()),
+        SimpleConstraint::Below(header_id.clone(), right_col_id.clone()),
+        // Left column to the left of line, aligned at top (where line connects to spine)
         SimpleConstraint::LeftOf(left_col_id.clone(), line_id.clone()),
-        SimpleConstraint::HorizontalSpacing(left_col_id.clone(), line_id.clone(), 10.0),
-        SimpleConstraint::AlignTop(vec![line_id.clone(), left_col_id.clone()]),
         // Right column to the right of line
         SimpleConstraint::RightOf(right_col_id.clone(), line_id.clone()),
-        SimpleConstraint::HorizontalSpacing(line_id.clone(), right_col_id.clone(), 10.0),
-        SimpleConstraint::AlignTop(vec![line_id.clone(), right_col_id.clone()]),
     ];
 
-    let branch = builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
+    let branch =
+        builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
     Ok(branch)
 }
 
