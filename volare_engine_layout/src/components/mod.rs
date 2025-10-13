@@ -69,6 +69,7 @@ impl Size {
 //Note: add new items to the end of the enum to avoid breaking the serialization
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityType {
+    PointShape,
     BoxShape,
     RectShape,
     TextShape,
@@ -187,6 +188,11 @@ impl Clone for SpacerDirection {
             SpacerDirection::Both => SpacerDirection::Both,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct PointShape {
+    pub entity: EntityID
 }
 
 /**
@@ -783,8 +789,8 @@ impl Entity for HorizontalStack {
 
 pub struct ShapeLine {
     pub entity: EntityID,
-    pub start: (Float, Float),
-    pub end: (Float, Float),
+    pub start: LinePointReference,
+    pub end: LinePointReference,
     pub line_options: LineOptions,
 }
 
@@ -792,18 +798,25 @@ impl Clone for ShapeLine {
     fn clone(&self) -> Self {
         ShapeLine {
             entity: self.entity.clone(),
-            start: self.start,
-            end: self.end,
+            start: self.start.clone(),
+            end: self.end.clone(),
             line_options: self.line_options.clone(),
         }
     }
 }
 
+/// A line can set the x,y values directly or through a separate Point entity
+/// Referencing through point entity is useful for using with constraint systems
+#[derive(Debug,Clone)]
+pub enum LinePointReference {
+    Value(Float, Float),
+    PointID(EntityID),
+}
 impl ShapeLine {
     pub fn new(
         line_id: EntityID,
-        start: (Float, Float),
-        end: (Float, Float),
+        start: LinePointReference,
+        end: LinePointReference,
         options: LineOptions,
     ) -> ShapeLine {
         ShapeLine {
@@ -853,6 +866,7 @@ impl LineOptions {
     }
 }
 
+// TODO: Add LinePointReference  support.
 pub struct PolyLine {
     pub entity: EntityID,
     pub points: Vec<(Float, Float)>,

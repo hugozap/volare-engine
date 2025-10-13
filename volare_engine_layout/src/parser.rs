@@ -832,7 +832,7 @@ impl JsonLinesParser {
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_line(entity_id.to_string(), start_point, end_point, options))
+                Ok(builder.new_line(entity_id.to_string(), LinePointReference::Value(start_point.0, start_point.1), LinePointReference::Value(end_point.0, end_point.1), options))
             }
 
             "ellipse" => {
