@@ -9,8 +9,8 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect,
-    ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point,
+    ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -100,8 +100,8 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     };
 
     // let transform_x = desired_content_x - wrapped_elem_bounds.x;
-     let transform_x = desired_content_x;
-     let transform_y = desired_content_y;
+    let transform_x = desired_content_x;
+    let transform_y = desired_content_y;
 
     session.set_position(shape_box.wrapped_entity.clone(), transform_x, transform_y);
 
@@ -307,7 +307,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         // Add line height
         y += line_size.1;
 
-        if i < shape_text.lines.len() -1 {
+        if i < shape_text.lines.len() - 1 {
             y += shape_text.text_options.line_spacing;
         }
     }
@@ -328,21 +328,50 @@ pub fn layout_spacer(session: &mut DiagramBuilder, spacer: &ShapeSpacer) {
 
 /**
  * Updates the size of the line entity based on the start and end points
+ * Points can be set directly or through other Point entitys
  */
 pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
-    let start = shape_line.start;
-    let end = shape_line.end;
-    //the line x is the minimum of the start and end x
-    let x = start.0.min(end.0);
-    let y = start.1.min(end.1);
+    let start = shape_line.start.clone();
+    let end = shape_line.end.clone();
+
+    let mut start_point = Point::new(0.0, 0.0);
+    let mut end_point = Point::new(0.0, 0.0);
+
+    match start {
+        LinePointReference::Value(x, y) => {
+            start_point.x = x;
+            start_point.y = y;
+        }
+        // Lines can refer a point (technically it can be any other entity with a position)
+        LinePointReference::PointID(id) => {
+            let pos = session.get_position(id);
+            start_point.x = pos.0;
+            start_point.y = pos.1;
+        }
+    }
+
+    match end {
+        LinePointReference::Value(x, y) => {
+            end_point.x = x;
+            end_point.y = y;
+        }
+        // Lines can refer a point (technically it can be any other entity with a position)
+        LinePointReference::PointID(id) => {
+            let pos = session.get_position(id);
+            end_point.x = pos.0;
+            end_point.y = pos.1;
+        }
+    }
 
     session.set_size(
         shape_line.entity.clone(),
-        (end.0 - start.0).abs(),
-        (end.1 - start.1).abs(),
+        (end_point.x - start_point.x).abs(),
+        (end_point.y - start_point.y).abs(),
     );
 
-    session.set_position(shape_line.entity.clone(), x, y);
+    // Note: The line is defined by the points, so don't set its position directly
+    // Will be the default pos (0,0)
+    // session.set_position(shape_line.entity.clone(), x, y);
 }
 
 /**
@@ -605,19 +634,18 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         let line_size = session.get_size(line_id.clone());
         if i < horizontal_line_positions.len() {
             let line = session.get_line_mut(line_id.clone());
-            let line_w:Float;
+            let line_w: Float;
             let line_h: Float;
             if let Some(line) = line {
-                line.start = (0.0, horizontal_line_positions[i]);
-                line.end = (width, horizontal_line_positions[i]);
-                line_w = line.end.0 - line.start.0;
-                line_h = line.end.1 - line.start.1;
+                let start_point = Point::new(0.0, horizontal_line_positions[i]);
+                let end_point = Point::new(width, horizontal_line_positions[i]);
+
+                line.start = LinePointReference::Value(start_point.x, start_point.y);
+                line.end = LinePointReference::Value(end_point.x, end_point.y);
+                line_w = end_point.x - start_point.x;
+                line_h = end_point.y - start_point.y;
                 // correct size of line
-                session.set_size(
-                    line_id.clone(),
-                    line_w,
-                    line_h
-                )
+                session.set_size(line_id.clone(), line_w, line_h)
             }
         }
     }
@@ -626,19 +654,17 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         //get the size of the line (should be 0,0 by default)
         if i < vertical_line_positions.len() {
             let line = session.get_line_mut(line_id.clone());
-            let line_w:Float;
+            let line_w: Float;
             let line_h: Float;
             if let Some(line) = line {
-                line.start = (vertical_line_positions[i], 0.0);
-                line.end = (vertical_line_positions[i],height);
-                line_w = line.end.0 - line.start.0;
-                line_h = line.end.1 - line.start.1;
+                let start_point = Point::new(vertical_line_positions[i], 0.0);
+                let end_point = Point::new(vertical_line_positions[i], height);
+                line.start = LinePointReference::Value(start_point.x, start_point.y);
+                line.end = LinePointReference::Value(end_point.x, end_point.y);
+                line_w = end_point.x - start_point.x;
+                line_h = end_point.y - start_point.y;
                 // correct size of line
-                session.set_size(
-                    line_id.clone(),
-                    line_w,
-                    line_h
-                )
+                session.set_size(line_id.clone(), line_w, line_h)
             }
         }
     }

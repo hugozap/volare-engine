@@ -311,7 +311,7 @@ impl ConstraintSystem {
                 let vars1 = self.variables.get(&id1).context("entity not found")?;
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
-                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y + vars2.height)
+                    .add_constraint(vars1.y | GE(REQUIRED) | vars2.y + vars2.height)
                     .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
             SimpleConstraint::Above(id1, id2) => {
@@ -319,7 +319,7 @@ impl ConstraintSystem {
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
                 // id1 está arriba de id2: id1.y + id1.height = id2.y
                 self.solver
-                    .add_constraint((vars1.y + vars1.height) | EQ(REQUIRED) | vars2.y)
+                    .add_constraint((vars1.y + vars1.height) | LE(REQUIRED) | vars2.y)
                     .map_err(|e| anyhow::anyhow!("Failed to add above constraint: {:?}", e))?;
             }
             SimpleConstraint::HorizontalSpacing(id1, id2, spacing) => {

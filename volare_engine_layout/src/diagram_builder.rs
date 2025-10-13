@@ -31,6 +31,7 @@ pub struct DiagramBuilder {
     pub entityTypes: HashMap<EntityID, EntityType>,
 
     // Components
+    points: HashMap<EntityID, PointShape>,
     boxes: HashMap<EntityID, ShapeBox>,
     rectangles: HashMap<EntityID, ShapeRect>,
     groups: HashMap<EntityID, ShapeGroup>,
@@ -94,6 +95,7 @@ impl DiagramBuilder {
             container_relative_positions: HashMap::new(),
             sizes: HashMap::new(),
             transforms: HashMap::new(),
+            points: HashMap::new(),
             boxes: HashMap::new(),
             rectangles: HashMap::new(),
             groups: HashMap::new(),
@@ -363,6 +365,22 @@ impl DiagramBuilder {
         node
     }
 
+    /// Points are useful to create lines when the start or end point is used in a constraint
+    pub fn new_point(
+        &mut self,
+        id: EntityID,
+    ) -> DiagramTreeNode {
+        let _ = self.new_entity(id.clone(), EntityType::PointShape);
+        let point = PointShape { entity: id.clone()};
+        self.points.insert(id.clone(), point);
+        let node = DiagramTreeNode {
+            entity_type: EntityType::PointShape,
+            entity_id: id.clone(),
+            children:Vec::new(),
+        };
+        node
+    }
+
     // Add the new_arc method
     pub fn new_arc(
         &mut self,
@@ -524,8 +542,8 @@ impl DiagramBuilder {
     pub fn new_line(
         &mut self,
         id: EntityID,
-        start: (Float, Float),
-        end: (Float, Float),
+        start: LinePointReference,
+        end: LinePointReference,
         options: LineOptions,
     ) -> DiagramTreeNode {
         let line_id = self.new_entity(id, EntityType::LineShape);
@@ -613,8 +631,8 @@ impl DiagramBuilder {
             self.new_entity(line_id.clone(), EntityType::LineShape);
             let line = ShapeLine::new(
                 line_id.clone(),
-                (0.0, 0.0),
-                (0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
                 LineOptions {
                     stroke_color: options.border_color.clone(),
                     stroke_width: 1.0,
@@ -630,8 +648,8 @@ impl DiagramBuilder {
             self.new_entity(line_id.clone(), EntityType::LineShape);
             let line = ShapeLine::new(
                 line_id.clone(),
-                (0.0, 0.0),
-                (0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
                 LineOptions {
                     stroke_color: options.border_color.clone(),
                     stroke_width: 1.0,
