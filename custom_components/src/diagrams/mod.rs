@@ -2,12 +2,12 @@ use std::fmt::format;
 
 use crate::diagram_builder::{DiagramBuilder, DiagramTreeNode};
 use crate::document::style::{
-    BG_ACCENT, BG_PRIMARY, BG_SECONDARY, BORDER_LIGHT_COLOR, DOCUMENT_WIDTH_DEFAULT, FONT_SANS,
-    FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX, FONT_WEIGHT_BOLD_MD, FONT_WEIGHT_NORMAL,
-    LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED, LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL,
-    PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL, SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL,
-    TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS, WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY_PANEL,
-    WIDTH_SM, WIDTH_XL,
+    BG_ACCENT, BG_PRIMARY, BG_SECONDARY, BORDER_LIGHT_COLOR, BORDER_STRONG_COLOR,
+    DOCUMENT_WIDTH_DEFAULT, FONT_SANS, FONT_WEIGHT_BOLD_LIGHT, FONT_WEIGHT_BOLD_MAX,
+    FONT_WEIGHT_BOLD_MD, FONT_WEIGHT_NORMAL, LINE_HEIGHT_NORMAL, LINE_HEIGHT_RELAXED,
+    LINE_HEIGHT_TIGHT, MUTED_TEXT, PADDING_NORMAL, PRIMARY_TEXT, SECONDARY_TEXT, SPACE_3XL,
+    SPACE_MD, SPACE_SM, SPACE_XS, TEXT_2XL, TEXT_3XL, TEXT_BASE, TEXT_LG, TEXT_XL, TEXT_XS,
+    WIDTH_FULL, WIDTH_LG, WIDTH_MD, WIDTH_PROPERTY_PANEL, WIDTH_SM, WIDTH_XL,
 };
 use crate::document::theme::BODY_COLOR;
 use crate::parser::{
@@ -303,21 +303,27 @@ fn create_top_branch(
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
     let line_id = format!("{}_line", id);
+    let line_start_id = format!("{}_line_start", id);
+    let line_end_id = format!("{}_line_end", id);
     let header_id = format!("{}_header", id);
     let left_col_id = format!("{}_left_col", id);
     let right_col_id = format!("{}_right_col", id);
 
+
+    let start_point = builder.new_point(line_start_id.clone());
+    let end_point = builder.new_point(line_end_id.clone());
     // 1. Create vertical line as a rectangle (going UP)
-    let line = builder.new_rectangle(
-        line_id.clone(),
-        RectOptions {
-            width_behavior: SizeBehavior::Fixed(2.0), // 2px ancho como línea
-            height_behavior: SizeBehavior::Content,   // Altura dinámica
-            fill_color: Fill::Color("black".to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
+    let line = builder.new_line(
+        line_id,
+        LinePointReference::PointID(line_start_id.clone()),
+        LinePointReference::PointID(line_end_id.clone()),
+        LineOptions {
+            stroke_color: BORDER_STRONG_COLOR.to_owned(),
+            stroke_width: 1.0,
         },
     );
+
+
 
     // 2. Create header (text above line)
     let header_text = builder.new_text(
@@ -371,13 +377,20 @@ fn create_top_branch(
     ];
 
     let constraints = vec![
-        SimpleConstraint::AlignCenterHorizontal(vec![line_id.clone(), header_id.clone()]),
+        SimpleConstraint::AlignCenterHorizontal(vec![line_start_id.clone(), header_id.clone()]),
+        SimpleConstraint::AlignCenterHorizontal(vec![line_end_id.clone(), header_id.clone()]),
         SimpleConstraint::Above(header_id.clone(), left_col_id.clone()),
         SimpleConstraint::Above(header_id.clone(), right_col_id.clone()),
-        // Left column to the left of line, aligned at top (where line connects to spine)
-        SimpleConstraint::LeftOf(left_col_id.clone(), line_id.clone()),
-        // Right column to the right of line
-        SimpleConstraint::RightOf(right_col_id.clone(), line_id.clone()),
+
+        SimpleConstraint::LeftOf(left_col_id.clone(), right_col_id.clone()),
+
+
+        SimpleConstraint::LeftOf(left_col_id.clone(), line_start_id.clone()),
+        SimpleConstraint::RightOf(right_col_id.clone(), line_start_id.clone()),
+
+        SimpleConstraint::AlignBottom(vec![line_start_id.clone(), left_col_id.clone(), right_col_id.clone()]),
+        SimpleConstraint::AlignBottom(vec![line_end_id.clone(), header_id.clone()]),
+
     ];
 
     let branch =
