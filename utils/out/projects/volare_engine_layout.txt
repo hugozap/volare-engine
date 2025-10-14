@@ -1285,8 +1285,8 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, Point, ShapeArc, ShapeRect,
-    ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point,
+    ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -1376,8 +1376,8 @@ pub fn layout_box(session: &mut DiagramBuilder, shape_box: &ShapeBox) {
     };
 
     // let transform_x = desired_content_x - wrapped_elem_bounds.x;
-     let transform_x = desired_content_x;
-     let transform_y = desired_content_y;
+    let transform_x = desired_content_x;
+    let transform_y = desired_content_y;
 
     session.set_position(shape_box.wrapped_entity.clone(), transform_x, transform_y);
 
@@ -1583,7 +1583,7 @@ pub fn layout_text(session: &mut DiagramBuilder, shape_text: &ShapeText) {
         // Add line height
         y += line_size.1;
 
-        if i < shape_text.lines.len() -1 {
+        if i < shape_text.lines.len() - 1 {
             y += shape_text.text_options.line_spacing;
         }
     }
@@ -1604,21 +1604,50 @@ pub fn layout_spacer(session: &mut DiagramBuilder, spacer: &ShapeSpacer) {
 
 /**
  * Updates the size of the line entity based on the start and end points
+ * Points can be set directly or through other Point entitys
  */
 pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
-    let start = shape_line.start;
-    let end = shape_line.end;
-    //the line x is the minimum of the start and end x
-    let x = start.0.min(end.0);
-    let y = start.1.min(end.1);
+    let start = shape_line.start.clone();
+    let end = shape_line.end.clone();
+
+    let mut start_point = Point::new(0.0, 0.0);
+    let mut end_point = Point::new(0.0, 0.0);
+
+    match start {
+        LinePointReference::Value(x, y) => {
+            start_point.x = x;
+            start_point.y = y;
+        }
+        // Lines can refer a point (technically it can be any other entity with a position)
+        LinePointReference::PointID(id) => {
+            let pos = session.get_position(id);
+            start_point.x = pos.0;
+            start_point.y = pos.1;
+        }
+    }
+
+    match end {
+        LinePointReference::Value(x, y) => {
+            end_point.x = x;
+            end_point.y = y;
+        }
+        // Lines can refer a point (technically it can be any other entity with a position)
+        LinePointReference::PointID(id) => {
+            let pos = session.get_position(id);
+            end_point.x = pos.0;
+            end_point.y = pos.1;
+        }
+    }
 
     session.set_size(
         shape_line.entity.clone(),
-        (end.0 - start.0).abs(),
-        (end.1 - start.1).abs(),
+        (end_point.x - start_point.x).abs(),
+        (end_point.y - start_point.y).abs(),
     );
 
-    session.set_position(shape_line.entity.clone(), x, y);
+    // Note: The line is defined by the points, so don't set its position directly
+    // Will be the default pos (0,0)
+    // session.set_position(shape_line.entity.clone(), x, y);
 }
 
 /**
@@ -1881,19 +1910,18 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         let line_size = session.get_size(line_id.clone());
         if i < horizontal_line_positions.len() {
             let line = session.get_line_mut(line_id.clone());
-            let line_w:Float;
+            let line_w: Float;
             let line_h: Float;
             if let Some(line) = line {
-                line.start = (0.0, horizontal_line_positions[i]);
-                line.end = (width, horizontal_line_positions[i]);
-                line_w = line.end.0 - line.start.0;
-                line_h = line.end.1 - line.start.1;
+                let start_point = Point::new(0.0, horizontal_line_positions[i]);
+                let end_point = Point::new(width, horizontal_line_positions[i]);
+
+                line.start = LinePointReference::Value(start_point.x, start_point.y);
+                line.end = LinePointReference::Value(end_point.x, end_point.y);
+                line_w = end_point.x - start_point.x;
+                line_h = end_point.y - start_point.y;
                 // correct size of line
-                session.set_size(
-                    line_id.clone(),
-                    line_w,
-                    line_h
-                )
+                session.set_size(line_id.clone(), line_w, line_h)
             }
         }
     }
@@ -1902,19 +1930,17 @@ pub fn layout_table(session: &mut DiagramBuilder, table: &Table) {
         //get the size of the line (should be 0,0 by default)
         if i < vertical_line_positions.len() {
             let line = session.get_line_mut(line_id.clone());
-            let line_w:Float;
+            let line_w: Float;
             let line_h: Float;
             if let Some(line) = line {
-                line.start = (vertical_line_positions[i], 0.0);
-                line.end = (vertical_line_positions[i],height);
-                line_w = line.end.0 - line.start.0;
-                line_h = line.end.1 - line.start.1;
+                let start_point = Point::new(vertical_line_positions[i], 0.0);
+                let end_point = Point::new(vertical_line_positions[i], height);
+                line.start = LinePointReference::Value(start_point.x, start_point.y);
+                line.end = LinePointReference::Value(end_point.x, end_point.y);
+                line_w = end_point.x - start_point.x;
+                line_h = end_point.y - start_point.y;
                 // correct size of line
-                session.set_size(
-                    line_id.clone(),
-                    line_w,
-                    line_h
-                )
+                session.set_size(line_id.clone(), line_w, line_h)
             }
         }
     }
@@ -2175,6 +2201,10 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             layout_arc(session, &arc);
         }
 
+        EntityType::PointShape => {
+            // Ignore points
+        }
+
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
     }
@@ -2326,6 +2356,9 @@ pub enum SimpleConstraint {
     SameWidth(Vec<EntityID>),
     /// All entities should have the same height. First is reference.
     SameHeight(Vec<EntityID>),
+    /// All entities should have at least the same height (or more) than first.
+    AtLeastSameHeight(Vec<EntityID>),
+    MinHeight(EntityID, Float),
     /// All entities should have the same size. First is reference.
     SameSize(Vec<EntityID>),
 
@@ -2458,10 +2491,10 @@ impl ConstraintSystem {
                     return Err(anyhow::anyhow!("AlignRight requires at least 2 entities"));
                 }
                 let reference = &entities[0];
-                let ref_vars = self
-                    .variables
-                    .get(reference).context(format!("entity not registered in constrain system {}", reference))?;
-                  
+                let ref_vars = self.variables.get(reference).context(format!(
+                    "entity not registered in constrain system {}",
+                    reference
+                ))?;
 
                 for entity in entities.iter().skip(1) {
                     let vars = self.variables.get(entity).context("entity not found")?;
@@ -2595,17 +2628,17 @@ impl ConstraintSystem {
                 let vars1 = self.variables.get(&id1).context("entity not found")?;
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
                 self.solver
-                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y + vars2.height)
+                    .add_constraint(vars1.y | GE(REQUIRED) | vars2.y + vars2.height)
                     .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
             }
             SimpleConstraint::Above(id1, id2) => {
                 let vars1 = self.variables.get(&id1).context("entity not found")?;
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
+                // id1 está arriba de id2: id1.y + id1.height = id2.y
                 self.solver
-                    .add_constraint(vars1.y | EQ(REQUIRED) | vars2.y - vars2.height)
-                    .map_err(|e| anyhow::anyhow!("Failed to add bottomOf constraint: {:?}", e))?;
+                    .add_constraint((vars1.y + vars1.height) | LE(REQUIRED) | vars2.y)
+                    .map_err(|e| anyhow::anyhow!("Failed to add above constraint: {:?}", e))?;
             }
-
             SimpleConstraint::HorizontalSpacing(id1, id2, spacing) => {
                 let vars1 = self.variables.get(&id1).context("entity not found")?;
                 let vars2 = self.variables.get(&id2).context("entity not found")?;
@@ -2784,6 +2817,35 @@ impl ConstraintSystem {
                             anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
                         })?;
                 }
+            }
+
+             SimpleConstraint::AtLeastSameHeight(entities) => {
+                if entities.len() < 2 {
+                    return Err(anyhow::anyhow!("SameHeight requires at least 2 entities"));
+                }
+                let reference = &entities[0];
+                let ref_vars = self
+                    .variables
+                    .get(reference)
+                    .context("Reference entity not found")?;
+
+                for entity in entities.iter().skip(1) {
+                    let vars = self.variables.get(entity).context("entity not found")?;
+                    self.solver
+                        .add_constraint(vars.height | GE(REQUIRED) | ref_vars.height)
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
+                        })?;
+                }
+            }
+
+            SimpleConstraint::MinHeight(id, h) => {
+               let vars = self.variables.get(&id).context("entity not found")?;
+                self.solver
+                    .add_constraint(vars.height | GE(REQUIRED) | h)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add min height constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::SameSize(entities) => {
@@ -3273,6 +3335,7 @@ impl Size {
 //Note: add new items to the end of the enum to avoid breaking the serialization
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityType {
+    PointShape,
     BoxShape,
     RectShape,
     TextShape,
@@ -3391,6 +3454,13 @@ impl Clone for SpacerDirection {
             SpacerDirection::Both => SpacerDirection::Both,
         }
     }
+}
+
+// Point doesn't have any attributes, position is handled with transformations as the rest
+// This struct is useful for having points anchored to other elements positions
+#[derive(Debug, Clone)]
+pub struct PointShape {
+    pub entity: EntityID
 }
 
 /**
@@ -3987,8 +4057,8 @@ impl Entity for HorizontalStack {
 
 pub struct ShapeLine {
     pub entity: EntityID,
-    pub start: (Float, Float),
-    pub end: (Float, Float),
+    pub start: LinePointReference,
+    pub end: LinePointReference,
     pub line_options: LineOptions,
 }
 
@@ -3996,18 +4066,25 @@ impl Clone for ShapeLine {
     fn clone(&self) -> Self {
         ShapeLine {
             entity: self.entity.clone(),
-            start: self.start,
-            end: self.end,
+            start: self.start.clone(),
+            end: self.end.clone(),
             line_options: self.line_options.clone(),
         }
     }
 }
 
+/// A line can set the x,y values directly or through a separate Point entity
+/// Referencing through point entity is useful for using with constraint systems
+#[derive(Debug,Clone)]
+pub enum LinePointReference {
+    Value(Float, Float),
+    PointID(EntityID),
+}
 impl ShapeLine {
     pub fn new(
         line_id: EntityID,
-        start: (Float, Float),
-        end: (Float, Float),
+        start: LinePointReference,
+        end: LinePointReference,
         options: LineOptions,
     ) -> ShapeLine {
         ShapeLine {
@@ -4057,6 +4134,7 @@ impl LineOptions {
     }
 }
 
+// TODO: Add LinePointReference  support.
 pub struct PolyLine {
     pub entity: EntityID,
     pub points: Vec<(Float, Float)>,
@@ -5572,19 +5650,20 @@ impl JsonLinesParser {
                    bail!("Missing attribute content or text");
                 }
 
+
+                // Only support "bold", otherwise return the value or "400" by default
                 let str_font_weight = &get_string_attr(
                         &entity.attributes,
                         &["font_weight"],
                         "400",
                     );
-                let f_weight:f32 = match str::parse(&self) => {
-                    Ok(val) => {
-                        val
-                    };
-                    
-
-
-                }
+                let f_weight:u32  = if let Ok(val) = str::parse::<u32>(&str_font_weight) {
+                    val 
+                } else if str_font_weight == "bold " {
+                    900
+                } else {
+                    400
+                };
 
                 let options = TextOptions {
                     font_size: get_float_attr(&entity.attributes, &["font_size"], 12.0),
@@ -5593,12 +5672,7 @@ impl JsonLinesParser {
                         &["color", "text_color"],
                         "black",
                     ),
-                    font_weight: str::parse(&get_string_attr(
-                        &entity.attributes,
-                        &["font_weight"],
-                        "400",
-                    ))
-                    .unwrap(),
+                    font_weight: f_weight,
                     font_family: get_string_attr(&entity.attributes, &["font_family"], "Arial"),
                     line_width: get_int_attr(&entity.attributes, &["line_width"], 200) as usize,
                     line_spacing: get_float_attr(&entity.attributes, &["line_spacing"], 0.0),
@@ -5810,7 +5884,7 @@ impl JsonLinesParser {
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_line(entity_id.to_string(), start_point, end_point, options))
+                Ok(builder.new_line(entity_id.to_string(), LinePointReference::Value(start_point.0, start_point.1), LinePointReference::Value(end_point.0, end_point.1), options))
             }
 
             "ellipse" => {
@@ -6644,6 +6718,7 @@ pub struct DiagramBuilder {
     pub entityTypes: HashMap<EntityID, EntityType>,
 
     // Components
+    points: HashMap<EntityID, PointShape>,
     boxes: HashMap<EntityID, ShapeBox>,
     rectangles: HashMap<EntityID, ShapeRect>,
     groups: HashMap<EntityID, ShapeGroup>,
@@ -6707,6 +6782,7 @@ impl DiagramBuilder {
             container_relative_positions: HashMap::new(),
             sizes: HashMap::new(),
             transforms: HashMap::new(),
+            points: HashMap::new(),
             boxes: HashMap::new(),
             rectangles: HashMap::new(),
             groups: HashMap::new(),
@@ -6757,6 +6833,7 @@ impl DiagramBuilder {
         self.constraint_systems.clear();
         self.images.clear();
         self.transforms.clear();
+        self.points.clear();
 
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
@@ -6976,6 +7053,22 @@ impl DiagramBuilder {
         node
     }
 
+    /// Points are useful to create lines when the start or end point is used in a constraint
+    pub fn new_point(
+        &mut self,
+        id: EntityID,
+    ) -> DiagramTreeNode {
+        let _ = self.new_entity(id.clone(), EntityType::PointShape);
+        let point = PointShape { entity: id.clone()};
+        self.points.insert(id.clone(), point);
+        let node = DiagramTreeNode {
+            entity_type: EntityType::PointShape,
+            entity_id: id.clone(),
+            children:Vec::new(),
+        };
+        node
+    }
+
     // Add the new_arc method
     pub fn new_arc(
         &mut self,
@@ -7137,8 +7230,8 @@ impl DiagramBuilder {
     pub fn new_line(
         &mut self,
         id: EntityID,
-        start: (Float, Float),
-        end: (Float, Float),
+        start: LinePointReference,
+        end: LinePointReference,
         options: LineOptions,
     ) -> DiagramTreeNode {
         let line_id = self.new_entity(id, EntityType::LineShape);
@@ -7226,8 +7319,8 @@ impl DiagramBuilder {
             self.new_entity(line_id.clone(), EntityType::LineShape);
             let line = ShapeLine::new(
                 line_id.clone(),
-                (0.0, 0.0),
-                (0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
                 LineOptions {
                     stroke_color: options.border_color.clone(),
                     stroke_width: 1.0,
@@ -7243,8 +7336,8 @@ impl DiagramBuilder {
             self.new_entity(line_id.clone(), EntityType::LineShape);
             let line = ShapeLine::new(
                 line_id.clone(),
-                (0.0, 0.0),
-                (0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
+                LinePointReference::Value(0.0, 0.0),
                 LineOptions {
                     stroke_color: options.border_color.clone(),
                     stroke_width: 1.0,

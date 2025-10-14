@@ -326,32 +326,38 @@ fn render_line(
     node: &DiagramTreeNode,
 ) {
     let line_shape = session.get_line(node.entity_id.clone());
-    let mut p_start = Point::new(0.0,0.0);
-    let mut p_end = Point::new(0.0,0.0);
+    let mut p_start = Point::new(0.0, 0.0);
+    let mut p_end = Point::new(0.0, 0.0);
 
     match line_shape.start.clone() {
-        LinePointReference::Value(x, y ) => {
+        LinePointReference::Value(x, y) => {
             p_start.x = x;
             p_start.y = y;
         }
 
-         LinePointReference::PointID(id) => {
+        LinePointReference::PointID(id) => {
             let pos = session.get_position(id);
-            p_start.x = pos.0;
-            p_start.y = pos.1;
+            let line_pos = session.get_position(line_shape.entity.clone());
+
+            // This is required to avoid applying transformation twice
+            p_start.x = pos.0 - line_pos.0; // Convert to line-relative coords
+            p_start.y = pos.1 - line_pos.1;
         }
     }
 
     match line_shape.end.clone() {
-        LinePointReference::Value(x, y ) => {
+        LinePointReference::Value(x, y) => {
             p_end.x = x;
             p_end.y = y;
         }
 
-         LinePointReference::PointID(id) => {
+        LinePointReference::PointID(id) => {
             let pos = session.get_position(id);
-            p_end.x = pos.0;
-            p_end.y = pos.1;
+            let line_pos = session.get_position(line_shape.entity.clone());
+
+            // This is required to avoid applying transformation twice
+            p_start.x = pos.0 - line_pos.0; // Convert to line-relative coords
+            p_start.y = pos.1 - line_pos.1;
         }
     }
 

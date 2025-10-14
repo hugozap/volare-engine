@@ -312,7 +312,7 @@ fn create_top_branch(
             width_behavior: SizeBehavior::Fixed(20.0),
             height_behavior: SizeBehavior::Content,
             fill_color: Fill::Color("transparent".to_owned()),
-            stroke_color: "red".to_owned(),
+            stroke_color: "transparent".to_owned(),
             stroke_width: 1.0,
             border_radius: 0.0,
         },
@@ -394,6 +394,16 @@ fn create_top_branch(
         SimpleConstraint::RightOf(right_col_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::Above(header_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::AlignCenterHorizontal(vec![header_id.clone(), spacer_rect_id.clone()]),
+
+        // linea vertical
+        SimpleConstraint::AlignTop(vec![spacer_rect_id.clone(), line_start_id.clone()]),
+        SimpleConstraint::AlignBottom(vec![spacer_rect_id.clone(), line_end_id.clone()]),
+
+        SimpleConstraint::AlignCenterHorizontal(vec![
+        spacer_rect_id.clone(), 
+        line_start_id.clone(), 
+        line_end_id.clone()
+    ]),
 
     ];
 

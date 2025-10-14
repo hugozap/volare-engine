@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Write};
 
 use crate::transform::Transform;
 use crate::{components::*, diagram_builder::*, DiagramBuilder, SimpleConstraint};
-use anyhow::{Context, Result,Error, bail};
+use anyhow::{bail, Context, Error, Result};
 use thiserror::Error;
 
 /// Simplified JSON Lines entity with only essential fields
@@ -94,9 +94,7 @@ pub enum ConstraintDeclaration {
     AspectRatio { entity: String, ratio: Float },
 }
 
-fn convert_constraint_declaration(
-    decl: &ConstraintDeclaration,
-) -> Result<SimpleConstraint> {
+fn convert_constraint_declaration(decl: &ConstraintDeclaration) -> Result<SimpleConstraint> {
     match decl {
         ConstraintDeclaration::AlignLeft { entities } => {
             Ok(SimpleConstraint::AlignLeft(entities.to_vec()))
@@ -154,7 +152,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::HorizontalSpacing { entities, spacing } => {
             if entities.len() != 2 {
-               bail!("horizontal_spacing requires exactly 2 entities");
+                bail!("horizontal_spacing requires exactly 2 entities");
             }
             Ok(SimpleConstraint::HorizontalSpacing(
                 entities[0].clone(),
@@ -174,7 +172,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::StackHorizontal { entities, spacing } => {
             if entities.len() < 2 {
-               bail!("stack_horizontal requires at least 2 entities");
+                bail!("stack_horizontal requires at least 2 entities");
             }
             Ok(SimpleConstraint::StackHorizontal(
                 entities.clone(),
@@ -539,11 +537,7 @@ impl JsonLinesParser {
     }
 
     /// Build the diagram tree from parsed entities
-    pub fn build(
-        &self,
-        root_id: &str,
-        builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode> {
+    pub fn build(&self, root_id: &str, builder: &mut DiagramBuilder) -> Result<DiagramTreeNode> {
         self.build_entity(root_id, builder)
     }
 
@@ -565,8 +559,7 @@ impl JsonLinesParser {
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
-            return builder
-                .create_custom_component(&entity_id, &component_type, &attributes, &self)
+            return builder.create_custom_component(&entity_id, &component_type, &attributes, &self);
         }
 
         // Handle built-in components using attribute helpers
@@ -595,18 +588,13 @@ impl JsonLinesParser {
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
-                   bail!("Missing attribute content or text");
+                    bail!("Missing attribute content or text");
                 }
 
-
                 // Only support "bold", otherwise return the value or "400" by default
-                let str_font_weight = &get_string_attr(
-                        &entity.attributes,
-                        &["font_weight"],
-                        "400",
-                    );
-                let f_weight:u32  = if let Ok(val) = str::parse::<u32>(&str_font_weight) {
-                    val 
+                let str_font_weight = &get_string_attr(&entity.attributes, &["font_weight"], "400");
+                let f_weight: u32 = if let Ok(val) = str::parse::<u32>(&str_font_weight) {
+                    val
                 } else if str_font_weight == "bold " {
                     900
                 } else {
@@ -832,7 +820,12 @@ impl JsonLinesParser {
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_line(entity_id.to_string(), LinePointReference::Value(start_point.0, start_point.1), LinePointReference::Value(end_point.0, end_point.1), options))
+                Ok(builder.new_line(
+                    entity_id.to_string(),
+                    LinePointReference::Value(start_point.0, start_point.1),
+                    LinePointReference::Value(end_point.0, end_point.1),
+                    options,
+                ))
             }
 
             "ellipse" => {
@@ -980,9 +973,7 @@ impl JsonLinesParser {
                         (width_behavior, height_behavior),
                     ))
                 } else {
-                    Err(JsonLinesError::MissingAttribute(
-                        "src or file_path".to_string(),
-                    ).into())
+                    Err(JsonLinesError::MissingAttribute("src or file_path".to_string()).into())
                 }
             }
 
@@ -1112,9 +1103,7 @@ impl JsonLinesParser {
                     constraints,
                 ))
             }
-            _ => Err(JsonLinesError::UnknownEntityType(
-                entity.entity_type.clone(),
-            ).into()),
+            _ => Err(JsonLinesError::UnknownEntityType(entity.entity_type.clone()).into()),
         }
     }
 
@@ -1312,8 +1301,7 @@ impl JsonLinesBuilder {
     }
 }
 
-
-#[derive( Debug)]
+#[derive(Debug)]
 pub enum JsonLinesError {
     ParseError { line: usize, message: String },
     EntityNotFound(String),
