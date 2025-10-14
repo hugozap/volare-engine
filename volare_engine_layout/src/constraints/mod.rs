@@ -44,6 +44,7 @@ pub enum SimpleConstraint {
     SameHeight(Vec<EntityID>),
     /// All entities should have at least the same height (or more) than first.
     AtLeastSameHeight(Vec<EntityID>),
+    MinHeight(EntityID, Float),
     /// All entities should have the same size. First is reference.
     SameSize(Vec<EntityID>),
 
@@ -522,6 +523,15 @@ impl ConstraintSystem {
                             anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
                         })?;
                 }
+            }
+
+            SimpleConstraint::MinHeight(id, h) => {
+               let vars = self.variables.get(&id).context("entity not found")?;
+                self.solver
+                    .add_constraint(vars.height | GE(REQUIRED) | h)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add min height constraint: {:?}", e)
+                    })?;
             }
 
             SimpleConstraint::SameSize(entities) => {

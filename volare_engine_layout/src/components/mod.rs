@@ -190,6 +190,8 @@ impl Clone for SpacerDirection {
     }
 }
 
+// Point doesn't have any attributes, position is handled with transformations as the rest
+// This struct is useful for having points anchored to other elements positions
 #[derive(Debug, Clone)]
 pub struct PointShape {
     pub entity: EntityID
