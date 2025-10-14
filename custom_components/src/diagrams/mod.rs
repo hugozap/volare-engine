@@ -67,7 +67,7 @@ pub fn create_ishikawa(
     parser: &JsonLinesParser,
 ) -> Result<DiagramTreeNode> {
     // Parse attributes
-    let problem = get_string_attr(attrs, &["problem"], "");
+    let problem = get_string_attr(attrs, &["problem"], "..");
 
     // IDs
     let spine_id = format!("{}_spine", id);
@@ -106,9 +106,9 @@ pub fn create_ishikawa(
             "Personas".to_string(),
             vec![
                 BranchItem::with_children(
-                    "Capacitación".to_string(),
+                    "Capacitación!!".to_string(),
                     vec![
-                        BranchItem::new("Falta cursos".to_string()),
+                        BranchItem::new("Falta cursos..".to_string()),
                         BranchItem::new("Sin presupuesto".to_string()),
                         BranchItem::new("Otro item".to_string()),
                         BranchItem::new("otro más".to_string()),
@@ -197,8 +197,8 @@ pub fn create_ishikawa(
 
     // Distribuir horizontalmente las ramas SUPERIORES
     if !top_branch_ids.is_empty() {
-        // Primera rama superior alineada con el inicio de la espina
-        constraints.push(SimpleConstraint::AlignLeft(vec![
+        // Primera rama superior alineada con el derecho de la espina
+        constraints.push(SimpleConstraint::AlignRight(vec![
             spine_id.clone(),
             top_branch_ids[0].clone(),
         ]));
@@ -246,10 +246,14 @@ pub fn create_ishikawa(
     }
 
     // La espina termina donde empieza la cabeza
-    constraints.push(SimpleConstraint::AlignRight(vec![
+    constraints.push(SimpleConstraint::LeftOf(
         spine_id.clone(),
         head_id.clone(),
-    ]));
+    ));
+
+    constraints.push(
+        SimpleConstraint::AlignCenterVertical(vec![head_id.clone(), spine_id.clone()])
+    );
 
     // Última rama superior debe estar a la izquierda de la cabeza
     if !top_branch_ids.is_empty() {
@@ -269,16 +273,12 @@ pub fn create_ishikawa(
             last_bottom.clone(),
             head_id.clone(),
         ));
-        // constraints.push(SimpleConstraint::HorizontalSpacing(
-        //     last_bottom.clone(),
-        //     head_id.clone(),
-        //     50.0,
-        // ));
+
     }
 
     // 3. Create children with positions
     let mut children_with_pos = vec![(spine.clone(), None), (head.clone(), None)];
-    children_with_pos.extend(all_branches);
+     children_with_pos.extend(all_branches);
 
     // Head positioned at the end of spine
     constraints.push(SimpleConstraint::RightOf(head_id.clone(), spine_id.clone()));
@@ -286,6 +286,9 @@ pub fn create_ishikawa(
         spine_id.clone(),
         head_id.clone(),
     ]));
+
+    constraints.push(SimpleConstraint::FixedWidth(spine_id.clone(), 600.0));
+
 
     // 4. Create container with constraints
     let container =
@@ -374,22 +377,45 @@ fn create_top_branch(
         (header.clone(), None),
         (left_col.clone(), None),
         (right_col.clone(), None),
+        (start_point, None),
+        (end_point.clone(), None),
     ];
 
     let constraints = vec![
-        SimpleConstraint::AlignCenterHorizontal(vec![line_start_id.clone(), header_id.clone()]),
-        SimpleConstraint::AlignCenterHorizontal(vec![line_end_id.clone(), header_id.clone()]),
+        // SimpleConstraint::AlignCenterHorizontal(vec![line_start_id.clone(), header_id.clone()]),
+        // SimpleConstraint::AlignCenterHorizontal(vec![line_end_id.clone(), header_id.clone()]),
         SimpleConstraint::Above(header_id.clone(), left_col_id.clone()),
         SimpleConstraint::Above(header_id.clone(), right_col_id.clone()),
 
         SimpleConstraint::LeftOf(left_col_id.clone(), right_col_id.clone()),
 
 
+        // line start entre left y right columns
         SimpleConstraint::LeftOf(left_col_id.clone(), line_start_id.clone()),
         SimpleConstraint::RightOf(right_col_id.clone(), line_start_id.clone()),
 
+        // line start y end alineados horizontalmente
+        SimpleConstraint::AlignCenterHorizontal(vec![line_start_id.clone(), line_end_id.clone()]),
+
+
+
         SimpleConstraint::AlignBottom(vec![line_start_id.clone(), left_col_id.clone(), right_col_id.clone()]),
         SimpleConstraint::AlignBottom(vec![line_end_id.clone(), header_id.clone()]),
+
+
+        //  SimpleConstraint::LeftOf(left_col_id.clone(), line_start_id.clone()),
+        //  SimpleConstraint::LeftOf(line_start_id.clone(), right_col_id.clone()),
+        //  SimpleConstraint::Below(header_id.clone(), left_col_id.clone()),
+        //  SimpleConstraint::Below(header_id.clone(), right_col_id.clone()),
+
+        //  SimpleConstraint::Below(line_end_id.clone(), left_col_id.clone() ),
+        //  SimpleConstraint::Below(line_end_id.clone(), right_col_id.clone() ),
+
+        //  SimpleConstraint::Above(line_start_id.clone(), left_col_id.clone() ),
+        //  SimpleConstraint::Above(line_start_id.clone(), right_col_id.clone() ),
+
+        //  SimpleConstraint::AlignCenterHorizontal(vec![line_start_id.clone(), header_id.clone()]),
+        //  SimpleConstraint::AlignCenterHorizontal(vec![line_end_id.clone(), header_id.clone()]),
 
     ];
 

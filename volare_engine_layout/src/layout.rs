@@ -925,6 +925,10 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             layout_arc(session, &arc);
         }
 
+        EntityType::PointShape => {
+            // Ignore points
+        }
+
         //if not recognized, show the name of it in the panic
         _ => panic!("Unknown entity type: {:?}", root.entity_type),
     }

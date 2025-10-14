@@ -146,6 +146,7 @@ impl DiagramBuilder {
         self.constraint_systems.clear();
         self.images.clear();
         self.transforms.clear();
+        self.points.clear();
 
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
