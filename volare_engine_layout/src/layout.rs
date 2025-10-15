@@ -733,18 +733,16 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
 }
 
-
 /// Determina si el size de un shape puede ser cambiado por un constraint
 /// Solo rectangulos y boxes pueden alterar su tamaño, el resto se considera fijo
 /// y el solver cassowary debe respetar esto
-fn isFixedSize(builder:&DiagramBuilder, id:EntityID) -> bool {
+fn isFixedSize(builder: &DiagramBuilder, id: EntityID) -> bool {
     let entity_type = builder.entityTypes.get(&id);
     if let Some(etype) = entity_type {
         match etype {
-            EntityType::BoxShape => true,
-            EntityType::RectShape => true,
-            _ => false
-
+            EntityType::BoxShape => false,
+            EntityType::RectShape => false,
+            _ => true,
         }
     } else {
         false
@@ -765,11 +763,10 @@ pub fn layout_constraint_container(
 
     // Recolectar bools que indican si el solver puede modificar o no el size del elemento
     let mut is_fixed_size_map = HashMap::<EntityID, bool>::new();
-    child_sizes.iter().for_each(|(id, (w,y))| {
-       let is_fixed =  isFixedSize(builder, id.clone());
-       is_fixed_size_map.insert(id.to_string(), is_fixed);
+    child_sizes.iter().for_each(|(id, (w, y))| {
+        let is_fixed = isFixedSize(builder, id.clone());
+        is_fixed_size_map.insert(id.to_string(), is_fixed);
     });
-
 
     let system = builder.get_constraint_system_mut(container.entity.clone());
 
@@ -777,7 +774,12 @@ pub fn layout_constraint_container(
     // at this point children already have their sizes calculated
     for (child_id, (w, h)) in child_sizes {
         system
-            .suggest_size(child_id.as_str(), w, h, is_fixed_size_map.get(&child_id).unwrap_or(&true).to_owned())
+            .suggest_size(
+                child_id.as_str(),
+                w,
+                h,
+                is_fixed_size_map.get(&child_id).unwrap_or(&true).to_owned(),
+            )
             .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
 

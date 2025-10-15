@@ -127,27 +127,29 @@ pub fn create_ishikawa(
         // ),
     ];
 
-    let bottom_categories = vec![
-        Category::new(
-            "Tecnología".to_string(),
-            vec![
-                BranchItem::new("Hardware obsoleto".to_string()),
-                BranchItem::with_children(
-                    "Software".to_string(),
-                    vec![
-                        BranchItem::new("Sin parches".to_string()),
-                        BranchItem::new("Versiones antiguas".to_string()),
-                    ],
-                ),
-            ],
-            vec![BranchItem::new("Falta integración".to_string())],
-        ),
-        Category::new(
-            "Ambiente".to_string(),
-            vec![BranchItem::new("Temperatura inestable".to_string())],
-            vec![BranchItem::new("Humedad alta".to_string())],
-        ),
-    ];
+    // let bottom_categories = vec![
+    //     Category::new(
+    //         "Tecnología".to_string(),
+    //         vec![
+    //             BranchItem::new("Hardware obsoleto".to_string()),
+    //             BranchItem::with_children(
+    //                 "Software".to_string(),
+    //                 vec![
+    //                     BranchItem::new("Sin parches".to_string()),
+    //                     BranchItem::new("Versiones antiguas".to_string()),
+    //                 ],
+    //             ),
+    //         ],
+    //         vec![BranchItem::new("Falta integración".to_string())],
+    //     ),
+    //     Category::new(
+    //         "Ambiente".to_string(),
+    //         vec![BranchItem::new("Temperatura inestable".to_string())],
+    //         vec![BranchItem::new("Humedad alta".to_string())],
+    //     ),
+    // ];
+
+    let bottom_categories: Vec::<Category> = vec![];
 
     // Create branches
     let mut all_branches = Vec::new();
