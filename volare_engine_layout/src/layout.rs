@@ -1,5 +1,6 @@
 /* Layout calculation for each type of entity */
 
+use std::collections::HashMap;
 use std::f32::{INFINITY, NEG_INFINITY};
 
 use crate::components::Float;
@@ -732,26 +733,51 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
 }
 
+
+/// Determina si el size de un shape puede ser cambiado por un constraint
+/// Solo rectangulos y boxes pueden alterar su tamaño, el resto se considera fijo
+/// y el solver cassowary debe respetar esto
+fn isFixedSize(builder:&DiagramBuilder, id:EntityID) -> bool {
+    let entity_type = builder.entityTypes.get(&id);
+    if let Some(etype) = entity_type {
+        match etype {
+            EntityType::BoxShape => true,
+            EntityType::RectShape => true,
+            _ => false
+
+        }
+    } else {
+        false
+    }
+}
 //TODO: Hay que cambiar, layout no debe crear el constraint system
 // el constraint system se registra en el builder
 pub fn layout_constraint_container(
-    session: &mut DiagramBuilder,
+    builder: &mut DiagramBuilder,
     container: &ConstraintLayoutContainer,
 ) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
     let child_sizes: Vec<(String, (Float, Float))> = container
         .children
         .iter()
-        .filter_map(|child_id| Some((child_id.clone(), session.get_size(child_id.clone()).clone())))
+        .filter_map(|child_id| Some((child_id.clone(), builder.get_size(child_id.clone()).clone())))
         .collect();
 
-    let system = session.get_constraint_system_mut(container.entity.clone());
+    // Recolectar bools que indican si el solver puede modificar o no el size del elemento
+    let mut is_fixed_size_map = HashMap::<EntityID, bool>::new();
+    child_sizes.iter().for_each(|(id, (w,y))| {
+       let is_fixed =  isFixedSize(builder, id.clone());
+       is_fixed_size_map.insert(id.to_string(), is_fixed);
+    });
+
+
+    let system = builder.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
     // at this point children already have their sizes calculated
     for (child_id, (w, h)) in child_sizes {
         system
-            .suggest_size(child_id.as_str(), w, h)
+            .suggest_size(child_id.as_str(), w, h, is_fixed_size_map.get(&child_id).unwrap_or(&true).to_owned())
             .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
 
@@ -790,8 +816,8 @@ pub fn layout_constraint_container(
             width,
             height
         );
-        session.set_position(entity_id.clone(), x + offset_x, y + offset_y);
-        session.set_size(entity_id.clone(), width, height);
+        builder.set_position(entity_id.clone(), x + offset_x, y + offset_y);
+        builder.set_size(entity_id.clone(), width, height);
 
         let right = x + offset_x + width;
         let bottom = y + offset_y + height;
@@ -808,7 +834,7 @@ pub fn layout_constraint_container(
         "container size calculated: {},{}",
         container_width, container_height
     );
-    session.set_size(container.entity.clone(), container_width, container_height);
+    builder.set_size(container.entity.clone(), container_width, container_height);
     Ok(())
 }
 

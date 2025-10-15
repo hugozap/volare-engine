@@ -505,7 +505,7 @@ impl ConstraintSystem {
                 }
             }
 
-             SimpleConstraint::AtLeastSameHeight(entities) => {
+            SimpleConstraint::AtLeastSameHeight(entities) => {
                 if entities.len() < 2 {
                     return Err(anyhow::anyhow!("SameHeight requires at least 2 entities"));
                 }
@@ -517,8 +517,9 @@ impl ConstraintSystem {
 
                 for entity in entities.iter().skip(1) {
                     let vars = self.variables.get(entity).context("entity not found")?;
+
                     self.solver
-                        .add_constraint(vars.height | GE(REQUIRED) | ref_vars.height)
+                        .add_constraint(ref_vars.height | GE(REQUIRED) | vars.height)
                         .map_err(|e| {
                             anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
                         })?;
@@ -526,12 +527,10 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::MinHeight(id, h) => {
-               let vars = self.variables.get(&id).context("entity not found")?;
+                let vars = self.variables.get(&id).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.height | GE(REQUIRED) | h)
-                    .map_err(|e| {
-                        anyhow::anyhow!("Failed to add min height constraint: {:?}", e)
-                    })?;
+                    .map_err(|e| anyhow::anyhow!("Failed to add min height constraint: {:?}", e))?;
             }
 
             SimpleConstraint::SameSize(entities) => {
@@ -675,16 +674,21 @@ impl ConstraintSystem {
         id: &str,
         width: f32,
         height: f32,
+        is_fixed_size: bool,
     ) -> Result<(), cassowary::SuggestValueError> {
         println!("Suggest_size called {} {} {}", id, width, height);
+
+        // Solo permitir al solver cambiar width o height cuando tiene sentido (ej un rectangulo)
+        // Un vstack no debe tener su width o height modificado
+        let c_strength = if is_fixed_size { REQUIRED} else { STRONG };
         if let Some(vars) = self.variables.get(id) {
             let _ = self
                 .solver
-                .add_constraint(vars.width | EQ(STRONG) | (width as f64))
+                .add_constraint(vars.width | EQ(c_strength) | (width as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested width constraint: {:?}", e));
             let _ = self
                 .solver
-                .add_constraint(vars.height | EQ(STRONG) | (height as f64))
+                .add_constraint(vars.height | EQ(c_strength) | (height as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested height constraint: {:?}", e));
         }
 

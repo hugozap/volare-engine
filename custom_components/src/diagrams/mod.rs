@@ -108,11 +108,12 @@ pub fn create_ishikawa(
                 BranchItem::with_children(
                     "Capacitación".to_string(),
                     vec![
-                        // BranchItem::new("Falta cursos..".to_string()),
-
+                        BranchItem::new("Falta cursos..".to_string()),
+                        BranchItem::new("Calidad cursos regular".to_string()),
                     ],
                 ),
-                // BranchItem::new("Alta rotación".to_string()),
+                BranchItem::new("Alta rotación".to_string()),
+                BranchItem::new("Otra causa".to_string()),
             ],
             vec![
                 BranchItem::new("Bajos salarios".to_string()),
@@ -170,7 +171,6 @@ pub fn create_ishikawa(
         all_branches.push((branch, None));
         top_branch_ids.push(branch_id.clone());
 
-        // Vertical constraint: branch above spine
         constraints.push(SimpleConstraint::Above(branch_id.clone(), spine_id.clone()));
     }
 
@@ -384,27 +384,39 @@ fn create_top_branch(
         (end_point.clone(), None),
         (spacer_rect.clone(), None),
     ];
-
     let constraints = vec![
+        // Minimum heights
         SimpleConstraint::MinHeight(left_col_id.clone(), 50.0),
-        SimpleConstraint::AtLeastSameHeight(vec![left_col_id.clone(), spacer_rect_id.clone() ]),
-        SimpleConstraint::AtLeastSameHeight(vec![right_col_id.clone(), spacer_rect_id.clone() ]),
-        SimpleConstraint::AlignTop(vec![left_col_id.clone(), spacer_rect_id.clone(), right_col_id.clone()]),
+        SimpleConstraint::MinHeight(spacer_rect_id.clone(), 50.0),
+        // Spacer grows to match the tallest column (FIXED: spacer is first)
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), left_col_id.clone()]),
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), right_col_id.clone()]),
+        // Align tops so all three start at the same y
+        SimpleConstraint::AlignTop(vec![
+            left_col_id.clone(),
+            spacer_rect_id.clone(),
+            right_col_id.clone(),
+        ]),
+        // Align bottoms so all three end at the same y (same height)
+        SimpleConstraint::AlignBottom(vec![
+            spacer_rect_id.clone(),
+            left_col_id.clone(),
+            right_col_id.clone(),
+        ]),
+        // Horizontal positioning: left_col | spacer | right_col
         SimpleConstraint::LeftOf(left_col_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::RightOf(right_col_id.clone(), spacer_rect_id.clone()),
+        // Header above the columns/spacer
         SimpleConstraint::Above(header_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::AlignCenterHorizontal(vec![header_id.clone(), spacer_rect_id.clone()]),
-
-        // linea vertical
+        // Line spans the full height of the spacer
         SimpleConstraint::AlignTop(vec![spacer_rect_id.clone(), line_start_id.clone()]),
         SimpleConstraint::AlignBottom(vec![spacer_rect_id.clone(), line_end_id.clone()]),
-
         SimpleConstraint::AlignCenterHorizontal(vec![
-        spacer_rect_id.clone(), 
-        line_start_id.clone(), 
-        line_end_id.clone()
-    ]),
-
+            spacer_rect_id.clone(),
+            line_start_id.clone(),
+            line_end_id.clone(),
+        ]),
     ];
 
     let branch =
