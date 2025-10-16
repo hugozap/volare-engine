@@ -127,29 +127,27 @@ pub fn create_ishikawa(
         // ),
     ];
 
-    // let bottom_categories = vec![
-    //     Category::new(
-    //         "Tecnología".to_string(),
-    //         vec![
-    //             BranchItem::new("Hardware obsoleto".to_string()),
-    //             BranchItem::with_children(
-    //                 "Software".to_string(),
-    //                 vec![
-    //                     BranchItem::new("Sin parches".to_string()),
-    //                     BranchItem::new("Versiones antiguas".to_string()),
-    //                 ],
-    //             ),
-    //         ],
-    //         vec![BranchItem::new("Falta integración".to_string())],
-    //     ),
-    //     Category::new(
-    //         "Ambiente".to_string(),
-    //         vec![BranchItem::new("Temperatura inestable".to_string())],
-    //         vec![BranchItem::new("Humedad alta".to_string())],
-    //     ),
-    // ];
-
-    let bottom_categories: Vec::<Category> = vec![];
+    let bottom_categories = vec![
+        Category::new(
+            "Tecnología".to_string(),
+            vec![
+                BranchItem::new("Hardware obsoleto".to_string()),
+                BranchItem::with_children(
+                    "Software".to_string(),
+                    vec![
+                        BranchItem::new("Sin parches".to_string()),
+                        BranchItem::new("Versiones antiguas".to_string()),
+                    ],
+                ),
+            ],
+            vec![BranchItem::new("Falta integración".to_string())],
+        ),
+        Category::new(
+            "Ambiente".to_string(),
+            vec![BranchItem::new("Temperatura inestable".to_string())],
+            vec![BranchItem::new("Humedad alta".to_string())],
+        ),
+    ];
 
     // Create branches
     let mut all_branches = Vec::new();
@@ -426,7 +424,7 @@ fn create_top_branch(
     Ok(branch)
 }
 
-/// Creates a bottom branch (line goes DOWN, text below the line)
+/// Creates a top branch (line goes UP, text above the line)
 fn create_bottom_branch(
     id: &str,
     category_name: &str,
@@ -435,23 +433,39 @@ fn create_bottom_branch(
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
     let line_id = format!("{}_line", id);
+    let line_start_id = format!("{}_line_start", id);
+    let line_end_id = format!("{}_line_end", id);
     let header_id = format!("{}_header", id);
     let left_col_id = format!("{}_left_col", id);
     let right_col_id = format!("{}_right_col", id);
+    let spacer_rect_id = format!("{}_vertical_spacer", id);
 
-    // 1. Create vertical line as a rectangle (going DOWN)
-    let line = builder.new_rectangle(
-        line_id.clone(),
+    let spacer_rect = builder.new_rectangle(
+        spacer_rect_id.clone(),
         RectOptions {
-            width_behavior: SizeBehavior::Fixed(2.0), // 2px ancho como línea
-            height_behavior: SizeBehavior::Content,   // Altura dinámica
-            fill_color: Fill::Color("black".to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
+            width_behavior: SizeBehavior::Fixed(20.0),
+            height_behavior: SizeBehavior::Content,
+            fill_color: Fill::Color("transparent".to_owned()),
+            stroke_color: "transparent".to_owned(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
         },
     );
 
-    // 2. Create header (text below line)
+    let start_point = builder.new_point(line_start_id.clone());
+    let end_point = builder.new_point(line_end_id.clone());
+    // 1. Create vertical line as a rectangle (going UP)
+    let line = builder.new_line(
+        line_id,
+        LinePointReference::PointID(line_start_id.clone()),
+        LinePointReference::PointID(line_end_id.clone()),
+        LineOptions {
+            stroke_color: BORDER_STRONG_COLOR.to_owned(),
+            stroke_width: 1.0,
+        },
+    );
+
+    // 2. Create header (text above line)
     let header_text = builder.new_text(
         format!("{}_header_text", id),
         category_name,
@@ -500,17 +514,43 @@ fn create_bottom_branch(
         (header.clone(), None),
         (left_col.clone(), None),
         (right_col.clone(), None),
+        (start_point, None),
+        (end_point.clone(), None),
+        (spacer_rect.clone(), None),
     ];
-
     let constraints = vec![
-        // Header below the line
-        SimpleConstraint::AlignCenterHorizontal(vec![line_id.clone(), header_id.clone()]),
-        SimpleConstraint::Below(header_id.clone(), left_col_id.clone()),
-        SimpleConstraint::Below(header_id.clone(), right_col_id.clone()),
-        // Left column to the left of line, aligned at top (where line connects to spine)
-        SimpleConstraint::LeftOf(left_col_id.clone(), line_id.clone()),
-        // Right column to the right of line
-        SimpleConstraint::RightOf(right_col_id.clone(), line_id.clone()),
+        // Minimum heights
+        SimpleConstraint::MinHeight(left_col_id.clone(), 50.0),
+        SimpleConstraint::MinHeight(spacer_rect_id.clone(), 50.0),
+        // Spacer grows to match the tallest column (FIXED: spacer is first)
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), left_col_id.clone()]),
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), right_col_id.clone()]),
+        // Align tops so all three start at the same y
+        SimpleConstraint::AlignBottom(vec![
+            left_col_id.clone(),
+            spacer_rect_id.clone(),
+            right_col_id.clone(),
+        ]),
+        // Align bottoms so all three end at the same y (same height)
+        SimpleConstraint::AlignTop(vec![
+            spacer_rect_id.clone(),
+            left_col_id.clone(),
+            right_col_id.clone(),
+        ]),
+        // Horizontal positioning: left_col | spacer | right_col
+        SimpleConstraint::LeftOf(left_col_id.clone(), spacer_rect_id.clone()),
+        SimpleConstraint::RightOf(right_col_id.clone(), spacer_rect_id.clone()),
+        // Header above the columns/spacer
+        SimpleConstraint::Below(header_id.clone(), spacer_rect_id.clone()),
+        SimpleConstraint::AlignCenterHorizontal(vec![header_id.clone(), spacer_rect_id.clone()]),
+        // Line spans the full height of the spacer
+        SimpleConstraint::AlignTop(vec![spacer_rect_id.clone(), line_start_id.clone()]),
+        SimpleConstraint::AlignBottom(vec![spacer_rect_id.clone(), line_end_id.clone()]),
+        SimpleConstraint::AlignCenterHorizontal(vec![
+            spacer_rect_id.clone(),
+            line_start_id.clone(),
+            line_end_id.clone(),
+        ]),
     ];
 
     let branch =
