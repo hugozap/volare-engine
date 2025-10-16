@@ -114,7 +114,7 @@ fn render_box(
     let mut box_content = String::new();
 
     let stroke_val = if box_shape.box_options.stroke_width == 0.0 {
-        String::from("none")
+        String::from("0")
     } else {
         box_shape.box_options.stroke_width.to_string()
     };
@@ -122,6 +122,7 @@ fn render_box(
     // Draw box rectangle
     match &box_shape.box_options.fill_color {
         Fill::Color(color) => {
+            
             box_content.push_str(&format!(
                 r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
                 size.0, size.1, color,

@@ -326,7 +326,7 @@ fn create_top_branch(
         LinePointReference::PointID(line_start_id.clone()),
         LinePointReference::PointID(line_end_id.clone()),
         LineOptions {
-            stroke_color: BORDER_STRONG_COLOR.to_owned(),
+            stroke_color: BODY_COLOR.to_owned(),
             stroke_width: 1.0,
         },
     );
@@ -355,6 +355,41 @@ fn create_top_branch(
         },
     );
 
+    let left_col_top_spacer = builder.new_spacer(
+        format!("{}_left_padding", id.clone()),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_top_spacer = builder.new_spacer(
+        format!("{}_right_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+    let left_col_bottom_spacer = builder.new_spacer(
+        format!("{}_left_padding", id.clone()),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_bottom_spacer = builder.new_spacer(
+        format!("{}_right_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
     // 3. Create left column items
     let mut left_nodes = Vec::new();
     for (i, item) in left_items.iter().enumerate() {
@@ -362,12 +397,18 @@ fn create_top_branch(
         left_nodes.push(item_node);
     }
 
+    left_nodes.insert(0, left_col_top_spacer);
+    left_nodes.push(left_col_bottom_spacer);
+
     // 4. Create right column items
     let mut right_nodes = Vec::new();
     for (i, item) in right_items.iter().enumerate() {
         let item_node = create_right_item(&format!("{}_right_{}", id, i), item, builder)?;
         right_nodes.push(item_node);
     }
+
+    right_nodes.insert(0, right_col_top_spacer);
+    right_nodes.push(right_col_bottom_spacer);
 
     // 5. Create vstacks
     let left_col = builder.new_vstack(left_col_id.clone(), left_nodes, HorizontalAlignment::Right);
@@ -460,7 +501,7 @@ fn create_bottom_branch(
         LinePointReference::PointID(line_start_id.clone()),
         LinePointReference::PointID(line_end_id.clone()),
         LineOptions {
-            stroke_color: BORDER_STRONG_COLOR.to_owned(),
+            stroke_color: BODY_COLOR.to_owned(),
             stroke_width: 1.0,
         },
     );
@@ -489,12 +530,49 @@ fn create_bottom_branch(
         },
     );
 
+    let left_col_top_spacer = builder.new_spacer(
+        format!("{}_left_padding", id.clone()),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_top_spacer = builder.new_spacer(
+        format!("{}_right_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+    let left_col_bottom_spacer = builder.new_spacer(
+        format!("{}_left_padding", id.clone()),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_bottom_spacer = builder.new_spacer(
+        format!("{}_right_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
     // 3. Create left column items
     let mut left_nodes = Vec::new();
     for (i, item) in left_items.iter().enumerate() {
         let item_node = create_left_item(&format!("{}_left_{}", id, i), item, builder)?;
         left_nodes.push(item_node);
     }
+    left_nodes.insert(0, left_col_top_spacer);
+    left_nodes.push(left_col_bottom_spacer);
 
     // 4. Create right column items
     let mut right_nodes = Vec::new();
@@ -502,6 +580,9 @@ fn create_bottom_branch(
         let item_node = create_right_item(&format!("{}_right_{}", id, i), item, builder)?;
         right_nodes.push(item_node);
     }
+
+    right_nodes.insert(0, right_col_top_spacer);
+    left_nodes.push(right_col_bottom_spacer);
 
     // 5. Create vstacks
     let left_col = builder.new_vstack(left_col_id.clone(), left_nodes, HorizontalAlignment::Right);
@@ -584,7 +665,7 @@ fn create_left_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
                 ..Default::default()
             },
         );
@@ -622,7 +703,7 @@ fn create_left_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
                 ..Default::default()
             },
         );
@@ -663,7 +744,8 @@ fn create_right_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
+                stroke_color:"transparent".to_string(),
                 ..Default::default()
             },
         );
@@ -701,7 +783,8 @@ fn create_right_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
+                stroke_color:"transparent".to_string(),
                 ..Default::default()
             },
         );
