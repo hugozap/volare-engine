@@ -748,22 +748,23 @@ fn isFixedSize(builder: &DiagramBuilder, id: EntityID) -> bool {
         false
     }
 }
-//TODO: Hay que cambiar, layout no debe crear el constraint system
-// el constraint system se registra en el builder
+
+
 pub fn layout_constraint_container(
     builder: &mut DiagramBuilder,
     container: &ConstraintLayoutContainer,
 ) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
+    
     let child_sizes: Vec<(String, (Float, Float))> = container
         .children
         .iter()
         .filter_map(|child_id| Some((child_id.clone(), builder.get_size(child_id.clone()).clone())))
         .collect();
 
-    // Recolectar bools que indican si el solver puede modificar o no el size del elemento
+    // Collect bools that indicate if the solver can modify the element's size
     let mut is_fixed_size_map = HashMap::<EntityID, bool>::new();
-    child_sizes.iter().for_each(|(id, (w, y))| {
+    child_sizes.iter().for_each(|(id, (w, h))| {
         let is_fixed = isFixedSize(builder, id.clone());
         is_fixed_size_map.insert(id.to_string(), is_fixed);
     });
@@ -802,7 +803,6 @@ pub fn layout_constraint_container(
     }
 
     let offset_x = if min_x < 0.0 { min_x.abs() } else { 0.0 };
-
     let offset_y = if min_y < 0.0 { min_y.abs() } else { 0.0 };
 
     println!("offset_x: {}", offset_x);
@@ -837,6 +837,22 @@ pub fn layout_constraint_container(
         container_width, container_height
     );
     builder.set_size(container.entity.clone(), container_width, container_height);
+    
+    // NOW layout lines that use PointID references
+    // At this point, all points have their final positions from the constraint solver
+    for child_id in &container.children {
+        let entity_type = builder.entityTypes.get(child_id);
+        
+        if let Some(EntityType::LineShape) = entity_type {
+            let line = builder.get_line(child_id.clone()).clone();
+            if matches!(line.start, LinePointReference::PointID(_)) 
+                || matches!(line.end, LinePointReference::PointID(_)) {
+                println!("✅ Now laying out line {} with final point positions", child_id);
+                layout_line(builder, &line);
+            }
+        }
+    }
+    
     Ok(())
 }
 
@@ -853,6 +869,20 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     //start with the bottom elements
     for child in &root.children {
         println!("Layout child: {:?}", child);
+
+         // Skip lines that use PointID if we're inside a ConstraintLayoutContainer
+        // They will be laid out AFTER constraints are solved
+        if root.entity_type == EntityType::ConstraintLayoutContainer {
+            if child.entity_type == EntityType::LineShape {
+                let line = session.get_line(child.entity_id.clone());
+                if matches!(line.start, LinePointReference::PointID(_)) 
+                    || matches!(line.end, LinePointReference::PointID(_)) {
+                    println!("⏭️  Skipping line {} during initial layout (uses PointID)", child.entity_id);
+                    continue; // Skip this line, it will be laid out after constraints
+                }
+            }
+        }
+        
         layout_tree_node(session, child);
         //print size and position of the child
 

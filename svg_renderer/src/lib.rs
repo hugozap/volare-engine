@@ -357,8 +357,8 @@ fn render_line(
             let line_pos = session.get_position(line_shape.entity.clone());
 
             // This is required to avoid applying transformation twice
-            p_start.x = pos.0 - line_pos.0; // Convert to line-relative coords
-            p_start.y = pos.1 - line_pos.1;
+            p_end.x = pos.0 - line_pos.0; // Convert to line-relative coords
+            p_end.y = pos.1 - line_pos.1;
         }
     }
 
