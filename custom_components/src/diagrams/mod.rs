@@ -74,15 +74,20 @@ pub fn create_ishikawa(
     let spine_id = format!("{}_spine", id);
     let head_id = format!("{}_head", id);
 
+    let spine_start_point_id = format!("{}_spine_start", id);
+    let spine_end_point_id = format!("{}_spine_end", id);
+
+    let spine_start = builder.new_point(spine_start_point_id.clone());
+    let spine_end = builder.new_point(spine_end_point_id.clone());
+
     // 1. Create spine as a rectangle that can grow
-    let spine = builder.new_rectangle(
+    let spine = builder.new_line(
         spine_id.clone(),
-        RectOptions {
-            width_behavior: SizeBehavior::Content,
-            height_behavior: SizeBehavior::Fixed(2.0),
-            fill_color: Fill::Color("black".to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
+        LinePointReference::PointID(spine_start_point_id.clone()),
+        LinePointReference::PointID(spine_end_point_id.clone()),
+        LineOptions {
+            stroke_color: BODY_COLOR.to_string(),
+            stroke_width: 2.0,
         },
     );
 
@@ -160,6 +165,25 @@ pub fn create_ishikawa(
     let mut top_branch_ids = Vec::new();
     let mut bottom_branch_ids = Vec::new();
 
+    // constraints.push(SimpleConstraint::AlignLeft(vec![
+    //     head_id.clone(),              // Reference (first)
+    //     spine_start_point_id.clone(), // Aligns to reference
+    // ]));
+
+    constraints.push(SimpleConstraint::FixedWidth(
+        spine_start_point_id.clone(),
+        0.0,
+    ));
+    constraints.push(SimpleConstraint::FixedWidth(
+        spine_end_point_id.clone(),
+        0.0,
+    ));
+
+    constraints.push(SimpleConstraint::AlignLeft(vec![
+        head_id.clone(),
+        spine_start_point_id.clone(),
+    ]));
+
     // Top branches
     for (i, category) in top_categories.iter().enumerate() {
         let branch = create_top_branch(
@@ -174,7 +198,10 @@ pub fn create_ishikawa(
         all_branches.push((branch, None));
         top_branch_ids.push(branch_id.clone());
 
-        constraints.push(SimpleConstraint::Above(branch_id.clone(), spine_id.clone()));
+        constraints.push(SimpleConstraint::Above(
+            branch_id.clone(),
+            spine_start_point_id.clone(),
+        ));
     }
 
     // Bottom branches
@@ -192,7 +219,10 @@ pub fn create_ishikawa(
         bottom_branch_ids.push(branch_id.clone());
 
         // Vertical constraint: branch below spine
-        constraints.push(SimpleConstraint::Below(branch_id.clone(), spine_id.clone()));
+        constraints.push(SimpleConstraint::Below(
+            branch_id.clone(),
+            spine_start_point_id.clone(),
+        ));
     }
 
     // Distribuir horizontalmente las ramas SUPERIORES
@@ -202,11 +232,6 @@ pub fn create_ishikawa(
         //     spine_id.clone(),
         //     top_branch_ids.last().unwrap().to_owned(),
         // ]));
-
-        constraints.push(SimpleConstraint::AlignRight(vec![
-            spine_id.clone(),
-            top_branch_ids[0].clone(), // ✅ FIRST branch
-        ]));
 
         // Espaciar ramas superiores entre sí
         if top_branch_ids.len() > 1 {
@@ -239,11 +264,11 @@ pub fn create_ishikawa(
         //     bottom_branch_ids[0].clone(), // ✅ FIRST branch
         // ]));
 
-        constraints.push(SimpleConstraint::HorizontalSpacing(
-            bottom_branch_ids.last().unwrap().to_string(),
-            head_id.clone(),
-            50.0,
-        ));
+        // constraints.push(SimpleConstraint::HorizontalSpacing(
+        //     bottom_branch_ids.last().unwrap().to_string(),
+        //     head_id.clone(),
+        //     50.0,
+        // ));
 
         // Espaciar ramas inferiores entre sí
         if bottom_branch_ids.len() > 1 {
@@ -262,23 +287,21 @@ pub fn create_ishikawa(
         }
     }
 
-    // La espina termina donde empieza la cabeza
-    constraints.push(SimpleConstraint::LeftOf(spine_id.clone(), head_id.clone()));
-
     constraints.push(SimpleConstraint::AlignCenterVertical(vec![
         head_id.clone(),
-        spine_id.clone(),
+        spine_start_point_id.clone(),
+        spine_end_point_id.clone(),
     ]));
 
     // Última rama superior debe estar a la izquierda de la cabeza
     if !top_branch_ids.is_empty() {
         let last_top = &top_branch_ids.last().unwrap();
         // constraints.push(SimpleConstraint::LeftOf(last_top.clone(), head_id.clone()));
-        constraints.push(SimpleConstraint::HorizontalSpacing(
-            last_top.to_string(),
-            head_id.clone(),
-            50.0,
-        ));
+        // constraints.push(SimpleConstraint::HorizontalSpacing(
+        //     last_top.to_string(),
+        //     head_id.clone(),
+        //     50.0,
+        // ));
     }
 
     // Última rama inferior debe estar a la izquierda de la cabeza
@@ -291,18 +314,27 @@ pub fn create_ishikawa(
         ));
     }
 
+    // Position spine end point - align with the leftmost first branch
+    let mut leftmost_branches = vec![spine_end_point_id.clone()];
+    if !top_branch_ids.is_empty() {
+        leftmost_branches.push(top_branch_ids[0].clone());
+    }
+    if !bottom_branch_ids.is_empty() {
+        leftmost_branches.push(bottom_branch_ids[0].clone());
+    }
+
+    if leftmost_branches.len() > 1 {
+        constraints.push(SimpleConstraint::AlignLeft(leftmost_branches));
+    }
+
     // 3. Create children with positions
-    let mut children_with_pos = vec![(spine.clone(), None), (head.clone(), None)];
+    let mut children_with_pos = vec![
+        (spine.clone(), None),
+        (spine_start.clone(), None),
+        (spine_end.clone(), None),
+        (head.clone(), None),
+    ];
     children_with_pos.extend(all_branches);
-
-    // Head positioned at the end of spine
-    constraints.push(SimpleConstraint::RightOf(head_id.clone(), spine_id.clone()));
-    constraints.push(SimpleConstraint::AlignCenterVertical(vec![
-        spine_id.clone(),
-        head_id.clone(),
-    ]));
-
-    constraints.push(SimpleConstraint::FixedWidth(spine_id.clone(), 600.0));
 
     // 4. Create container with constraints
     let container =

@@ -1276,6 +1276,7 @@ Please use this components to get smart defaults for spacing and typography
 ===/src/layout.rs===
 /* Layout calculation for each type of entity */
 
+use std::collections::HashMap;
 use std::f32::{INFINITY, NEG_INFINITY};
 
 use crate::components::Float;
@@ -2008,26 +2009,53 @@ pub fn layout_arc(session: &mut DiagramBuilder, shape_arc: &ShapeArc) {
     session.set_size(shape_arc.entity.clone(), diameter, diameter);
 }
 
+/// Determina si el size de un shape puede ser cambiado por un constraint
+/// Solo rectangulos y boxes pueden alterar su tamaño, el resto se considera fijo
+/// y el solver cassowary debe respetar esto
+fn isFixedSize(builder: &DiagramBuilder, id: EntityID) -> bool {
+    let entity_type = builder.entityTypes.get(&id);
+    if let Some(etype) = entity_type {
+        match etype {
+            EntityType::BoxShape => false,
+            EntityType::RectShape => false,
+            _ => true,
+        }
+    } else {
+        false
+    }
+}
 //TODO: Hay que cambiar, layout no debe crear el constraint system
 // el constraint system se registra en el builder
 pub fn layout_constraint_container(
-    session: &mut DiagramBuilder,
+    builder: &mut DiagramBuilder,
     container: &ConstraintLayoutContainer,
 ) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
     let child_sizes: Vec<(String, (Float, Float))> = container
         .children
         .iter()
-        .filter_map(|child_id| Some((child_id.clone(), session.get_size(child_id.clone()).clone())))
+        .filter_map(|child_id| Some((child_id.clone(), builder.get_size(child_id.clone()).clone())))
         .collect();
 
-    let system = session.get_constraint_system_mut(container.entity.clone());
+    // Recolectar bools que indican si el solver puede modificar o no el size del elemento
+    let mut is_fixed_size_map = HashMap::<EntityID, bool>::new();
+    child_sizes.iter().for_each(|(id, (w, y))| {
+        let is_fixed = isFixedSize(builder, id.clone());
+        is_fixed_size_map.insert(id.to_string(), is_fixed);
+    });
+
+    let system = builder.get_constraint_system_mut(container.entity.clone());
 
     // Use existing sizes as suggestions
     // at this point children already have their sizes calculated
     for (child_id, (w, h)) in child_sizes {
         system
-            .suggest_size(child_id.as_str(), w, h)
+            .suggest_size(
+                child_id.as_str(),
+                w,
+                h,
+                is_fixed_size_map.get(&child_id).unwrap_or(&true).to_owned(),
+            )
             .map_err(|e| anyhow::anyhow!("Failed to suggest size for entity {:?}", e))?;
     }
 
@@ -2066,8 +2094,8 @@ pub fn layout_constraint_container(
             width,
             height
         );
-        session.set_position(entity_id.clone(), x + offset_x, y + offset_y);
-        session.set_size(entity_id.clone(), width, height);
+        builder.set_position(entity_id.clone(), x + offset_x, y + offset_y);
+        builder.set_size(entity_id.clone(), width, height);
 
         let right = x + offset_x + width;
         let bottom = y + offset_y + height;
@@ -2084,7 +2112,7 @@ pub fn layout_constraint_container(
         "container size calculated: {},{}",
         container_width, container_height
     );
-    session.set_size(container.entity.clone(), container_width, container_height);
+    builder.set_size(container.entity.clone(), container_width, container_height);
     Ok(())
 }
 
@@ -2819,7 +2847,7 @@ impl ConstraintSystem {
                 }
             }
 
-             SimpleConstraint::AtLeastSameHeight(entities) => {
+            SimpleConstraint::AtLeastSameHeight(entities) => {
                 if entities.len() < 2 {
                     return Err(anyhow::anyhow!("SameHeight requires at least 2 entities"));
                 }
@@ -2831,8 +2859,9 @@ impl ConstraintSystem {
 
                 for entity in entities.iter().skip(1) {
                     let vars = self.variables.get(entity).context("entity not found")?;
+
                     self.solver
-                        .add_constraint(vars.height | GE(REQUIRED) | ref_vars.height)
+                        .add_constraint(ref_vars.height | GE(REQUIRED) | vars.height)
                         .map_err(|e| {
                             anyhow::anyhow!("Failed to add same height constraint: {:?}", e)
                         })?;
@@ -2840,12 +2869,10 @@ impl ConstraintSystem {
             }
 
             SimpleConstraint::MinHeight(id, h) => {
-               let vars = self.variables.get(&id).context("entity not found")?;
+                let vars = self.variables.get(&id).context("entity not found")?;
                 self.solver
                     .add_constraint(vars.height | GE(REQUIRED) | h)
-                    .map_err(|e| {
-                        anyhow::anyhow!("Failed to add min height constraint: {:?}", e)
-                    })?;
+                    .map_err(|e| anyhow::anyhow!("Failed to add min height constraint: {:?}", e))?;
             }
 
             SimpleConstraint::SameSize(entities) => {
@@ -2989,16 +3016,21 @@ impl ConstraintSystem {
         id: &str,
         width: f32,
         height: f32,
+        is_fixed_size: bool,
     ) -> Result<(), cassowary::SuggestValueError> {
         println!("Suggest_size called {} {} {}", id, width, height);
+
+        // Solo permitir al solver cambiar width o height cuando tiene sentido (ej un rectangulo)
+        // Un vstack no debe tener su width o height modificado
+        let c_strength = if is_fixed_size { REQUIRED} else { STRONG };
         if let Some(vars) = self.variables.get(id) {
             let _ = self
                 .solver
-                .add_constraint(vars.width | EQ(STRONG) | (width as f64))
+                .add_constraint(vars.width | EQ(c_strength) | (width as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested width constraint: {:?}", e));
             let _ = self
                 .solver
-                .add_constraint(vars.height | EQ(STRONG) | (height as f64))
+                .add_constraint(vars.height | EQ(c_strength) | (height as f64))
                 .map_err(|e| anyhow::anyhow!("Failed to add suggested height constraint: {:?}", e));
         }
 
@@ -5058,7 +5090,7 @@ use std::io::{BufRead, BufReader, Write};
 
 use crate::transform::Transform;
 use crate::{components::*, diagram_builder::*, DiagramBuilder, SimpleConstraint};
-use anyhow::{Context, Result,Error, bail};
+use anyhow::{bail, Context, Error, Result};
 use thiserror::Error;
 
 /// Simplified JSON Lines entity with only essential fields
@@ -5146,9 +5178,7 @@ pub enum ConstraintDeclaration {
     AspectRatio { entity: String, ratio: Float },
 }
 
-fn convert_constraint_declaration(
-    decl: &ConstraintDeclaration,
-) -> Result<SimpleConstraint> {
+fn convert_constraint_declaration(decl: &ConstraintDeclaration) -> Result<SimpleConstraint> {
     match decl {
         ConstraintDeclaration::AlignLeft { entities } => {
             Ok(SimpleConstraint::AlignLeft(entities.to_vec()))
@@ -5206,7 +5236,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::HorizontalSpacing { entities, spacing } => {
             if entities.len() != 2 {
-               bail!("horizontal_spacing requires exactly 2 entities");
+                bail!("horizontal_spacing requires exactly 2 entities");
             }
             Ok(SimpleConstraint::HorizontalSpacing(
                 entities[0].clone(),
@@ -5226,7 +5256,7 @@ fn convert_constraint_declaration(
         }
         ConstraintDeclaration::StackHorizontal { entities, spacing } => {
             if entities.len() < 2 {
-               bail!("stack_horizontal requires at least 2 entities");
+                bail!("stack_horizontal requires at least 2 entities");
             }
             Ok(SimpleConstraint::StackHorizontal(
                 entities.clone(),
@@ -5591,11 +5621,7 @@ impl JsonLinesParser {
     }
 
     /// Build the diagram tree from parsed entities
-    pub fn build(
-        &self,
-        root_id: &str,
-        builder: &mut DiagramBuilder,
-    ) -> Result<DiagramTreeNode> {
+    pub fn build(&self, root_id: &str, builder: &mut DiagramBuilder) -> Result<DiagramTreeNode> {
         self.build_entity(root_id, builder)
     }
 
@@ -5617,8 +5643,7 @@ impl JsonLinesParser {
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
-            return builder
-                .create_custom_component(&entity_id, &component_type, &attributes, &self)
+            return builder.create_custom_component(&entity_id, &component_type, &attributes, &self);
         }
 
         // Handle built-in components using attribute helpers
@@ -5647,18 +5672,13 @@ impl JsonLinesParser {
             "text" => {
                 let content = get_string_attr(&entity.attributes, &["content", "text"], "");
                 if content.is_empty() {
-                   bail!("Missing attribute content or text");
+                    bail!("Missing attribute content or text");
                 }
 
-
                 // Only support "bold", otherwise return the value or "400" by default
-                let str_font_weight = &get_string_attr(
-                        &entity.attributes,
-                        &["font_weight"],
-                        "400",
-                    );
-                let f_weight:u32  = if let Ok(val) = str::parse::<u32>(&str_font_weight) {
-                    val 
+                let str_font_weight = &get_string_attr(&entity.attributes, &["font_weight"], "400");
+                let f_weight: u32 = if let Ok(val) = str::parse::<u32>(&str_font_weight) {
+                    val
                 } else if str_font_weight == "bold " {
                     900
                 } else {
@@ -5884,7 +5904,12 @@ impl JsonLinesParser {
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_line(entity_id.to_string(), LinePointReference::Value(start_point.0, start_point.1), LinePointReference::Value(end_point.0, end_point.1), options))
+                Ok(builder.new_line(
+                    entity_id.to_string(),
+                    LinePointReference::Value(start_point.0, start_point.1),
+                    LinePointReference::Value(end_point.0, end_point.1),
+                    options,
+                ))
             }
 
             "ellipse" => {
@@ -6032,9 +6057,7 @@ impl JsonLinesParser {
                         (width_behavior, height_behavior),
                     ))
                 } else {
-                    Err(JsonLinesError::MissingAttribute(
-                        "src or file_path".to_string(),
-                    ).into())
+                    Err(JsonLinesError::MissingAttribute("src or file_path".to_string()).into())
                 }
             }
 
@@ -6164,9 +6187,7 @@ impl JsonLinesParser {
                     constraints,
                 ))
             }
-            _ => Err(JsonLinesError::UnknownEntityType(
-                entity.entity_type.clone(),
-            ).into()),
+            _ => Err(JsonLinesError::UnknownEntityType(entity.entity_type.clone()).into()),
         }
     }
 
@@ -6364,8 +6385,7 @@ impl JsonLinesBuilder {
     }
 }
 
-
-#[derive( Debug)]
+#[derive(Debug)]
 pub enum JsonLinesError {
     ParseError { line: usize, message: String },
     EntityNotFound(String),

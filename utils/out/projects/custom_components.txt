@@ -68,6 +68,7 @@ use uuid::uuid;
 // Constants for fishbone diagram
 const ITEM_BOX_WIDTH: f32 = 100.0;
 const CATEGORY_BOX_WIDTH: f32 = 100.0;
+const CONNECTOR_GAP: f32 = 20.0; // Gap between item box and connector line
 
 // Structure to represent an item with optional children
 #[derive(Clone, Debug)]
@@ -119,15 +120,20 @@ pub fn create_ishikawa(
     let spine_id = format!("{}_spine", id);
     let head_id = format!("{}_head", id);
 
+    let spine_start_point_id = format!("{}_spine_start", id);
+    let spine_end_point_id = format!("{}_spine_end", id);
+
+    let spine_start = builder.new_point(spine_start_point_id.clone());
+    let spine_end = builder.new_point(spine_end_point_id.clone());
+
     // 1. Create spine as a rectangle that can grow
-    let spine = builder.new_rectangle(
+    let spine = builder.new_line(
         spine_id.clone(),
-        RectOptions {
-            width_behavior: SizeBehavior::Content,
-            height_behavior: SizeBehavior::Fixed(2.0),
-            fill_color: Fill::Color("black".to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
+        LinePointReference::PointID(spine_start_point_id.clone()),
+        LinePointReference::PointID(spine_end_point_id.clone()),
+        LineOptions {
+            stroke_color: BODY_COLOR.to_string(),
+            stroke_width: 2.0,
         },
     );
 
@@ -154,22 +160,23 @@ pub fn create_ishikawa(
                 BranchItem::with_children(
                     "Capacitación".to_string(),
                     vec![
-                        // BranchItem::new("Falta cursos..".to_string()),
-
+                        BranchItem::new("Falta cursos..".to_string()),
+                        BranchItem::new("Calidad cursos regular".to_string()),
                     ],
                 ),
-                // BranchItem::new("Alta rotación".to_string()),
+                BranchItem::new("Alta rotación".to_string()),
+                BranchItem::new("Otra causa".to_string()),
             ],
             vec![
                 BranchItem::new("Bajos salarios".to_string()),
                 // BranchItem::new("Falta motivación".to_string()),
             ],
         ),
-        // Category::new(
-        //     "Procesos".to_string(),
-        //     vec![BranchItem::new("Documentación incompleta".to_string())],
-        //     vec![BranchItem::new("Falta de revisiones".to_string())],
-        // ),
+        Category::new(
+            "Procesos".to_string(),
+            vec![BranchItem::new("Documentación incompleta".to_string())],
+            vec![BranchItem::new("Falta de revisiones".to_string())],
+        ),
     ];
 
     let bottom_categories = vec![
@@ -190,7 +197,9 @@ pub fn create_ishikawa(
         Category::new(
             "Ambiente".to_string(),
             vec![BranchItem::new("Temperatura inestable".to_string())],
-            vec![BranchItem::new("Humedad alta".to_string())],
+            vec![BranchItem::new(
+                "Humedad alta y otros problemas adicionales".to_string(),
+            )],
         ),
     ];
 
@@ -201,6 +210,25 @@ pub fn create_ishikawa(
     // Track branch IDs separately
     let mut top_branch_ids = Vec::new();
     let mut bottom_branch_ids = Vec::new();
+
+    // constraints.push(SimpleConstraint::AlignLeft(vec![
+    //     head_id.clone(),              // Reference (first)
+    //     spine_start_point_id.clone(), // Aligns to reference
+    // ]));
+
+    constraints.push(SimpleConstraint::FixedWidth(
+        spine_start_point_id.clone(),
+        0.0,
+    ));
+    constraints.push(SimpleConstraint::FixedWidth(
+        spine_end_point_id.clone(),
+        0.0,
+    ));
+
+    constraints.push(SimpleConstraint::AlignLeft(vec![
+        head_id.clone(),
+        spine_start_point_id.clone(),
+    ]));
 
     // Top branches
     for (i, category) in top_categories.iter().enumerate() {
@@ -216,8 +244,10 @@ pub fn create_ishikawa(
         all_branches.push((branch, None));
         top_branch_ids.push(branch_id.clone());
 
-        // Vertical constraint: branch above spine
-        constraints.push(SimpleConstraint::Above(branch_id.clone(), spine_id.clone()));
+        constraints.push(SimpleConstraint::Above(
+            branch_id.clone(),
+            spine_start_point_id.clone(),
+        ));
     }
 
     // Bottom branches
@@ -235,30 +265,33 @@ pub fn create_ishikawa(
         bottom_branch_ids.push(branch_id.clone());
 
         // Vertical constraint: branch below spine
-        constraints.push(SimpleConstraint::Below(branch_id.clone(), spine_id.clone()));
+        constraints.push(SimpleConstraint::Below(
+            branch_id.clone(),
+            spine_start_point_id.clone(),
+        ));
     }
 
     // Distribuir horizontalmente las ramas SUPERIORES
     if !top_branch_ids.is_empty() {
         // Primera rama superior alineada con el derecho de la espina
-        constraints.push(SimpleConstraint::AlignRight(vec![
-            spine_id.clone(),
-            top_branch_ids[0].clone(),
-        ]));
+        // constraints.push(SimpleConstraint::AlignRight(vec![
+        //     spine_id.clone(),
+        //     top_branch_ids.last().unwrap().to_owned(),
+        // ]));
 
         // Espaciar ramas superiores entre sí
         if top_branch_ids.len() > 1 {
             let spacing = 80.0;
             for i in 1..top_branch_ids.len() {
-                constraints.push(SimpleConstraint::RightOf(
-                    top_branch_ids[i].clone(),
-                    top_branch_ids[i - 1].clone(),
-                ));
-                // constraints.push(SimpleConstraint::HorizontalSpacing(
-                //     top_branch_ids[i - 1].clone(),
+                // constraints.push(SimpleConstraint::RightOf(
                 //     top_branch_ids[i].clone(),
-                //     spacing,
+                //     top_branch_ids[i - 1].clone(),
                 // ));
+                constraints.push(SimpleConstraint::HorizontalSpacing(
+                    top_branch_ids[i - 1].clone(),
+                    top_branch_ids[i].clone(),
+                    spacing,
+                ));
             }
         }
     }
@@ -266,68 +299,88 @@ pub fn create_ishikawa(
     // Distribuir horizontalmente las ramas INFERIORES
     if !bottom_branch_ids.is_empty() {
         // Primera rama inferior alineada con el inicio de la espina
-        constraints.push(SimpleConstraint::AlignLeft(vec![
-            spine_id.clone(),
-            bottom_branch_ids[0].clone(),
-        ]));
+        // constraints.push(SimpleConstraint::AlignLeft(vec![
+        //     spine_id.clone(),
+        //     bottom_branch_ids.last().unwrap().to_owned(),
+
+        // ]));
+
+        // constraints.push(SimpleConstraint::AlignLeft(vec![
+        //     spine_id.clone(),
+        //     bottom_branch_ids[0].clone(), // ✅ FIRST branch
+        // ]));
+
+        constraints.push(SimpleConstraint::HorizontalSpacing(
+            bottom_branch_ids.last().unwrap().to_string(),
+            head_id.clone(),
+            50.0,
+        ));
 
         // Espaciar ramas inferiores entre sí
         if bottom_branch_ids.len() > 1 {
             let spacing = 80.0;
             for i in 1..bottom_branch_ids.len() {
-                constraints.push(SimpleConstraint::RightOf(
-                    bottom_branch_ids[i].clone(),
-                    bottom_branch_ids[i - 1].clone(),
-                ));
-                // constraints.push(SimpleConstraint::HorizontalSpacing(
-                //     bottom_branch_ids[i - 1].clone(),
+                // constraints.push(SimpleConstraint::RightOf(
                 //     bottom_branch_ids[i].clone(),
-                //     spacing,
+                //     bottom_branch_ids[i - 1].clone(),
                 // ));
+                constraints.push(SimpleConstraint::HorizontalSpacing(
+                    bottom_branch_ids[i - 1].clone(),
+                    bottom_branch_ids[i].clone(),
+                    spacing,
+                ));
             }
         }
     }
 
-    // La espina termina donde empieza la cabeza
-    constraints.push(SimpleConstraint::LeftOf(spine_id.clone(), head_id.clone()));
-
     constraints.push(SimpleConstraint::AlignCenterVertical(vec![
         head_id.clone(),
-        spine_id.clone(),
+        spine_start_point_id.clone(),
+        spine_end_point_id.clone(),
     ]));
 
     // Última rama superior debe estar a la izquierda de la cabeza
     if !top_branch_ids.is_empty() {
-        let last_top = &top_branch_ids[top_branch_ids.len() - 1];
-        constraints.push(SimpleConstraint::LeftOf(last_top.clone(), head_id.clone()));
-        // constraints.push(SimpleConstraint::HorizontalSpacing(
-        //     last_top.clone(),
-        //     head_id.clone(),
-        //     50.0,
-        // ));
+        let last_top = &top_branch_ids.last().unwrap();
+        // constraints.push(SimpleConstraint::LeftOf(last_top.clone(), head_id.clone()));
+        constraints.push(SimpleConstraint::HorizontalSpacing(
+            last_top.to_string(),
+            head_id.clone(),
+            50.0,
+        ));
     }
 
     // Última rama inferior debe estar a la izquierda de la cabeza
     if !bottom_branch_ids.is_empty() {
-        let last_bottom = &bottom_branch_ids[bottom_branch_ids.len() - 1];
-        constraints.push(SimpleConstraint::LeftOf(
-            last_bottom.clone(),
+        let last_bottom = &bottom_branch_ids.last().unwrap();
+        constraints.push(SimpleConstraint::HorizontalSpacing(
+            last_bottom.to_string(),
             head_id.clone(),
+            50.0,
         ));
     }
 
+    // Position spine end point - align with the leftmost first branch
+    let mut leftmost_branches = vec![spine_end_point_id.clone()];
+    if !top_branch_ids.is_empty() {
+        leftmost_branches.push(top_branch_ids[0].clone());
+    }
+    if !bottom_branch_ids.is_empty() {
+        leftmost_branches.push(bottom_branch_ids[0].clone());
+    }
+
+    if leftmost_branches.len() > 1 {
+        constraints.push(SimpleConstraint::AlignLeft(leftmost_branches));
+    }
+
     // 3. Create children with positions
-    let mut children_with_pos = vec![(spine.clone(), None), (head.clone(), None)];
+    let mut children_with_pos = vec![
+        (spine.clone(), None),
+        (spine_start.clone(), None),
+        (spine_end.clone(), None),
+        (head.clone(), None),
+    ];
     children_with_pos.extend(all_branches);
-
-    // Head positioned at the end of spine
-    constraints.push(SimpleConstraint::RightOf(head_id.clone(), spine_id.clone()));
-    constraints.push(SimpleConstraint::AlignCenterVertical(vec![
-        spine_id.clone(),
-        head_id.clone(),
-    ]));
-
-    constraints.push(SimpleConstraint::FixedWidth(spine_id.clone(), 600.0));
 
     // 4. Create container with constraints
     let container =
@@ -336,7 +389,7 @@ pub fn create_ishikawa(
     Ok(container)
 }
 
-/// Creates a top branch (line goes UP, text above the line)
+/// Creates a top branch with connector lines
 fn create_top_branch(
     id: &str,
     category_name: &str,
@@ -355,10 +408,10 @@ fn create_top_branch(
     let spacer_rect = builder.new_rectangle(
         spacer_rect_id.clone(),
         RectOptions {
-            width_behavior: SizeBehavior::Fixed(20.0),
-            height_behavior: SizeBehavior::Content,
+            width_behavior: SizeBehavior::Fixed(0.0),
+            height_behavior: SizeBehavior::Fixed(150.0),
             fill_color: Fill::Color("transparent".to_owned()),
-            stroke_color: "red".to_owned(),
+            stroke_color: "transparent".to_owned(),
             stroke_width: 1.0,
             border_radius: 0.0,
         },
@@ -366,18 +419,17 @@ fn create_top_branch(
 
     let start_point = builder.new_point(line_start_id.clone());
     let end_point = builder.new_point(line_end_id.clone());
-    // 1. Create vertical line as a rectangle (going UP)
+
     let line = builder.new_line(
         line_id,
         LinePointReference::PointID(line_start_id.clone()),
         LinePointReference::PointID(line_end_id.clone()),
         LineOptions {
-            stroke_color: BORDER_STRONG_COLOR.to_owned(),
+            stroke_color: BODY_COLOR.to_owned(),
             stroke_width: 1.0,
         },
     );
 
-    // 2. Create header (text above line)
     let header_text = builder.new_text(
         format!("{}_header_text", id),
         category_name,
@@ -401,26 +453,68 @@ fn create_top_branch(
         },
     );
 
-    // 3. Create left column items
+    let left_col_top_spacer = builder.new_spacer(
+        format!("{}_left_top_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_top_spacer = builder.new_spacer(
+        format!("{}_right_top_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let left_col_bottom_spacer = builder.new_spacer(
+        format!("{}_left_bottom_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_bottom_spacer = builder.new_spacer(
+        format!("{}_right_bottom_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    // Create left column items with connectors
     let mut left_nodes = Vec::new();
     for (i, item) in left_items.iter().enumerate() {
-        let item_node = create_left_item(&format!("{}_left_{}", id, i), item, builder)?;
+        let item_node =
+            create_left_item_with_connector(&format!("{}_left_{}", id, i), item, builder)?;
         left_nodes.push(item_node);
     }
 
-    // 4. Create right column items
+    left_nodes.insert(0, left_col_top_spacer);
+    left_nodes.push(left_col_bottom_spacer);
+
+    // Create right column items with connectors
     let mut right_nodes = Vec::new();
     for (i, item) in right_items.iter().enumerate() {
-        let item_node = create_right_item(&format!("{}_right_{}", id, i), item, builder)?;
+        let item_node =
+            create_right_item_with_connector(&format!("{}_right_{}", id, i), item, builder)?;
         right_nodes.push(item_node);
     }
 
-    // 5. Create vstacks
+    right_nodes.insert(0, right_col_top_spacer);
+    right_nodes.push(right_col_bottom_spacer);
+
     let left_col = builder.new_vstack(left_col_id.clone(), left_nodes, HorizontalAlignment::Right);
     let right_col =
         builder.new_vstack(right_col_id.clone(), right_nodes, HorizontalAlignment::Left);
 
-    // 6. Create constraint container
     let children_with_pos = vec![
         (line.clone(), None),
         (header.clone(), None),
@@ -433,26 +527,37 @@ fn create_top_branch(
 
     let constraints = vec![
         SimpleConstraint::MinHeight(left_col_id.clone(), 50.0),
-        SimpleConstraint::AtLeastSameHeight(vec![left_col_id.clone(), spacer_rect_id.clone() ]),
-        SimpleConstraint::AtLeastSameHeight(vec![right_col_id.clone(), spacer_rect_id.clone() ]),
-        SimpleConstraint::AlignTop(vec![left_col_id.clone(), spacer_rect_id.clone(), right_col_id.clone()]),
+        SimpleConstraint::MinHeight(spacer_rect_id.clone(), 50.0),
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), left_col_id.clone()]),
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), right_col_id.clone()]),
+        SimpleConstraint::AlignTop(vec![
+            left_col_id.clone(),
+            spacer_rect_id.clone(),
+            right_col_id.clone(),
+        ]),
+        SimpleConstraint::AlignBottom(vec![
+            spacer_rect_id.clone(),
+            left_col_id.clone(),
+            right_col_id.clone(),
+        ]),
         SimpleConstraint::LeftOf(left_col_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::RightOf(right_col_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::Above(header_id.clone(), spacer_rect_id.clone()),
         SimpleConstraint::AlignCenterHorizontal(vec![header_id.clone(), spacer_rect_id.clone()]),
-
-        // linea vertical
         SimpleConstraint::AlignTop(vec![spacer_rect_id.clone(), line_start_id.clone()]),
         SimpleConstraint::AlignBottom(vec![spacer_rect_id.clone(), line_end_id.clone()]),
-
+        SimpleConstraint::AlignCenterHorizontal(vec![
+            spacer_rect_id.clone(),
+            line_start_id.clone(),
+            line_end_id.clone(),
+        ]),
     ];
 
     let branch =
         builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
     Ok(branch)
 }
-
-/// Creates a bottom branch (line goes DOWN, text below the line)
+/// Creates a bottom branch with connector lines
 fn create_bottom_branch(
     id: &str,
     category_name: &str,
@@ -461,23 +566,38 @@ fn create_bottom_branch(
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
     let line_id = format!("{}_line", id);
+    let line_start_id = format!("{}_line_start", id);
+    let line_end_id = format!("{}_line_end", id);
     let header_id = format!("{}_header", id);
     let left_col_id = format!("{}_left_col", id);
     let right_col_id = format!("{}_right_col", id);
+    let spacer_rect_id = format!("{}_vertical_spacer", id);
 
-    // 1. Create vertical line as a rectangle (going DOWN)
-    let line = builder.new_rectangle(
-        line_id.clone(),
+    let spacer_rect = builder.new_rectangle(
+        spacer_rect_id.clone(),
         RectOptions {
-            width_behavior: SizeBehavior::Fixed(2.0), // 2px ancho como línea
-            height_behavior: SizeBehavior::Content,   // Altura dinámica
-            fill_color: Fill::Color("black".to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
+            width_behavior: SizeBehavior::Fixed(0.0),
+            height_behavior: SizeBehavior::Content,
+            fill_color: Fill::Color("transparent".to_owned()),
+            stroke_color: "transparent".to_owned(),
+            stroke_width: 1.0,
+            border_radius: 0.0,
         },
     );
 
-    // 2. Create header (text below line)
+    let start_point = builder.new_point(line_start_id.clone());
+    let end_point = builder.new_point(line_end_id.clone());
+
+    let line = builder.new_line(
+        line_id,
+        LinePointReference::PointID(line_start_id.clone()),
+        LinePointReference::PointID(line_end_id.clone()),
+        LineOptions {
+            stroke_color: BODY_COLOR.to_owned(),
+            stroke_width: 1.0,
+        },
+    );
+
     let header_text = builder.new_text(
         format!("{}_header_text", id),
         category_name,
@@ -501,49 +621,170 @@ fn create_bottom_branch(
         },
     );
 
-    // 3. Create left column items
+    let left_col_top_spacer = builder.new_spacer(
+        format!("{}_left_top_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_top_spacer = builder.new_spacer(
+        format!("{}_right_top_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let left_col_bottom_spacer = builder.new_spacer(
+        format!("{}_left_bottom_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    let right_col_bottom_spacer = builder.new_spacer(
+        format!("{}_right_bottom_padding", id),
+        SpacerOptions {
+            width: 0.0,
+            height: 30.0,
+            direction: SpacerDirection::Vertical,
+        },
+    );
+
+    // Create left column items with connectors
     let mut left_nodes = Vec::new();
     for (i, item) in left_items.iter().enumerate() {
-        let item_node = create_left_item(&format!("{}_left_{}", id, i), item, builder)?;
+        let item_node =
+            create_left_item_with_connector(&format!("{}_left_{}", id, i), item, builder)?;
         left_nodes.push(item_node);
     }
+    left_nodes.insert(0, left_col_top_spacer);
+    left_nodes.push(left_col_bottom_spacer);
 
-    // 4. Create right column items
+    // Create right column items with connectors
     let mut right_nodes = Vec::new();
     for (i, item) in right_items.iter().enumerate() {
-        let item_node = create_right_item(&format!("{}_right_{}", id, i), item, builder)?;
+        let item_node =
+            create_right_item_with_connector(&format!("{}_right_{}", id, i), item, builder)?;
         right_nodes.push(item_node);
     }
 
-    // 5. Create vstacks
+    right_nodes.insert(0, right_col_top_spacer);
+    right_nodes.push(right_col_bottom_spacer);
+
     let left_col = builder.new_vstack(left_col_id.clone(), left_nodes, HorizontalAlignment::Right);
     let right_col =
         builder.new_vstack(right_col_id.clone(), right_nodes, HorizontalAlignment::Left);
 
-    // 6. Create constraint container
     let children_with_pos = vec![
         (line.clone(), None),
         (header.clone(), None),
         (left_col.clone(), None),
         (right_col.clone(), None),
+        (start_point, None),
+        (end_point.clone(), None),
+        (spacer_rect.clone(), None),
     ];
 
     let constraints = vec![
-        // Header below the line
-        SimpleConstraint::AlignCenterHorizontal(vec![line_id.clone(), header_id.clone()]),
-        SimpleConstraint::Below(header_id.clone(), left_col_id.clone()),
-        SimpleConstraint::Below(header_id.clone(), right_col_id.clone()),
-        // Left column to the left of line, aligned at top (where line connects to spine)
-        SimpleConstraint::LeftOf(left_col_id.clone(), line_id.clone()),
-        // Right column to the right of line
-        SimpleConstraint::RightOf(right_col_id.clone(), line_id.clone()),
+        SimpleConstraint::MinHeight(left_col_id.clone(), 50.0),
+        SimpleConstraint::MinHeight(spacer_rect_id.clone(), 50.0),
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), left_col_id.clone()]),
+        SimpleConstraint::AtLeastSameHeight(vec![spacer_rect_id.clone(), right_col_id.clone()]),
+        SimpleConstraint::AlignBottom(vec![
+            left_col_id.clone(),
+            spacer_rect_id.clone(),
+            right_col_id.clone(),
+        ]),
+        SimpleConstraint::AlignTop(vec![
+            spacer_rect_id.clone(),
+            left_col_id.clone(),
+            right_col_id.clone(),
+        ]),
+        SimpleConstraint::LeftOf(left_col_id.clone(), spacer_rect_id.clone()),
+        SimpleConstraint::RightOf(right_col_id.clone(), spacer_rect_id.clone()),
+        SimpleConstraint::Below(header_id.clone(), spacer_rect_id.clone()),
+        SimpleConstraint::AlignCenterHorizontal(vec![header_id.clone(), spacer_rect_id.clone()]),
+        SimpleConstraint::AlignTop(vec![spacer_rect_id.clone(), line_start_id.clone()]),
+        SimpleConstraint::AlignBottom(vec![spacer_rect_id.clone(), line_end_id.clone()]),
+        SimpleConstraint::AlignCenterHorizontal(vec![
+            spacer_rect_id.clone(),
+            line_start_id.clone(),
+            line_end_id.clone(),
+        ]),
     ];
 
     let branch =
         builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
     Ok(branch)
 }
+/// Creates a left item with a horizontal connector line
+fn create_left_item_with_connector(
+    id: &str,
+    item: &BranchItem,
+    builder: &mut DiagramBuilder,
+) -> Result<DiagramTreeNode> {
+    let item_content = create_left_item(id, item, builder)?;
 
+    // Create connector line (horizontal line pointing right)
+    let connector_id = format!("{}_connector", id);
+    let connector = builder.new_rectangle(
+        connector_id,
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(CONNECTOR_GAP),
+            height_behavior: SizeBehavior::Fixed(1.0),
+            fill_color: Fill::Color(BODY_COLOR.to_string()),
+            stroke_width: 0.0,
+            ..Default::default()
+        },
+    );
+
+    // Combine item and connector horizontally
+    let hstack = builder.new_hstack(
+        format!("{}_with_connector", id),
+        vec![item_content, connector],
+        VerticalAlignment::Center,
+    );
+
+    Ok(hstack)
+}
+
+/// Creates a right item with a horizontal connector line
+fn create_right_item_with_connector(
+    id: &str,
+    item: &BranchItem,
+    builder: &mut DiagramBuilder,
+) -> Result<DiagramTreeNode> {
+    let item_content = create_right_item(id, item, builder)?;
+
+    // Create connector line (horizontal line pointing left)
+    let connector_id = format!("{}_connector", id);
+    let connector = builder.new_rectangle(
+        connector_id,
+        RectOptions {
+            width_behavior: SizeBehavior::Fixed(CONNECTOR_GAP),
+            height_behavior: SizeBehavior::Fixed(1.0),
+            fill_color: Fill::Color(BODY_COLOR.to_string()),
+            stroke_width: 0.0,
+            ..Default::default()
+        },
+    );
+
+    // Combine connector and item horizontally (connector first for right side)
+    let hstack = builder.new_hstack(
+        format!("{}_with_connector", id),
+        vec![connector, item_content],
+        VerticalAlignment::Center,
+    );
+
+    Ok(hstack)
+}
 /// Creates a left column item (children first, then text)
 fn create_left_item(
     id: &str,
@@ -551,7 +792,6 @@ fn create_left_item(
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
     if item.children.is_empty() {
-        // Leaf node
         let item_text = builder.new_text(
             format!("{}_text", id),
             &item.name,
@@ -570,17 +810,18 @@ fn create_left_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
+                stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
 
         Ok(item_box)
     } else {
-        // Has children: [children_vstack, text]
         let mut children_nodes = Vec::new();
         for (i, child) in item.children.iter().enumerate() {
-            let child_node = create_left_item(&format!("{}_child_{}", id, i), child, builder)?;
+            let child_node =
+                create_left_item_with_connector(&format!("{}_child_{}", id, i), child, builder)?;
             children_nodes.push(child_node);
         }
 
@@ -608,7 +849,8 @@ fn create_left_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
+                stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
@@ -622,7 +864,6 @@ fn create_left_item(
         Ok(hstack)
     }
 }
-
 /// Creates a right column item (text first, then children)
 fn create_right_item(
     id: &str,
@@ -630,7 +871,6 @@ fn create_right_item(
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
     if item.children.is_empty() {
-        // Leaf node
         let item_text = builder.new_text(
             format!("{}_text", id),
             &item.name,
@@ -649,17 +889,18 @@ fn create_right_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
+                stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
 
         Ok(item_box)
     } else {
-        // Has children: [text, children_vstack]
         let mut children_nodes = Vec::new();
         for (i, child) in item.children.iter().enumerate() {
-            let child_node = create_right_item(&format!("{}_child_{}", id, i), child, builder)?;
+            let child_node =
+                create_right_item_with_connector(&format!("{}_child_{}", id, i), child, builder)?;
             children_nodes.push(child_node);
         }
 
@@ -687,7 +928,8 @@ fn create_right_item(
                 padding: 3.0,
                 width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
                 height_behavior: SizeBehavior::Content,
-                stroke_width: 1.0,
+                stroke_width: 0.0,
+                stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
