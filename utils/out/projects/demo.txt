@@ -1380,9 +1380,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::env::temp_dir().join("document_demo");
     std::fs::create_dir_all(&output_dir)?;
 
-    let input = r##"
-{"id":"test","type":"ishikawa","problem":"problem goes here"}"##;
+//     let input = r##"
+// {"id":"test","type":"ishikawa","problem":"problem goes here"}"##;
 
+    let input = r##"{"id":"root","type":"free_container","width":500,"height":300,"children":["box1","box2","box3","conn1","conn2","conn3"],"positions":{"box1":[50,120],"box2":[220,120],"box3":[390,120]}}
+{"id":"box1","type":"rect","width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":2}
+{"id":"box2","type":"rect","width":80,"height":60,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"box3","type":"rect","width":80,"height":60,"fill":"lightyellow","stroke":"orange","stroke_width":2}
+{"id":"conn1","type":"connector","source":"box1","target":"box2","stroke_color":"blue","stroke_width":2,"arrow_end":true}
+{"id":"conn2","type":"connector","source":"box2","target":"box3","stroke_color":"green","stroke_width":2,"arrow_end":true}
+{"id":"conn3","type":"connector","source":"box1","target":"box3","stroke_color":"red","stroke_width":1}
+"##;
  // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
     let root_id = parser.parse_string(input)?;

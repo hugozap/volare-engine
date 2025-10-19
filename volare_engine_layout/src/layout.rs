@@ -11,7 +11,8 @@ use crate::{
 };
 use crate::{
     ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point,
-    ShapeArc, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
+    ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
+    VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -254,7 +255,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
 
     for elem in shape_group.elements.iter() {
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        let elem_pos = session.get_position(elem.clone()); // Uses transforms behind the scenes
+        let elem_pos = session.get_local_position(elem.clone()); // Uses transforms behind the scenes
 
         min_x = min_x.min(elem_pos.0);
         min_y = min_y.min(elem_pos.1);
@@ -345,7 +346,7 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
         }
         // Lines can refer a point (technically it can be any other entity with a position)
         LinePointReference::PointID(id) => {
-            let pos = session.get_position(id);
+            let pos = session.get_local_position(id);
             start_point.x = pos.0;
             start_point.y = pos.1;
         }
@@ -358,7 +359,7 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
         }
         // Lines can refer a point (technically it can be any other entity with a position)
         LinePointReference::PointID(id) => {
-            let pos = session.get_position(id);
+            let pos = session.get_local_position(id);
             end_point.x = pos.0;
             end_point.y = pos.1;
         }
@@ -373,6 +374,27 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
     // Note: The line is defined by the points, so don't set its position directly
     // Will be the default pos (0,0)
     // session.set_position(shape_line.entity.clone(), x, y);
+}
+
+pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector) {
+    // Get absolute centers
+    let (start_x, start_y) = session.get_absolute_center(&connector.source_id);
+    let (end_x, end_y) = session.get_absolute_center(&connector.target_id);
+
+    session.set_position(connector.start_point_id.clone(), start_x, start_y);
+    session.set_position(connector.end_point_id.clone(), end_x, end_y);
+
+    let min_x = start_x.min(end_x);
+    let max_x = start_x.max(end_x);
+    let min_y = start_y.min(end_y);
+    let max_y = start_y.max(end_y);
+
+    let width = max_x - min_x;
+    let height = max_y - min_y;
+
+    // Update connector bounds
+    session.set_position(connector.entity.clone(), min_x, min_y);
+    session.set_size(connector.entity.clone(), width, height);
 }
 
 /**
@@ -469,7 +491,7 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     for elem in vertical_stack.elements.iter() {
         // FIXED: Use effective bounds consistently for alignment calculations
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        let current_pos = session.get_position(elem.clone());
+        let current_pos = session.get_local_position(elem.clone());
 
         let x = match vertical_stack.horizontal_alignment {
             HorizontalAlignment::Left => -elem_bounds.x, // Compensate for bounding box offset
@@ -507,7 +529,7 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
     for elem in horizontal_stack.elements.iter() {
         // FIXED: Use effective bounds consistently for alignment calculations
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        let current_pos = session.get_position(elem.clone());
+        let current_pos = session.get_local_position(elem.clone());
 
         let y = match horizontal_stack.vertical_alignment {
             VerticalAlignment::Top => -elem_bounds.y, // Compensate for bounding box offset
@@ -749,13 +771,12 @@ fn isFixedSize(builder: &DiagramBuilder, id: EntityID) -> bool {
     }
 }
 
-
 pub fn layout_constraint_container(
     builder: &mut DiagramBuilder,
     container: &ConstraintLayoutContainer,
 ) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
-    
+
     let child_sizes: Vec<(String, (Float, Float))> = container
         .children
         .iter()
@@ -837,22 +858,40 @@ pub fn layout_constraint_container(
         container_width, container_height
     );
     builder.set_size(container.entity.clone(), container_width, container_height);
-    
+
     // NOW layout lines that use PointID references
     // At this point, all points have their final positions from the constraint solver
     for child_id in &container.children {
         let entity_type = builder.entityTypes.get(child_id);
-        
+
         if let Some(EntityType::LineShape) = entity_type {
             let line = builder.get_line(child_id.clone()).clone();
-            if matches!(line.start, LinePointReference::PointID(_)) 
-                || matches!(line.end, LinePointReference::PointID(_)) {
-                println!("✅ Now laying out line {} with final point positions", child_id);
+            if matches!(line.start, LinePointReference::PointID(_))
+                || matches!(line.end, LinePointReference::PointID(_))
+            {
+                println!(
+                    "✅ Now laying out line {} with final point positions",
+                    child_id
+                );
                 layout_line(builder, &line);
             }
         }
     }
-    
+
+    // NOW layout connectors that depend on final positions
+    for child_id in &container.children {
+        let entity_type = builder.entityTypes.get(child_id);
+
+        if let Some(EntityType::ConnectorShape) = entity_type {
+            println!(
+                "✅ Now laying out connector {} with final positions",
+                child_id
+            );
+            let connector = builder.get_connector(child_id.clone()).clone();
+            layout_connector(builder, &connector);
+        }
+    }
+
     Ok(())
 }
 
@@ -870,26 +909,48 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     for child in &root.children {
         println!("Layout child: {:?}", child);
 
-         // Skip lines that use PointID if we're inside a ConstraintLayoutContainer
+        // Skip connectors in first pass
+        if child.entity_type == EntityType::ConnectorShape {
+            continue;
+        }
+
+        // Skip lines that use PointID if we're inside a ConstraintLayoutContainer
         // They will be laid out AFTER constraints are solved
         if root.entity_type == EntityType::ConstraintLayoutContainer {
             if child.entity_type == EntityType::LineShape {
                 let line = session.get_line(child.entity_id.clone());
-                if matches!(line.start, LinePointReference::PointID(_)) 
-                    || matches!(line.end, LinePointReference::PointID(_)) {
-                    println!("⏭️  Skipping line {} during initial layout (uses PointID)", child.entity_id);
+                if matches!(line.start, LinePointReference::PointID(_))
+                    || matches!(line.end, LinePointReference::PointID(_))
+                {
+                    println!(
+                        "⏭️  Skipping line {} during initial layout (uses PointID)",
+                        child.entity_id
+                    );
                     continue; // Skip this line, it will be laid out after constraints
                 }
             }
         }
-        
+
         layout_tree_node(session, child);
         //print size and position of the child
 
         let child_size = session.get_size(child.entity_id.clone());
-        let child_pos = session.get_position(child.entity_id.clone());
+        let child_pos = session.get_local_position(child.entity_id.clone());
         println!("Child size: {:?}", child_size);
         println!("Child pos: {:?}", child_pos);
+    }
+
+    // SECOND PASS: Now layout connectors after all other elements have positions
+    for child in &root.children {
+        if child.entity_type == EntityType::ConnectorShape {
+            println!("🔗 Layout connector (second pass): {:?}", child.entity_id);
+            layout_tree_node(session, child);
+
+            let child_size = session.get_size(child.entity_id.clone());
+            let child_pos = session.get_local_position(child.entity_id.clone());
+            println!("Connector size: {:?}", child_size);
+            println!("Connector pos: {:?}", child_pos);
+        }
     }
 
     //Once the children are laid out, we can layout the current element
@@ -923,6 +984,11 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             let line = session.get_line(root.entity_id.clone()).clone();
             layout_line(session, &line);
         }
+
+        EntityType::ConnectorShape => {
+           // Skip, they are handled in layout_diagram in a later phase
+        }
+
         EntityType::ArrowShape => {
             //get the Shape arrow entity
             let arrow = session.get_arrow(root.entity_id.clone()).clone();
@@ -994,6 +1060,83 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     session.get_effective_bounds(root.entity_id.clone())
 }
 
+/// Recursively calculates and caches absolute positions for all nodes in the tree
+/// Properly handles rotation, scaling, and translation by accumulating transforms
+fn calculate_absolute_positions(
+    session: &mut DiagramBuilder,
+    node: &DiagramTreeNode,
+    parent_transform: Transform,
+) {
+    // Get this node's local transform
+    let local_transform = session.get_transform(node.entity_id.clone());
+
+    // Combine parent transform with local transform
+    // Order matters: parent_transform * local_transform
+    let absolute_transform = parent_transform.combine(&local_transform);
+
+    // The absolute position is the translation component of the combined transform
+    let absolute_pos = (absolute_transform.matrix[4], absolute_transform.matrix[5]);
+
+    // Store it in the cache
+    session
+        .absolute_positions
+        .insert(node.entity_id.clone(), absolute_pos);
+
+    println!(
+        "📍 Absolute position for {}: ({:.1}, {:.1})",
+        node.entity_id, absolute_pos.0, absolute_pos.1
+    );
+
+    // Recursively process all children with the accumulated transform
+    for child in &node.children {
+        calculate_absolute_positions(session, child, absolute_transform.clone());
+    }
+}
+/// Complete diagram layout in three passes:
+/// 1. Calculate sizes and local positions (layout_tree_node) - skips connectors
+/// 2. Calculate absolute positions for all elements
+/// 3. Layout connectors using absolute positions
+pub fn layout_diagram(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
+    println!("🎨 Starting diagram layout...");
+
+    // Pass 1: Calculate sizes and set local positions
+    // Connectors are skipped in this pass
+    let bbox = layout_tree_node(session, root);
+
+    println!("✅ Layout complete, now calculating absolute positions...");
+
+    // Pass 2: Calculate and cache absolute positions
+    session.absolute_positions.clear();
+    calculate_absolute_positions(session, root, Transform::identity());
+
+    println!(
+        "✅ Absolute positions calculated for {} elements",
+        session.absolute_positions.len()
+    );
+
+    // Pass 3: Layout all connectors now that absolute positions are available
+    println!("🔗 Laying out connectors...");
+    layout_connectors_recursive(session, root);
+    println!("✅ Connectors laid out");
+
+    bbox
+}
+
+/// Recursively finds and layouts all connectors in the tree
+fn layout_connectors_recursive(session: &mut DiagramBuilder, node: &DiagramTreeNode) {
+    // If this node is a connector, layout it
+    if node.entity_type == EntityType::ConnectorShape {
+        println!("  📌 Laying out connector: {}", node.entity_id);
+        let connector = session.get_connector(node.entity_id.clone()).clone();
+        layout_connector(session, &connector);
+    }
+
+    // Recursively process all children
+    for child in &node.children {
+        layout_connectors_recursive(session, child);
+    }
+}
+
 //import textoptions defined in src/components/mod.rs
 use crate::components::{BoxOptions, TextOptions};
 //Test that a box with a text inside is correctly laid out
@@ -1022,10 +1165,10 @@ fn test_layout_box_with_text() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id.clone());
+    let text_position = session.get_local_position(text.entity_id.clone());
     let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_position = session.get_local_position(box_shape.entity_id.clone());
     let box_size = session.get_size(box_shape.entity_id.clone());
     //assert equal positions
 
@@ -1062,10 +1205,10 @@ fn test_box_fixed_size() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id.clone());
+    let text_position = session.get_local_position(text.entity_id.clone());
     let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_position = session.get_local_position(box_shape.entity_id.clone());
     let box_size = session.get_size(box_shape.entity_id.clone());
 
     //assert equal positions

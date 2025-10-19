@@ -538,7 +538,62 @@ impl JsonLinesParser {
 
     /// Build the diagram tree from parsed entities
     pub fn build(&self, root_id: &str, builder: &mut DiagramBuilder) -> Result<DiagramTreeNode> {
-        self.build_entity(root_id, builder)
+        let mut root_node = self.build_entity(root_id, builder)?;
+
+        let promoted_connectors =
+            self.promote_connectors_to_root(root_id, &mut root_node, builder)?;
+
+        // After building the root node, process the elements that need to be children of root (e.g connectors)
+        let pending = builder.take_pending_root_nodes();
+        if !pending.is_empty() {
+            root_node
+                .children
+                .extend(pending.iter().map(|e| Box::new(e.to_owned())));
+        }
+        Ok(root_node)
+    }
+
+    fn promote_connectors_to_root(
+        &self,
+        root_id: &str,
+        root_node: &mut DiagramTreeNode,
+        builder: &mut DiagramBuilder,
+    ) -> Result<Vec<String>> {
+        let mut promoted = Vec::new();
+
+        // Find all connectors in the tree
+        self.find_and_remove_connectors(&mut root_node.children, &mut promoted);
+
+        // Build connector nodes and add to root
+        for conn_id in &promoted {
+            if let Some(entity) = self.entities.get(conn_id) {
+                if entity.entity_type == "connector" {
+                    let conn_node = self.build_entity(conn_id, builder)?;
+                    root_node.children.push(Box::new(conn_node));
+                }
+            }
+        }
+
+        Ok(promoted)
+    }
+
+    fn find_and_remove_connectors(
+        &self,
+        children: &mut Vec<Box<DiagramTreeNode>>,
+        found: &mut Vec<String>,
+    ) {
+        children.retain(|child| {
+            if child.entity_type == EntityType::ConnectorShape {
+                found.push(child.entity_id.clone());
+                false // Remove from current location
+            } else {
+                // Recursively check children
+                if !child.children.is_empty() {
+                    self.find_and_remove_connectors(&mut child.children.clone(), found);
+                }
+                true // Keep non-connector nodes
+            }
+        });
     }
 
     fn build_entity(
@@ -559,7 +614,12 @@ impl JsonLinesParser {
 
         // Check for custom components FIRST - they get the raw attributes map
         if builder.has_custom_component(&component_type) {
-            return builder.create_custom_component(&entity_id, &component_type, &attributes, &self);
+            return builder.create_custom_component(
+                &entity_id,
+                &component_type,
+                &attributes,
+                &self,
+            );
         }
 
         // Handle built-in components using attribute helpers
@@ -826,6 +886,61 @@ impl JsonLinesParser {
                     LinePointReference::Value(end_point.0, end_point.1),
                     options,
                 ))
+            }
+
+            "connector" => {
+                // Required attributes
+                let source_id =
+                    get_string_attr(&entity.attributes, &["source", "source_id", "from"], "");
+
+                let target_id =
+                    get_string_attr(&entity.attributes, &["target", "target_id", "to"], "");
+
+                if source_id.is_empty() || target_id.is_empty() {
+                    bail!("Connector requires 'source' and 'target' attributes");
+                }
+
+                // Optional styling
+                let stroke_color = get_string_attr(
+                    &entity.attributes,
+                    &["stroke_color", "color", "stroke"],
+                    "black",
+                );
+
+                let stroke_width = get_float_attr(&entity.attributes, &["stroke_width"], 1.0);
+
+                // Connector type
+                let connector_type_str =
+                    get_string_attr(&entity.attributes, &["connector_type"], "straight");
+
+                let connector_type = match connector_type_str.as_str() {
+                    "curved" => ConnectorType::Curved,
+                    "orthogonal" => ConnectorType::Orthogonal,
+                    _ => ConnectorType::Straight,
+                };
+
+                // Curve offset for curved connectors
+                let curve_offset = if connector_type_str == "curved" {
+                    let offset =
+                        get_float_attr(&entity.attributes, &["curve_offset", "curve_amount"], 0.0);
+                    if offset > 0.0 {
+                        Some(offset)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                let options = ConnectorOptions {
+                    connector_type,
+                    stroke_color,
+                    stroke_width,
+                    curve_offset,
+                };
+
+                // Create connector
+                Ok(builder.new_connector(entity_id.to_string(), source_id, target_id, options))
             }
 
             "ellipse" => {

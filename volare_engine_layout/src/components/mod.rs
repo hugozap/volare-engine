@@ -74,6 +74,7 @@ pub enum EntityType {
     RectShape,
     TextShape,
     LineShape,
+    ConnectorShape,
     ArrowShape,
     EllipseShape,
     ImageShape,
@@ -124,6 +125,32 @@ impl SizeBehavior {
             _ => Err("Called unwrap_fixed on non-Fixed SizeBehavior"),
         }
     }
+}
+
+// Connectors
+#[derive(Clone, Debug)]
+pub enum ConnectorType {
+    Straight,
+    Curved,
+    Orthogonal,
+}
+
+#[derive(Clone)]
+pub struct ConnectorOptions {
+    pub connector_type: ConnectorType,
+    pub stroke_color : String,
+    pub stroke_width: Float,
+    pub curve_offset: Option<Float>, //curve ammount
+}
+
+#[derive(Clone)]
+pub struct ShapeConnector {
+    pub entity: EntityID,
+    pub source_id: EntityID,
+    pub target_id: EntityID,
+    pub start_point_id: EntityID,
+    pub end_point_id: EntityID,
+    pub options: ConnectorOptions,
 }
 
 // Add spacer component

@@ -29,6 +29,7 @@ pub struct DiagramBuilder {
     // Maps entity IDS to their transforms for positioning, rotation, scaling, etc.
     pub transforms: HashMap<EntityID, Transform>,
     pub entityTypes: HashMap<EntityID, EntityType>,
+    pub absolute_positions: HashMap<EntityID, (Float, Float)>,
 
     // Components
     points: HashMap<EntityID, PointShape>,
@@ -41,6 +42,7 @@ pub struct DiagramBuilder {
     vertical_stacks: HashMap<EntityID, VerticalStack>,
     ellipses: HashMap<EntityID, ShapeEllipse>,
     lines: HashMap<EntityID, ShapeLine>,
+    connectors: HashMap<EntityID, ShapeConnector>,
     arrows: HashMap<EntityID, ShapeArrow>,
     tables: HashMap<EntityID, Table>,
     images: HashMap<EntityID, ShapeImage>,
@@ -50,6 +52,9 @@ pub struct DiagramBuilder {
     constraint_systems: HashMap<EntityID, ConstraintSystem>,
     arcs: HashMap<EntityID, ShapeArc>,
     spacers: HashMap<EntityID, ShapeSpacer>,
+
+    // Items that need to be at root level (e.g connectors)
+    pending_root_nodes: Vec<DiagramTreeNode>,
     pub custom_components: CustomComponentRegistry,
 }
 
@@ -105,6 +110,7 @@ impl DiagramBuilder {
             vertical_stacks: HashMap::new(),
             ellipses: HashMap::new(),
             lines: HashMap::new(),
+            connectors: HashMap::new(),
             arrows: HashMap::new(),
             tables: HashMap::new(),
             images: HashMap::new(),
@@ -115,8 +121,20 @@ impl DiagramBuilder {
             arcs: HashMap::new(),
             spacers: HashMap::new(),
 
+            pending_root_nodes: Vec::new(),
             custom_components: CustomComponentRegistry::new(),
+            absolute_positions: HashMap::new(),
         }
+    }
+
+    /// Register a node to be added at root level (e.g., connectors)
+    pub fn register_root_level_node(&mut self, node: DiagramTreeNode) {
+        self.pending_root_nodes.push(node);
+    }
+
+    /// Take all pending root nodes (clears the list)
+    pub fn take_pending_root_nodes(&mut self) -> Vec<DiagramTreeNode> {
+        std::mem::take(&mut self.pending_root_nodes)
     }
 
     pub fn clear_cache(&mut self) {
@@ -136,6 +154,7 @@ impl DiagramBuilder {
         self.vertical_stacks.clear();
         self.ellipses.clear();
         self.lines.clear();
+        self.connectors.clear();
         self.arrows.clear();
         self.tables.clear();
         self.images.clear();
@@ -147,6 +166,7 @@ impl DiagramBuilder {
         self.images.clear();
         self.transforms.clear();
         self.points.clear();
+        self.absolute_positions.clear();
 
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
@@ -238,7 +258,8 @@ impl DiagramBuilder {
     }
 
     // Convenience methods for common operations
-    pub fn get_position(&self, entity_id: EntityID) -> (Float, Float) {
+    // Get the local position
+    pub fn get_local_position(&self, entity_id: EntityID) -> (Float, Float) {
         let transform = self.get_transform(entity_id);
         (transform.matrix[4], transform.matrix[5]) // e, f components
     }
@@ -286,7 +307,7 @@ impl DiagramBuilder {
     }
 
     pub fn set_rotation(&mut self, entity_id: EntityID, angle_degrees: Float) {
-        let pos = self.get_position(entity_id.clone());
+        let pos = self.get_local_position(entity_id.clone());
         let size = self.get_size(entity_id.clone());
 
         // Rotate around center of element
@@ -327,6 +348,7 @@ impl DiagramBuilder {
     }
 
     pub fn set_size(&mut self, entity_id: EntityID, width: Float, height: Float) {
+        println!("getting size {}", entity_id);
         let size = self.sizes.get_mut(&entity_id).unwrap();
         size.w = width;
         size.h = height;
@@ -367,17 +389,14 @@ impl DiagramBuilder {
     }
 
     /// Points are useful to create lines when the start or end point is used in a constraint
-    pub fn new_point(
-        &mut self,
-        id: EntityID,
-    ) -> DiagramTreeNode {
+    pub fn new_point(&mut self, id: EntityID) -> DiagramTreeNode {
         let _ = self.new_entity(id.clone(), EntityType::PointShape);
-        let point = PointShape { entity: id.clone()};
+        let point = PointShape { entity: id.clone() };
         self.points.insert(id.clone(), point);
         let node = DiagramTreeNode {
             entity_type: EntityType::PointShape,
             entity_id: id.clone(),
-            children:Vec::new(),
+            children: Vec::new(),
         };
         node
     }
@@ -552,6 +571,41 @@ impl DiagramBuilder {
         self.lines.insert(line_id.clone(), line);
         println!("Creating new line with id {}", line_id.clone());
         DiagramTreeNode::new(EntityType::LineShape, line_id)
+    }
+
+    pub fn new_connector(
+        &mut self,
+        id: EntityID,
+        source_id: EntityID,
+        target_id: EntityID,
+        options: ConnectorOptions,
+    ) -> DiagramTreeNode {
+        self.new_entity(id.clone(), EntityType::ConnectorShape);
+
+        // Create start and end points
+        let start_point = self.new_point(format!("{}_start", id.clone()));
+        let end_point = self.new_point(format!("{}_end", id.clone()));
+
+        let connector = ShapeConnector {
+            entity: id.clone(),
+            source_id: source_id,
+            target_id: target_id,
+            start_point_id: start_point.entity_id.clone(),
+            end_point_id: end_point.entity_id.clone(),
+            options: options,
+        };
+
+        self.connectors.insert(id.clone(), connector);
+
+        let mut children = Vec::new();
+        children.push(Box::new(start_point.clone()));
+        children.push(Box::new(end_point.clone()));
+
+        DiagramTreeNode {
+            entity_type: EntityType::ConnectorShape,
+            entity_id: id.clone(),
+            children: children,
+        }
     }
 
     pub fn new_elipse(
@@ -859,6 +913,10 @@ impl DiagramBuilder {
         &self.lines[&id]
     }
 
+    pub fn get_connector(&self, id: EntityID) -> &ShapeConnector {
+        &self.connectors[&id]
+    }
+
     pub fn get_line_mut(&mut self, id: EntityID) -> Option<&mut ShapeLine> {
         self.lines.get_mut(&id)
     }
@@ -928,6 +986,55 @@ impl DiagramBuilder {
     pub fn get_spacer(&self, id: EntityID) -> &ShapeSpacer {
         &self.spacers[&id]
     }
+
+    pub fn get_absolute_center(&self, entity_id: &EntityID) -> (Float, Float) {
+        let size = self.get_size(entity_id.clone());
+
+        // Local center point (relative to element's origin)
+        let local_center = (size.0 / 2.0, size.1 / 2.0);
+
+        // Get the transform for this element
+        let transform = self.get_transform(entity_id.clone());
+
+        // Use cached absolute position
+        let absolute_pos = self
+            .absolute_positions
+            .get(entity_id)
+            .copied()
+            .unwrap_or_else(|| {
+                println!(
+                    "⚠️  WARNING: No absolute position cached for {}, using local position",
+                    entity_id
+                );
+                // Fallback to local position (won't be correct for nested elements)
+                self.get_local_position(entity_id.clone())
+            });
+
+        // For elements with rotation/scale, we need to transform the center point
+        // Extract just rotation/scale (no translation) from the transform
+        let rotation_scale_transform = Transform {
+            matrix: [
+                transform.matrix[0], // a (scale/rotation)
+                transform.matrix[1], // b (rotation)
+                transform.matrix[2], // c (rotation)
+                transform.matrix[3], // d (scale/rotation)
+                0.0,                 // e (no translation)
+                0.0,                 // f (no translation)
+            ],
+        };
+
+        // Transform the local center through rotation/scale
+        let transformed_center =
+            rotation_scale_transform.transform_point(local_center.0, local_center.1);
+
+        // Add to absolute position
+        (
+            absolute_pos.0 + transformed_center.0,
+            absolute_pos.1 + transformed_center.1,
+        )
+    }
+
+   
 
     pub fn get_custom_component(
         &self,
