@@ -508,15 +508,29 @@ Align multiple entities. First entity is reference.
 ```
 
 ### Directional Positioning
-Position relative to reference element.
-
+Position the first entity relative to the second entity (reference).
 ```json
-{"type":"right_of","entities":["positioned_element","reference_element"]}
-{"type":"left_of","entities":["positioned_element","reference_element"]}
-{"type":"above","entities":["positioned_element","reference_element"]}
-{"type":"below","entities":["positioned_element","reference_element"]}
+{"type":"right_of","entities":["elem_A","elem_B"]}  // A is to the right of B
+{"type":"left_of","entities":["elem_A","elem_B"]}   // A is to the left of B
+{"type":"above","entities":["elem_A","elem_B"]}     // A is above B
+{"type":"below","entities":["elem_A","elem_B"]}     // A is below B
 ```
 
+**Syntax:** `{"type":"<direction>","entities":[<positioned>,<reference>]}`
+- First element is the one being positioned
+- Second element is the reference/anchor element
+
+**Examples:**
+```json
+// Place header above content
+{"type":"above","entities":["header","content"]}
+
+// Place footer below content  
+{"type":"below","entities":["footer","content"]}
+
+// Place sidebar to the left of main area
+{"type":"left_of","entities":["sidebar","main"]}
+```
 ### Spacing Constraints
 
 ```json
