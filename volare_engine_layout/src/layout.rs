@@ -370,17 +370,17 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
         (end_point.x - start_point.x).abs(),
         (end_point.y - start_point.y).abs(),
     );
-
-    // Note: The line is defined by the points, so don't set its position directly
-    // Will be the default pos (0,0)
-    // session.set_position(shape_line.entity.clone(), x, y);
 }
-
 pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector) {
-    // Get absolute centers
-    let (start_x, start_y) = session.get_absolute_center(&connector.source_id);
-    let (end_x, end_y) = session.get_absolute_center(&connector.target_id);
+    // Get port positions instead of centers
+    let (start_x, start_y) =
+        session.get_port_position(&connector.source_id, &connector.options.source_port);
+    let (end_x, end_y) =
+        session.get_port_position(&connector.target_id, &connector.options.target_port);
 
+    println!("🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})", 
+             connector.entity, start_x, start_y, end_x, end_y);
+    
     session.set_position(connector.start_point_id.clone(), start_x, start_y);
     session.set_position(connector.end_point_id.clone(), end_x, end_y);
 
@@ -392,11 +392,12 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let width = max_x - min_x;
     let height = max_y - min_y;
 
-    // Update connector bounds
+    println!("   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})", 
+             min_x, min_y, width, height);
+
     session.set_position(connector.entity.clone(), min_x, min_y);
     session.set_size(connector.entity.clone(), width, height);
 }
-
 /**
  * Updates the size of the arrow entity based on the start and end points
  */
@@ -940,19 +941,6 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         println!("Child pos: {:?}", child_pos);
     }
 
-    // SECOND PASS: Now layout connectors after all other elements have positions
-    for child in &root.children {
-        if child.entity_type == EntityType::ConnectorShape {
-            println!("🔗 Layout connector (second pass): {:?}", child.entity_id);
-            layout_tree_node(session, child);
-
-            let child_size = session.get_size(child.entity_id.clone());
-            let child_pos = session.get_local_position(child.entity_id.clone());
-            println!("Connector size: {:?}", child_size);
-            println!("Connector pos: {:?}", child_pos);
-        }
-    }
-
     //Once the children are laid out, we can layout the current element
     //use methods in the layout module
     match root.entity_type {
@@ -986,7 +974,7 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::ConnectorShape => {
-           // Skip, they are handled in layout_diagram in a later phase
+            // Skip, they are handled in layout_diagram in a later phase
         }
 
         EntityType::ArrowShape => {

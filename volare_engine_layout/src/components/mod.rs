@@ -135,13 +135,6 @@ pub enum ConnectorType {
     Orthogonal,
 }
 
-#[derive(Clone)]
-pub struct ConnectorOptions {
-    pub connector_type: ConnectorType,
-    pub stroke_color : String,
-    pub stroke_width: Float,
-    pub curve_offset: Option<Float>, //curve ammount
-}
 
 #[derive(Clone)]
 pub struct ShapeConnector {
@@ -151,6 +144,48 @@ pub struct ShapeConnector {
     pub start_point_id: EntityID,
     pub end_point_id: EntityID,
     pub options: ConnectorOptions,
+}
+
+#[derive(Debug, Clone)]
+pub enum Port {
+    Center,
+    Top,
+    Bottom,
+    Left,
+    Right,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl Default for Port {
+    fn default() -> Self {
+        Port::Center
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectorOptions {
+    pub connector_type: ConnectorType,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub curve_offset: Option<Float>,
+    pub source_port: Port,      // NEW
+    pub target_port: Port,      // NEW
+}
+
+impl Default for ConnectorOptions {
+    fn default() -> Self {
+        Self {
+            connector_type: ConnectorType::Straight,
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            curve_offset: None,
+            source_port: Port::Center,
+            target_port: Port::Center,
+        }
+    }
 }
 
 // Add spacer component

@@ -272,6 +272,17 @@ Automatically draws a line connecting two elements from their centers.
 - `connector_type` (string) - "straight", "curved", or "orthogonal" (default: "straight")
 - `curve_offset` or `curve_amount` (number) - Curve offset for "curved" type
 
+
+**Optional Port Attributes:**
+- `source_port` (string) - Port on source element: "center", "top", "bottom", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right" (default: "center")
+- `target_port` (string) - Port on target element (same options as source_port)
+
+**Example:**
+```json
+{"id":"conn1","type":"connector","source":"box1","source_port":"right","target":"box2","target_port":"left","stroke_color":"red","stroke_width":2}
+{"id":"conn2","type":"connector","source":"header","source_port":"bottom","target":"body","target_port":"top","stroke_color":"blue","stroke_width":2}
+```
+
 **Example:**
 ```json
 {"id":"conn1","type":"connector","source":"box1","target":"box2","stroke_color":"red","stroke_width":2}

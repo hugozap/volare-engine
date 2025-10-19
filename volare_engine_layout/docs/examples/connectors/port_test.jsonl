@@ -1,0 +1,28 @@
+{"id":"root","type":"free_container","width":800,"height":600,"children":["center_box","top_box","bottom_box","left_box","right_box","tl_box","tr_box","bl_box","br_box","conn_top","conn_bottom","conn_left","conn_right","conn_tl","conn_tr","conn_bl","conn_br","legend"],"background":"#f5f5f5"}
+{"id":"center_box","type":"rect","x":360,"y":270,"width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":3}
+{"id":"top_box","type":"rect","x":360,"y":100,"width":60,"height":40,"fill":"lightcoral","stroke":"red","stroke_width":2}
+{"id":"bottom_box","type":"rect","x":360,"y":460,"width":60,"height":40,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"left_box","type":"rect","x":150,"y":270,"width":60,"height":40,"fill":"lightyellow","stroke":"orange","stroke_width":2}
+{"id":"right_box","type":"rect","x":590,"y":270,"width":60,"height":40,"fill":"lightpink","stroke":"purple","stroke_width":2}
+{"id":"tl_box","type":"rect","x":200,"y":150,"width":50,"height":35,"fill":"lavender","stroke":"indigo","stroke_width":2}
+{"id":"tr_box","type":"rect","x":550,"y":150,"width":50,"height":35,"fill":"peachpuff","stroke":"darkorange","stroke_width":2}
+{"id":"bl_box","type":"rect","x":200,"y":415,"width":50,"height":35,"fill":"lightcyan","stroke":"teal","stroke_width":2}
+{"id":"br_box","type":"rect","x":550,"y":415,"width":50,"height":35,"fill":"mistyrose","stroke":"crimson","stroke_width":2}
+{"id":"conn_top","type":"connector","source":"center_box","source_port":"top","target":"top_box","target_port":"bottom","stroke_color":"red","stroke_width":2}
+{"id":"conn_bottom","type":"connector","source":"center_box","source_port":"bottom","target":"bottom_box","target_port":"top","stroke_color":"green","stroke_width":2}
+{"id":"conn_left","type":"connector","source":"center_box","source_port":"left","target":"left_box","target_port":"right","stroke_color":"orange","stroke_width":2}
+{"id":"conn_right","type":"connector","source":"center_box","source_port":"right","target":"right_box","target_port":"left","stroke_color":"purple","stroke_width":2}
+{"id":"conn_tl","type":"connector","source":"center_box","source_port":"top_left","target":"tl_box","target_port":"bottom_right","stroke_color":"indigo","stroke_width":2}
+{"id":"conn_tr","type":"connector","source":"center_box","source_port":"top_right","target":"tr_box","target_port":"bottom_left","stroke_color":"darkorange","stroke_width":2}
+{"id":"conn_bl","type":"connector","source":"center_box","source_port":"bottom_left","target":"bl_box","target_port":"top_right","stroke_color":"teal","stroke_width":2}
+{"id":"conn_br","type":"connector","source":"center_box","source_port":"bottom_right","target":"br_box","target_port":"top_left","stroke_color":"crimson","stroke_width":2}
+{"id":"legend","type":"vstack","children":["legend_title","legend_top","legend_bottom","legend_left","legend_right","legend_tl","legend_tr","legend_bl","legend_br"],"h_align":"left","x":20,"y":20}
+{"id":"legend_title","type":"text","content":"Port Connection Test","font_size":16,"color":"black"}
+{"id":"legend_top","type":"text","content":"🔴 Top ↔ Bottom","font_size":12,"color":"red"}
+{"id":"legend_bottom","type":"text","content":"🟢 Bottom ↔ Top","font_size":12,"color":"green"}
+{"id":"legend_left","type":"text","content":"🟠 Left ↔ Right","font_size":12,"color":"orange"}
+{"id":"legend_right","type":"text","content":"🟣 Right ↔ Left","font_size":12,"color":"purple"}
+{"id":"legend_tl","type":"text","content":"🔵 TopLeft ↔ BottomRight","font_size":12,"color":"indigo"}
+{"id":"legend_tr","type":"text","content":"🟤 TopRight ↔ BottomLeft","font_size":12,"color":"darkorange"}
+{"id":"legend_bl","type":"text","content":"🔷 BottomLeft ↔ TopRight","font_size":12,"color":"teal"}
+{"id":"legend_br","type":"text","content":"🔴 BottomRight ↔ TopLeft","font_size":12,"color":"crimson"}

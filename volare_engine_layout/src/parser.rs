@@ -932,11 +932,17 @@ impl JsonLinesParser {
                     None
                 };
 
+                // Parse ports
+                let source_port = parse_port(&entity.attributes, "source_port");
+                let target_port = parse_port(&entity.attributes, "target_port");
+
                 let options = ConnectorOptions {
                     connector_type,
                     stroke_color,
                     stroke_width,
                     curve_offset,
+                    source_port,
+                    target_port,
                 };
 
                 // Create connector
@@ -1729,5 +1735,20 @@ impl JsonLinesParser {
 
         // Call the original build_entity
         self.build_entity(entity_id, builder)
+    }
+}
+
+fn parse_port(attributes: &Map<String, Value>, key: &str) -> Port {
+    let port_str = get_string_attr(attributes, &[key], "center");
+    match port_str.as_str() {
+        "top" => Port::Top,
+        "bottom" => Port::Bottom,
+        "left" => Port::Left,
+        "right" => Port::Right,
+        "top_left" | "topleft" => Port::TopLeft,
+        "top_right" | "topright" => Port::TopRight,
+        "bottom_left" | "bottomleft" => Port::BottomLeft,
+        "bottom_right" | "bottomright" => Port::BottomRight,
+        _ => Port::Center,
     }
 }

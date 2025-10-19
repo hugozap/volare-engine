@@ -987,6 +987,64 @@ impl DiagramBuilder {
         &self.spacers[&id]
     }
 
+    /// Get the position of a specific port on an element
+    pub fn get_port_position(&self, entity_id: &EntityID, port: &Port) -> (Float, Float) {
+    let size = self.get_size(entity_id.clone());
+
+    // Get absolute position (for elements with rotation, this includes the transform)
+    let absolute_pos = self
+        .absolute_positions
+        .get(entity_id)
+        .copied()
+        .unwrap_or_else(|| {
+            println!("⚠️  WARNING: No absolute position cached for {}", entity_id);
+            self.get_local_position(entity_id.clone())
+        });
+
+    // Calculate port offset based on size
+    let (offset_x, offset_y) = match port {
+        Port::Center => (size.0 / 2.0, size.1 / 2.0),
+        Port::Top => (size.0 / 2.0, 0.0),
+        Port::Bottom => (size.0 / 2.0, size.1),
+        Port::Left => (0.0, size.1 / 2.0),
+        Port::Right => (size.0, size.1 / 2.0),
+        Port::TopLeft => (0.0, 0.0),
+        Port::TopRight => (size.0, 0.0),
+        Port::BottomLeft => (0.0, size.1),
+        Port::BottomRight => (size.0, size.1),
+    };
+
+    // ADD THIS DEBUG LINE:
+    println!("  🔌 Port {:?} on {} (size {:.1}x{:.1}): absolute_pos=({:.1},{:.1}), offset=({:.1},{:.1})", 
+             port, entity_id, size.0, size.1, absolute_pos.0, absolute_pos.1, offset_x, offset_y);
+
+    // For rotated elements, we'd need to transform the port offset
+    // through the element's rotation transform here
+    let transform = self.get_transform(entity_id.clone());
+    let rotation_scale_transform = Transform {
+        matrix: [
+            transform.matrix[0], // a (scale/rotation)
+            transform.matrix[1], // b (rotation)
+            transform.matrix[2], // c (rotation)
+            transform.matrix[3], // d (scale/rotation)
+            0.0,                 // no translation
+            0.0,
+        ],
+    };
+
+    let transformed_offset = rotation_scale_transform.transform_point(offset_x, offset_y);
+
+    println!("     After transform: offset=({:.1},{:.1}), final=({:.1},{:.1})",
+             transformed_offset.0, transformed_offset.1,
+             absolute_pos.0 + transformed_offset.0,
+             absolute_pos.1 + transformed_offset.1);
+
+    (
+        absolute_pos.0 + transformed_offset.0,
+        absolute_pos.1 + transformed_offset.1,
+    )
+}
+
     pub fn get_absolute_center(&self, entity_id: &EntityID) -> (Float, Float) {
         let size = self.get_size(entity_id.clone());
 
@@ -1033,8 +1091,6 @@ impl DiagramBuilder {
             absolute_pos.1 + transformed_center.1,
         )
     }
-
-   
 
     pub fn get_custom_component(
         &self,
