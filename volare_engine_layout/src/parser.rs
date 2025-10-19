@@ -936,6 +936,11 @@ impl JsonLinesParser {
                 let source_port = parse_port(&entity.attributes, "source_port");
                 let target_port = parse_port(&entity.attributes, "target_port");
 
+                let arrow_start =
+                    get_bool_attr(&entity.attributes, &["arrow_start", "arrow_begin"], false);
+                let arrow_end = get_bool_attr(&entity.attributes, &["arrow_end"], false);
+                let arrow_size = get_float_attr(&entity.attributes, &["arrow_size"], 8.0);
+
                 let options = ConnectorOptions {
                     connector_type,
                     stroke_color,
@@ -943,6 +948,9 @@ impl JsonLinesParser {
                     curve_offset,
                     source_port,
                     target_port,
+                    arrow_start,
+                    arrow_end,
+                    arrow_size,
                 };
 
                 // Create connector

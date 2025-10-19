@@ -273,6 +273,7 @@ Automatically draws a line connecting two elements from their centers.
 - `curve_offset` or `curve_amount` (number) - Curve offset for "curved" type
 
 
+
 **Optional Port Attributes:**
 - `source_port` (string) - Port on source element: "center", "top", "bottom", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right" (default: "center")
 - `target_port` (string) - Port on target element (same options as source_port)
@@ -287,6 +288,17 @@ Automatically draws a line connecting two elements from their centers.
 ```json
 {"id":"conn1","type":"connector","source":"box1","target":"box2","stroke_color":"red","stroke_width":2}
 {"id":"conn2","type":"connector","from":"elem1","to":"elem2","connector_type":"curved","curve_offset":20}
+```
+**Optional Arrow Attributes:**
+- `arrow_start` or `arrow_begin` (boolean) - Add arrowhead at source end (default: false)
+- `arrow_end` (boolean) - Add arrowhead at target end (default: false)
+- `arrow_size` (number) - Size of arrowheads (default: 8.0)
+
+**Example:**
+```json
+{"id":"conn1","type":"connector","source":"box1","target":"box2","arrow_end":true,"stroke_color":"blue","stroke_width":2}
+{"id":"conn2","type":"connector","source":"box2","target":"box3","arrow_start":true,"arrow_end":true,"stroke_color":"red","stroke_width":2}
+{"id":"conn3","type":"connector","source":"box1","source_port":"right","target":"box2","target_port":"left","arrow_end":true,"arrow_size":12,"stroke_color":"green","stroke_width":3}
 ```
 
 **Notes:**

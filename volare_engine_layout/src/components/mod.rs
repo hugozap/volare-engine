@@ -5,8 +5,8 @@ use crate::parser::JsonLinesParser;
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
-use serde_json::{Map, Value};
 use anyhow::{bail, Result};
+use serde_json::{Map, Value};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -135,7 +135,6 @@ pub enum ConnectorType {
     Orthogonal,
 }
 
-
 #[derive(Clone)]
 pub struct ShapeConnector {
     pub entity: EntityID,
@@ -171,8 +170,12 @@ pub struct ConnectorOptions {
     pub stroke_color: String,
     pub stroke_width: Float,
     pub curve_offset: Option<Float>,
-    pub source_port: Port,      // NEW
-    pub target_port: Port,      // NEW
+    pub source_port: Port, //
+    pub target_port: Port, //
+
+    pub arrow_start: bool, // : arrow at start
+    pub arrow_end: bool,   // : arrow at end
+    pub arrow_size: Float, // : arrow size
 }
 
 impl Default for ConnectorOptions {
@@ -184,6 +187,9 @@ impl Default for ConnectorOptions {
             curve_offset: None,
             source_port: Port::Center,
             target_port: Port::Center,
+            arrow_start: false,
+            arrow_end: false,
+            arrow_size: 10.0,
         }
     }
 }
@@ -256,7 +262,7 @@ impl Clone for SpacerDirection {
 // This struct is useful for having points anchored to other elements positions
 #[derive(Debug, Clone)]
 pub struct PointShape {
-    pub entity: EntityID
+    pub entity: EntityID,
 }
 
 /**
@@ -871,7 +877,7 @@ impl Clone for ShapeLine {
 
 /// A line can set the x,y values directly or through a separate Point entity
 /// Referencing through point entity is useful for using with constraint systems
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub enum LinePointReference {
     Value(Float, Float),
     PointID(EntityID),
@@ -1029,7 +1035,7 @@ impl ArrowOptions {
         ArrowOptions {
             stroke_color: String::from("black"),
             stroke_width: 1.0,
-            arrow_size: 10.0,
+            arrow_size: 8.0,
         }
     }
 }
@@ -1183,7 +1189,6 @@ impl Clone for ConstraintLayoutContainer {
     }
 }
 
-
 impl Entity for ConstraintLayoutContainer {
     fn get_id(&self) -> EntityID {
         self.entity.clone()
@@ -1199,8 +1204,8 @@ impl Entity for ConstraintLayoutContainer {
 }
 
 impl ConstraintLayoutContainer {
-    pub fn new(entity: EntityID, children: Vec<String>)->Self{
-        ConstraintLayoutContainer{
+    pub fn new(entity: EntityID, children: Vec<String>) -> Self {
+        ConstraintLayoutContainer {
             entity: entity,
             children: children,
         }
@@ -1443,7 +1448,7 @@ impl CustomComponentRegistry {
     /// Create a component instance using the registered factory
     pub fn create_component(
         &self,
-        id: &str, 
+        id: &str,
         component_type: &str,
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
@@ -1451,7 +1456,7 @@ impl CustomComponentRegistry {
     ) -> Result<crate::diagram_builder::DiagramTreeNode> {
         match self.factories.get(component_type) {
             Some(factory) => factory(id, attributes, builder, parser),
-            None => bail!("Unknown custom component type: {}", component_type)
+            None => bail!("Unknown custom component type: {}", component_type),
         }
     }
 
@@ -1471,7 +1476,7 @@ impl CustomComponentRegistry {
     ) -> Option<
         &Arc<
             dyn Fn(
-                     &str,
+                    &str,
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
                     &JsonLinesParser,

@@ -22,6 +22,11 @@ impl<W: Write> Renderer<W> for SVGRenderer {
             root_bounds.width, root_bounds.height,
             root_bounds.x, root_bounds.y, root_bounds.width, root_bounds.height
         ));
+
+         svg.push_str(r#"<defs>"#);
+        add_arrow_markers(&mut svg, session, diagram_node);
+        svg.push_str(r#"</defs>"#);
+
         svg.push_str(render_node(diagram_node, session).as_str());
 
         // Render all connectors in a separate group at the end (on top)
@@ -74,6 +79,57 @@ fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
     }
 
     result
+}
+
+/// Collects all unique arrow configurations and creates marker definitions
+fn add_arrow_markers(svg: &mut String, session: &DiagramBuilder, node: &DiagramTreeNode) {
+    let mut markers = std::collections::HashSet::new();
+    collect_connector_markers(node, session, &mut markers);
+    
+    for marker_id in markers {
+        svg.push_str(&marker_id);
+    }
+}
+
+/// Recursively collects all connector marker definitions
+fn collect_connector_markers(
+    node: &DiagramTreeNode,
+    session: &DiagramBuilder,
+    markers: &mut std::collections::HashSet<String>,
+) {
+    if node.entity_type == EntityType::ConnectorShape {
+        let connector = session.get_connector(node.entity_id.clone());
+        
+        if connector.options.arrow_start || connector.options.arrow_end {
+            let marker_id = format!("arrow-{}", node.entity_id);
+            let color = &connector.options.stroke_color;
+            let size = connector.options.arrow_size;
+            
+            if connector.options.arrow_end {
+                markers.insert(format!(
+                    r#"<marker id="{}-end" markerWidth="{}" markerHeight="{}" refX="{}" refY="{}" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L0,{} L{},{} z" fill="{}" />
+                    </marker>"#,
+                    marker_id, size, size, size, size / 2.0,
+                    size, size, size / 2.0, color
+                ));
+            }
+            
+            if connector.options.arrow_start {
+                markers.insert(format!(
+                    r#"<marker id="{}-start" markerWidth="{}" markerHeight="{}" refX="0" refY="{}" orient="auto" markerUnits="strokeWidth">
+                        <path d="M{},0 L{},{} L{},{} z" fill="{}" />
+                    </marker>"#,
+                    marker_id, size, size, size / 2.0,
+                    size, size, size / 2.0, size, size, color
+                ));
+            }
+        }
+    }
+    
+    for child in &node.children {
+        collect_connector_markers(child, session, markers);
+    }
 }
 
 /// Recursively finds and renders all connectors in the tree
@@ -363,7 +419,6 @@ fn render_line(
 
     render_with_transform(session, svg, entity_id, &line_content);
 }
-
 fn render_connector(
     session: &DiagramBuilder,
     svg: &mut String,
@@ -383,18 +438,67 @@ fn render_connector(
     let rel_end_x = end_pos.0 - connector_pos.0;
     let rel_end_y = end_pos.1 - connector_pos.1;
     
-    // Create the line content
-    let line_content = format!(
-        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}" />"#,
+    let mut line_content = String::new();
+    
+    // Add arrow marker definitions if needed
+    if connector.options.arrow_start || connector.options.arrow_end {
+        let marker_id = format!("arrow-{}", entity_id);
+        line_content.push_str(&format!(
+            r#"<defs>
+                <marker id="{}-end" markerWidth="{}" markerHeight="{}" refX="{}" refY="{}" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,{} L{},{}  z" fill="{}" />
+                </marker>
+                <marker id="{}-start" markerWidth="{}" markerHeight="{}" refX="0" refY="{}" orient="auto" markerUnits="strokeWidth">
+                    <path d="M{},0 L{},{} L{},{}  z" fill="{}" />
+                </marker>
+            </defs>"#,
+            marker_id, 
+            connector.options.arrow_size, 
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.stroke_color,
+            marker_id,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.stroke_color
+        ));
+    }
+    
+    // Create the line with optional arrow markers
+    let marker_start = if connector.options.arrow_start {
+        format!(r#" marker-start="url(#arrow-{}-start)""#, entity_id)
+    } else {
+        String::new()
+    };
+    
+    let marker_end = if connector.options.arrow_end {
+        format!(r#" marker-end="url(#arrow-{}-end)""#, entity_id)
+    } else {
+        String::new()
+    };
+    
+    line_content.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"{}{} />"#,
         rel_start_x,
         rel_start_y,
         rel_end_x,
         rel_end_y,
         connector.options.stroke_color,
-        connector.options.stroke_width
-    );
+        connector.options.stroke_width,
+        marker_start,
+        marker_end
+    ));
     
-    // Actually render it with transform!
     render_with_transform(session, svg, entity_id, &line_content);
 }
 
