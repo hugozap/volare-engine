@@ -396,6 +396,146 @@ The properties do affect layout and are used by rendering.
 
 
 
+===/docs/diagrams/ichikawa.md===
+# Ishikawa Diagram (Fishbone Diagram) - JSONL Specification
+
+## Overview
+The Ishikawa diagram, also known as a fishbone diagram or cause-and-effect diagram, is used to visualize the potential causes of a problem. The diagram consists of a central "spine" leading to the problem statement, with category "branches" extending from the spine, each containing items that represent causes.
+
+## Basic Structure
+
+```jsonl
+{"type":"ishikawa","id":"unique_id","problem":"Problem Statement","categories":[...]}
+```
+
+## Parameters
+
+### Root Level Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `type` | string | Yes | Must be `"ishikawa"` |
+| `id` | string | Yes | Unique identifier for the diagram (e.g., `"root"`) |
+| `problem` | string | Yes | The main problem or effect being analyzed. Displayed in the "head" box on the right side of the diagram |
+| `categories` | array | Yes | Array of category objects representing major cause categories |
+
+### Category Object
+
+Each category represents a major classification of causes (e.g., People, Process, Technology, Environment).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Name of the category (e.g., `"People"`, `"Process"`) |
+| `items` | array | Yes | Array of item objects representing causes within this category |
+
+**Automatic Distribution**: Categories are automatically distributed between top and bottom branches:
+- First half of categories → top branches
+- Second half of categories → bottom branches
+- Example: 4 categories = 2 top, 2 bottom
+
+### Item Object
+
+Items represent individual causes or factors. Items can have nested children for sub-causes.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Name/description of the cause (e.g., `"High turnover"`, `"Lack of training"`) |
+| `children` | array | No | Array of nested item objects representing sub-causes. Can be nested multiple levels deep |
+
+**Automatic Distribution**: Items within each category are automatically distributed:
+- First half of items → left side of branch
+- Second half of items → right side of branch
+- Example: 5 items = 3 left, 2 right
+
+## Complete Examples
+
+### Example 1: Simple Ishikawa Diagram
+
+```jsonl
+{"type":"ishikawa","id":"root","problem":"Customer Complaints","categories":[{"name":"People","items":[{"name":"Insufficient training"},{"name":"High turnover"}]},{"name":"Process","items":[{"name":"No quality checks"},{"name":"Unclear procedures"}]}]}
+```
+
+**Result:**
+- **Top branch**: People (Insufficient training on left, High turnover on right)
+- **Bottom branch**: Process (No quality checks on left, Unclear procedures on right)
+
+### Example 2: Complex Ishikawa with Nested Children
+
+```jsonl
+{"type":"ishikawa","id":"root","problem":"Low Product Quality","categories":[{"name":"People","items":[{"name":"Training","children":[{"name":"Lack of courses"},{"name":"Poor quality materials"}]},{"name":"High turnover"},{"name":"Low motivation"}]},{"name":"Process","items":[{"name":"Documentation incomplete"},{"name":"Lack of reviews"},{"name":"No standardization"}]},{"name":"Technology","items":[{"name":"Obsolete hardware"},{"name":"Software issues","children":[{"name":"No patches"},{"name":"Old versions"}]},{"name":"Lack of integration"}]},{"name":"Environment","items":[{"name":"Unstable temperature"},{"name":"High humidity"}]}]}
+```
+
+**Result:**
+- **Top branches**: People, Process
+- **Bottom branches**: Technology, Environment
+- **Nested items**: "Training" and "Software issues" have sub-causes displayed hierarchically
+
+### Example 3: Six Categories (6M Method)
+
+```jsonl
+{"type":"ishikawa","id":"root","problem":"Production Defects","categories":[{"name":"Man","items":[{"name":"Skill gaps"},{"name":"Fatigue"}]},{"name":"Method","items":[{"name":"Outdated procedures"},{"name":"No documentation"}]},{"name":"Machine","items":[{"name":"Poor maintenance"},{"name":"Old equipment"}]},{"name":"Material","items":[{"name":"Low quality suppliers"},{"name":"Inconsistent batches"}]},{"name":"Measurement","items":[{"name":"Uncalibrated tools"},{"name":"Inconsistent standards"}]},{"name":"Mother Nature","items":[{"name":"Temperature fluctuations"},{"name":"Humidity"}]}]}
+```
+
+**Result:**
+- **Top branches** (3): Man, Method, Machine
+- **Bottom branches** (3): Material, Measurement, Mother Nature
+
+## Visual Layout
+
+```
+         [Item]─┐
+                │
+    [Item]──────┤     [Category]
+                │          │
+         [Item]─┘          │
+                           │
+═══════════════════════════╪═══════════════════ [Problem]
+                           │
+         [Item]─┐          │
+                │          │
+    [Item]──────┤     [Category]
+                │
+         [Item]─┘
+```
+
+## Best Practices
+
+1. **Problem Statement**: Be specific and measurable (e.g., "Customer satisfaction below 80%" rather than "Poor service")
+
+2. **Category Names**: Use standard frameworks when applicable:
+   - **4M**: Man, Method, Machine, Material
+   - **6M**: Add Measurement, Mother Nature (Environment)
+   - **8P** (Service): People, Process, Place, Promotion, Product, Price, Physical Evidence, Positioning
+   - Or create custom categories relevant to your domain
+
+3. **Items**:
+   - Keep descriptions concise (2-5 words)
+   - Use specific, actionable causes
+   - Nest related sub-causes using `children` for clarity
+
+4. **Distribution**:
+   - Aim for balanced categories (2-6 items per category)
+   - The system automatically balances left/right distribution
+   - Odd numbers work fine (e.g., 5 items = 3 left, 2 right)
+
+5. **Nesting Depth**:
+   - Use 1-2 levels of nesting for clarity
+   - Avoid more than 3 levels (becomes hard to read)
+
+## Common Use Cases
+
+- **Manufacturing Quality**: Using 6M framework
+- **Service Quality**: Using 8P framework
+- **Project Issues**: Custom categories like Resources, Planning, Communication, Technology
+- **Root Cause Analysis**: Any domain-specific categories
+- **Problem Solving**: Brainstorming and organizing potential causes
+
+## Notes
+
+- All visual layout (positioning, spacing, connector lines) is handled automatically
+- Categories are evenly distributed between top and bottom branches
+- Items within categories are evenly distributed between left and right sides
+- The diagram adapts to any number of categories and items
 ===/docs/JSONL Document components.md===
 # JSONL Document components Specification (high level document components)
 
@@ -777,10 +917,33 @@ Automatically draws a line connecting two elements from their centers.
 - `connector_type` (string) - "straight", "curved", or "orthogonal" (default: "straight")
 - `curve_offset` or `curve_amount` (number) - Curve offset for "curved" type
 
+
+
+**Optional Port Attributes:**
+- `source_port` (string) - Port on source element: "center", "top", "bottom", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right" (default: "center")
+- `target_port` (string) - Port on target element (same options as source_port)
+
+**Example:**
+```json
+{"id":"conn1","type":"connector","source":"box1","source_port":"right","target":"box2","target_port":"left","stroke_color":"red","stroke_width":2}
+{"id":"conn2","type":"connector","source":"header","source_port":"bottom","target":"body","target_port":"top","stroke_color":"blue","stroke_width":2}
+```
+
 **Example:**
 ```json
 {"id":"conn1","type":"connector","source":"box1","target":"box2","stroke_color":"red","stroke_width":2}
 {"id":"conn2","type":"connector","from":"elem1","to":"elem2","connector_type":"curved","curve_offset":20}
+```
+**Optional Arrow Attributes:**
+- `arrow_start` or `arrow_begin` (boolean) - Add arrowhead at source end (default: false)
+- `arrow_end` (boolean) - Add arrowhead at target end (default: false)
+- `arrow_size` (number) - Size of arrowheads (default: 8.0)
+
+**Example:**
+```json
+{"id":"conn1","type":"connector","source":"box1","target":"box2","arrow_end":true,"stroke_color":"blue","stroke_width":2}
+{"id":"conn2","type":"connector","source":"box2","target":"box3","arrow_start":true,"arrow_end":true,"stroke_color":"red","stroke_width":2}
+{"id":"conn3","type":"connector","source":"box1","source_port":"right","target":"box2","target_port":"left","arrow_end":true,"arrow_size":12,"stroke_color":"green","stroke_width":3}
 ```
 
 **Notes:**
@@ -1013,15 +1176,29 @@ Align multiple entities. First entity is reference.
 ```
 
 ### Directional Positioning
-Position relative to reference element.
-
+Position the first entity relative to the second entity (reference).
 ```json
-{"type":"right_of","entities":["positioned_element","reference_element"]}
-{"type":"left_of","entities":["positioned_element","reference_element"]}
-{"type":"above","entities":["positioned_element","reference_element"]}
-{"type":"below","entities":["positioned_element","reference_element"]}
+{"type":"right_of","entities":["elem_A","elem_B"]}  // A is to the right of B
+{"type":"left_of","entities":["elem_A","elem_B"]}   // A is to the left of B
+{"type":"above","entities":["elem_A","elem_B"]}     // A is above B
+{"type":"below","entities":["elem_A","elem_B"]}     // A is below B
 ```
 
+**Syntax:** `{"type":"<direction>","entities":[<positioned>,<reference>]}`
+- First element is the one being positioned
+- Second element is the reference/anchor element
+
+**Examples:**
+```json
+// Place header above content
+{"type":"above","entities":["header","content"]}
+
+// Place footer below content  
+{"type":"below","entities":["footer","content"]}
+
+// Place sidebar to the left of main area
+{"type":"left_of","entities":["sidebar","main"]}
+```
 ### Spacing Constraints
 
 ```json
@@ -1117,6 +1294,47 @@ Custom components are registered via `builder.register_custom_component()` and c
 ---
 
 **Version 1.2** - Complete specification based on parser implementation
+===/docs/examples/connectors/port_test.jsonl===
+{"id":"root","type":"free_container","width":800,"height":600,"children":["center_box","top_box","bottom_box","left_box","right_box","tl_box","tr_box","bl_box","br_box","conn_top","conn_bottom","conn_left","conn_right","conn_tl","conn_tr","conn_bl","conn_br","legend"],"background":"#f5f5f5"}
+{"id":"center_box","type":"rect","x":360,"y":270,"width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":3}
+{"id":"top_box","type":"rect","x":360,"y":100,"width":60,"height":40,"fill":"lightcoral","stroke":"red","stroke_width":2}
+{"id":"bottom_box","type":"rect","x":360,"y":460,"width":60,"height":40,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"left_box","type":"rect","x":150,"y":270,"width":60,"height":40,"fill":"lightyellow","stroke":"orange","stroke_width":2}
+{"id":"right_box","type":"rect","x":590,"y":270,"width":60,"height":40,"fill":"lightpink","stroke":"purple","stroke_width":2}
+{"id":"tl_box","type":"rect","x":200,"y":150,"width":50,"height":35,"fill":"lavender","stroke":"indigo","stroke_width":2}
+{"id":"tr_box","type":"rect","x":550,"y":150,"width":50,"height":35,"fill":"peachpuff","stroke":"darkorange","stroke_width":2}
+{"id":"bl_box","type":"rect","x":200,"y":415,"width":50,"height":35,"fill":"lightcyan","stroke":"teal","stroke_width":2}
+{"id":"br_box","type":"rect","x":550,"y":415,"width":50,"height":35,"fill":"mistyrose","stroke":"crimson","stroke_width":2}
+{"id":"conn_top","type":"connector","source":"center_box","source_port":"top","target":"top_box","target_port":"bottom","stroke_color":"red","stroke_width":2}
+{"id":"conn_bottom","type":"connector","source":"center_box","source_port":"bottom","target":"bottom_box","target_port":"top","stroke_color":"green","stroke_width":2}
+{"id":"conn_left","type":"connector","source":"center_box","source_port":"left","target":"left_box","target_port":"right","stroke_color":"orange","stroke_width":2}
+{"id":"conn_right","type":"connector","source":"center_box","source_port":"right","target":"right_box","target_port":"left","stroke_color":"purple","stroke_width":2}
+{"id":"conn_tl","type":"connector","source":"center_box","source_port":"top_left","target":"tl_box","target_port":"bottom_right","stroke_color":"indigo","stroke_width":2}
+{"id":"conn_tr","type":"connector","source":"center_box","source_port":"top_right","target":"tr_box","target_port":"bottom_left","stroke_color":"darkorange","stroke_width":2}
+{"id":"conn_bl","type":"connector","source":"center_box","source_port":"bottom_left","target":"bl_box","target_port":"top_right","stroke_color":"teal","stroke_width":2}
+{"id":"conn_br","type":"connector","source":"center_box","source_port":"bottom_right","target":"br_box","target_port":"top_left","stroke_color":"crimson","stroke_width":2}
+{"id":"legend","type":"vstack","children":["legend_title","legend_top","legend_bottom","legend_left","legend_right","legend_tl","legend_tr","legend_bl","legend_br"],"h_align":"left","x":20,"y":20}
+{"id":"legend_title","type":"text","content":"Port Connection Test","font_size":16,"color":"black"}
+{"id":"legend_top","type":"text","content":"🔴 Top ↔ Bottom","font_size":12,"color":"red"}
+{"id":"legend_bottom","type":"text","content":"🟢 Bottom ↔ Top","font_size":12,"color":"green"}
+{"id":"legend_left","type":"text","content":"🟠 Left ↔ Right","font_size":12,"color":"orange"}
+{"id":"legend_right","type":"text","content":"🟣 Right ↔ Left","font_size":12,"color":"purple"}
+{"id":"legend_tl","type":"text","content":"🔵 TopLeft ↔ BottomRight","font_size":12,"color":"indigo"}
+{"id":"legend_tr","type":"text","content":"🟤 TopRight ↔ BottomLeft","font_size":12,"color":"darkorange"}
+{"id":"legend_bl","type":"text","content":"🔷 BottomLeft ↔ TopRight","font_size":12,"color":"teal"}
+{"id":"legend_br","type":"text","content":"🔴 BottomRight ↔ TopLeft","font_size":12,"color":"crimson"}
+
+===/docs/examples/connectors/connectors_arrows.jsonl===
+{"id":"root","type":"free_container","width":400,"height":300,"children":["center","top","right","bottom","left","conn_top","conn_right","conn_bottom","conn_left"]}
+{"id":"center","type":"rect","x":160,"y":120,"width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":2}
+{"id":"top","type":"rect","x":160,"y":20,"width":80,"height":40,"fill":"lightcoral","stroke":"red","stroke_width":2}
+{"id":"right","type":"rect","x":300,"y":130,"width":80,"height":40,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"bottom","type":"rect","x":160,"y":240,"width":80,"height":40,"fill":"lightyellow","stroke":"orange","stroke_width":2}
+{"id":"left","type":"rect","x":20,"y":130,"width":80,"height":40,"fill":"lightpink","stroke":"purple","stroke_width":2}
+{"id":"conn_top","type":"connector","source":"center","source_port":"top","target":"top","target_port":"bottom","arrow_end":true,"stroke_color":"red","stroke_width":2,"arrow_size":12}
+{"id":"conn_right","type":"connector","source":"center","source_port":"right","target":"right","target_port":"left","arrow_end":true,"stroke_color":"green","stroke_width":2,"arrow_size":12}
+{"id":"conn_bottom","type":"connector","source":"center","source_port":"bottom","target":"bottom","target_port":"top","arrow_end":true,"stroke_color":"orange","stroke_width":2,"arrow_size":12}
+{"id":"conn_left","type":"connector","source":"center","source_port":"left","target":"left","target_port":"right","arrow_end":true,"stroke_color":"purple","stroke_width":2,"arrow_size":8}
 ===/docs/examples/shapes/polylines.jsonl===
 {"id":"root","type":"vstack","children":["title","demo_container"],"h_align":"center"}
 {"id":"title","type":"text","content":"📈 Polyline Test & Examples","font_size":24,"color":"darkblue"}
@@ -1340,7 +1558,9 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
+    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point,
+    ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
+    VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -1583,7 +1803,7 @@ pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
 
     for elem in shape_group.elements.iter() {
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        let elem_pos = session.get_position(elem.clone()); // Uses transforms behind the scenes
+        let elem_pos = session.get_local_position(elem.clone()); // Uses transforms behind the scenes
 
         min_x = min_x.min(elem_pos.0);
         min_y = min_y.min(elem_pos.1);
@@ -1674,7 +1894,7 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
         }
         // Lines can refer a point (technically it can be any other entity with a position)
         LinePointReference::PointID(id) => {
-            let pos = session.get_position(id);
+            let pos = session.get_local_position(id);
             start_point.x = pos.0;
             start_point.y = pos.1;
         }
@@ -1687,7 +1907,7 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
         }
         // Lines can refer a point (technically it can be any other entity with a position)
         LinePointReference::PointID(id) => {
-            let pos = session.get_position(id);
+            let pos = session.get_local_position(id);
             end_point.x = pos.0;
             end_point.y = pos.1;
         }
@@ -1698,16 +1918,16 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
         (end_point.x - start_point.x).abs(),
         (end_point.y - start_point.y).abs(),
     );
-
-    // Note: The line is defined by the points, so don't set its position directly
-    // Will be the default pos (0,0)
-    // session.set_position(shape_line.entity.clone(), x, y);
 }
-
 pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector) {
-    // Get absolute centers
-    let (start_x, start_y) = session.get_absolute_center(&connector.source_id);
-    let (end_x, end_y) = session.get_absolute_center(&connector.target_id);
+    // Get port positions instead of centers
+    let (start_x, start_y) =
+        session.get_port_position(&connector.source_id, &connector.options.source_port);
+    let (end_x, end_y) =
+        session.get_port_position(&connector.target_id, &connector.options.target_port);
+
+    println!("🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})", 
+             connector.entity, start_x, start_y, end_x, end_y);
     
     session.set_position(connector.start_point_id.clone(), start_x, start_y);
     session.set_position(connector.end_point_id.clone(), end_x, end_y);
@@ -1716,15 +1936,16 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let max_x = start_x.max(end_x);
     let min_y = start_y.min(end_y);
     let max_y = start_y.max(end_y);
-    
+
     let width = max_x - min_x;
     let height = max_y - min_y;
-    
-    // Update connector bounds
+
+    println!("   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})", 
+             min_x, min_y, width, height);
+
     session.set_position(connector.entity.clone(), min_x, min_y);
     session.set_size(connector.entity.clone(), width, height);
 }
-
 /**
  * Updates the size of the arrow entity based on the start and end points
  */
@@ -1819,7 +2040,7 @@ pub fn layout_vertical_stack(session: &mut DiagramBuilder, vertical_stack: &Vert
     for elem in vertical_stack.elements.iter() {
         // FIXED: Use effective bounds consistently for alignment calculations
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        let current_pos = session.get_position(elem.clone());
+        let current_pos = session.get_local_position(elem.clone());
 
         let x = match vertical_stack.horizontal_alignment {
             HorizontalAlignment::Left => -elem_bounds.x, // Compensate for bounding box offset
@@ -1857,7 +2078,7 @@ pub fn layout_horizontal_stack(session: &mut DiagramBuilder, horizontal_stack: &
     for elem in horizontal_stack.elements.iter() {
         // FIXED: Use effective bounds consistently for alignment calculations
         let elem_bounds = session.get_effective_bounds(elem.clone());
-        let current_pos = session.get_position(elem.clone());
+        let current_pos = session.get_local_position(elem.clone());
 
         let y = match horizontal_stack.vertical_alignment {
             VerticalAlignment::Top => -elem_bounds.y, // Compensate for bounding box offset
@@ -2099,13 +2320,12 @@ fn isFixedSize(builder: &DiagramBuilder, id: EntityID) -> bool {
     }
 }
 
-
 pub fn layout_constraint_container(
     builder: &mut DiagramBuilder,
     container: &ConstraintLayoutContainer,
 ) -> anyhow::Result<()> {
     println!("layout_constraint_container called");
-    
+
     let child_sizes: Vec<(String, (Float, Float))> = container
         .children
         .iter()
@@ -2187,22 +2407,40 @@ pub fn layout_constraint_container(
         container_width, container_height
     );
     builder.set_size(container.entity.clone(), container_width, container_height);
-    
+
     // NOW layout lines that use PointID references
     // At this point, all points have their final positions from the constraint solver
     for child_id in &container.children {
         let entity_type = builder.entityTypes.get(child_id);
-        
+
         if let Some(EntityType::LineShape) = entity_type {
             let line = builder.get_line(child_id.clone()).clone();
-            if matches!(line.start, LinePointReference::PointID(_)) 
-                || matches!(line.end, LinePointReference::PointID(_)) {
-                println!("✅ Now laying out line {} with final point positions", child_id);
+            if matches!(line.start, LinePointReference::PointID(_))
+                || matches!(line.end, LinePointReference::PointID(_))
+            {
+                println!(
+                    "✅ Now laying out line {} with final point positions",
+                    child_id
+                );
                 layout_line(builder, &line);
             }
         }
     }
-    
+
+    // NOW layout connectors that depend on final positions
+    for child_id in &container.children {
+        let entity_type = builder.entityTypes.get(child_id);
+
+        if let Some(EntityType::ConnectorShape) = entity_type {
+            println!(
+                "✅ Now laying out connector {} with final positions",
+                child_id
+            );
+            let connector = builder.get_connector(child_id.clone()).clone();
+            layout_connector(builder, &connector);
+        }
+    }
+
     Ok(())
 }
 
@@ -2225,39 +2463,30 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
             continue;
         }
 
-         // Skip lines that use PointID if we're inside a ConstraintLayoutContainer
+        // Skip lines that use PointID if we're inside a ConstraintLayoutContainer
         // They will be laid out AFTER constraints are solved
         if root.entity_type == EntityType::ConstraintLayoutContainer {
             if child.entity_type == EntityType::LineShape {
                 let line = session.get_line(child.entity_id.clone());
-                if matches!(line.start, LinePointReference::PointID(_)) 
-                    || matches!(line.end, LinePointReference::PointID(_)) {
-                    println!("⏭️  Skipping line {} during initial layout (uses PointID)", child.entity_id);
+                if matches!(line.start, LinePointReference::PointID(_))
+                    || matches!(line.end, LinePointReference::PointID(_))
+                {
+                    println!(
+                        "⏭️  Skipping line {} during initial layout (uses PointID)",
+                        child.entity_id
+                    );
                     continue; // Skip this line, it will be laid out after constraints
                 }
             }
         }
-        
+
         layout_tree_node(session, child);
         //print size and position of the child
 
         let child_size = session.get_size(child.entity_id.clone());
-        let child_pos = session.get_position(child.entity_id.clone());
+        let child_pos = session.get_local_position(child.entity_id.clone());
         println!("Child size: {:?}", child_size);
         println!("Child pos: {:?}", child_pos);
-    }
-
-    // SECOND PASS: Now layout connectors after all other elements have positions
-    for child in &root.children {
-        if child.entity_type == EntityType::ConnectorShape {
-            println!("🔗 Layout connector (second pass): {:?}", child.entity_id);
-            layout_tree_node(session, child);
-            
-            let child_size = session.get_size(child.entity_id.clone());
-            let child_pos = session.get_position(child.entity_id.clone());
-            println!("Connector size: {:?}", child_size);
-            println!("Connector pos: {:?}", child_pos);
-        }
     }
 
     //Once the children are laid out, we can layout the current element
@@ -2293,9 +2522,7 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
         }
 
         EntityType::ConnectorShape => {
-            //get the Shape line entity
-            let connector = session.get_connector(root.entity_id.clone()).clone();
-            layout_connector(session, &connector);
+            // Skip, they are handled in layout_diagram in a later phase
         }
 
         EntityType::ArrowShape => {
@@ -2369,6 +2596,83 @@ pub fn layout_tree_node(session: &mut DiagramBuilder, root: &DiagramTreeNode) ->
     session.get_effective_bounds(root.entity_id.clone())
 }
 
+/// Recursively calculates and caches absolute positions for all nodes in the tree
+/// Properly handles rotation, scaling, and translation by accumulating transforms
+fn calculate_absolute_positions(
+    session: &mut DiagramBuilder,
+    node: &DiagramTreeNode,
+    parent_transform: Transform,
+) {
+    // Get this node's local transform
+    let local_transform = session.get_transform(node.entity_id.clone());
+
+    // Combine parent transform with local transform
+    // Order matters: parent_transform * local_transform
+    let absolute_transform = parent_transform.combine(&local_transform);
+
+    // The absolute position is the translation component of the combined transform
+    let absolute_pos = (absolute_transform.matrix[4], absolute_transform.matrix[5]);
+
+    // Store it in the cache
+    session
+        .absolute_positions
+        .insert(node.entity_id.clone(), absolute_pos);
+
+    println!(
+        "📍 Absolute position for {}: ({:.1}, {:.1})",
+        node.entity_id, absolute_pos.0, absolute_pos.1
+    );
+
+    // Recursively process all children with the accumulated transform
+    for child in &node.children {
+        calculate_absolute_positions(session, child, absolute_transform.clone());
+    }
+}
+/// Complete diagram layout in three passes:
+/// 1. Calculate sizes and local positions (layout_tree_node) - skips connectors
+/// 2. Calculate absolute positions for all elements
+/// 3. Layout connectors using absolute positions
+pub fn layout_diagram(session: &mut DiagramBuilder, root: &DiagramTreeNode) -> BoundingBox {
+    println!("🎨 Starting diagram layout...");
+
+    // Pass 1: Calculate sizes and set local positions
+    // Connectors are skipped in this pass
+    let bbox = layout_tree_node(session, root);
+
+    println!("✅ Layout complete, now calculating absolute positions...");
+
+    // Pass 2: Calculate and cache absolute positions
+    session.absolute_positions.clear();
+    calculate_absolute_positions(session, root, Transform::identity());
+
+    println!(
+        "✅ Absolute positions calculated for {} elements",
+        session.absolute_positions.len()
+    );
+
+    // Pass 3: Layout all connectors now that absolute positions are available
+    println!("🔗 Laying out connectors...");
+    layout_connectors_recursive(session, root);
+    println!("✅ Connectors laid out");
+
+    bbox
+}
+
+/// Recursively finds and layouts all connectors in the tree
+fn layout_connectors_recursive(session: &mut DiagramBuilder, node: &DiagramTreeNode) {
+    // If this node is a connector, layout it
+    if node.entity_type == EntityType::ConnectorShape {
+        println!("  📌 Laying out connector: {}", node.entity_id);
+        let connector = session.get_connector(node.entity_id.clone()).clone();
+        layout_connector(session, &connector);
+    }
+
+    // Recursively process all children
+    for child in &node.children {
+        layout_connectors_recursive(session, child);
+    }
+}
+
 //import textoptions defined in src/components/mod.rs
 use crate::components::{BoxOptions, TextOptions};
 //Test that a box with a text inside is correctly laid out
@@ -2397,10 +2701,10 @@ fn test_layout_box_with_text() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id.clone());
+    let text_position = session.get_local_position(text.entity_id.clone());
     let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_position = session.get_local_position(box_shape.entity_id.clone());
     let box_size = session.get_size(box_shape.entity_id.clone());
     //assert equal positions
 
@@ -2437,10 +2741,10 @@ fn test_box_fixed_size() {
     //layout the box
     layout_tree_node(&mut session, &box_shape);
 
-    let text_position = session.get_position(text.entity_id.clone());
+    let text_position = session.get_local_position(text.entity_id.clone());
     let text_size = session.get_size(text.entity_id.clone());
 
-    let box_position = session.get_position(box_shape.entity_id.clone());
+    let box_position = session.get_local_position(box_shape.entity_id.clone());
     let box_size = session.get_size(box_shape.entity_id.clone());
 
     //assert equal positions
@@ -3381,14 +3685,14 @@ mod debug_rotation_positioning {
         layout_tree_node(&mut builder, &hstack);
         
         println!("🔍 AFTER LAYOUT:");
-        println!("  Normal rect position: {:?}", builder.get_position("normal_rect".to_string()));
+        println!("  Normal rect position: {:?}", builder.get_local_position("normal_rect".to_string()));
         println!("  Normal rect bounds: {:?}", builder.get_effective_bounds("normal_rect".to_string()));
         
-        println!("  Rotated rect position: {:?}", builder.get_position("rotated_rect".to_string()));
+        println!("  Rotated rect position: {:?}", builder.get_local_position("rotated_rect".to_string()));
         println!("  Rotated rect bounds: {:?}", builder.get_effective_bounds("rotated_rect".to_string()));
         println!("  Rotated rect transform: {:?}", builder.get_transform("rotated_rect".to_string()));
         
-        println!("  Normal rect2 position: {:?}", builder.get_position("normal_rect2".to_string()));
+        println!("  Normal rect2 position: {:?}", builder.get_local_position("normal_rect2".to_string()));
         println!("  Normal rect2 bounds: {:?}", builder.get_effective_bounds("normal_rect2".to_string()));
         
         println!("  Stack total size: {:?}", builder.get_size("root".to_string()));
@@ -3432,8 +3736,8 @@ use crate::parser::JsonLinesParser;
 use core::fmt;
 use std::{any::Any, collections::HashMap, sync::Arc};
 
-use serde_json::{Map, Value};
 use anyhow::{bail, Result};
+use serde_json::{Map, Value};
 
 pub use crate::components::table::*;
 //new type EntityID that is a u64
@@ -3563,14 +3867,6 @@ pub enum ConnectorType {
 }
 
 #[derive(Clone)]
-pub struct ConnectorOptions {
-    pub connector_type: ConnectorType,
-    pub stroke_color : String,
-    pub stroke_width: Float,
-    pub curve_offset: Option<Float>, //curve ammount
-}
-
-#[derive(Clone)]
 pub struct ShapeConnector {
     pub entity: EntityID,
     pub source_id: EntityID,
@@ -3578,6 +3874,55 @@ pub struct ShapeConnector {
     pub start_point_id: EntityID,
     pub end_point_id: EntityID,
     pub options: ConnectorOptions,
+}
+
+#[derive(Debug, Clone)]
+pub enum Port {
+    Center,
+    Top,
+    Bottom,
+    Left,
+    Right,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl Default for Port {
+    fn default() -> Self {
+        Port::Center
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectorOptions {
+    pub connector_type: ConnectorType,
+    pub stroke_color: String,
+    pub stroke_width: Float,
+    pub curve_offset: Option<Float>,
+    pub source_port: Port, //
+    pub target_port: Port, //
+
+    pub arrow_start: bool, // : arrow at start
+    pub arrow_end: bool,   // : arrow at end
+    pub arrow_size: Float, // : arrow size
+}
+
+impl Default for ConnectorOptions {
+    fn default() -> Self {
+        Self {
+            connector_type: ConnectorType::Straight,
+            stroke_color: "black".to_string(),
+            stroke_width: 1.0,
+            curve_offset: None,
+            source_port: Port::Center,
+            target_port: Port::Center,
+            arrow_start: false,
+            arrow_end: false,
+            arrow_size: 10.0,
+        }
+    }
 }
 
 // Add spacer component
@@ -3648,7 +3993,7 @@ impl Clone for SpacerDirection {
 // This struct is useful for having points anchored to other elements positions
 #[derive(Debug, Clone)]
 pub struct PointShape {
-    pub entity: EntityID
+    pub entity: EntityID,
 }
 
 /**
@@ -4263,7 +4608,7 @@ impl Clone for ShapeLine {
 
 /// A line can set the x,y values directly or through a separate Point entity
 /// Referencing through point entity is useful for using with constraint systems
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub enum LinePointReference {
     Value(Float, Float),
     PointID(EntityID),
@@ -4421,7 +4766,7 @@ impl ArrowOptions {
         ArrowOptions {
             stroke_color: String::from("black"),
             stroke_width: 1.0,
-            arrow_size: 10.0,
+            arrow_size: 8.0,
         }
     }
 }
@@ -4575,7 +4920,6 @@ impl Clone for ConstraintLayoutContainer {
     }
 }
 
-
 impl Entity for ConstraintLayoutContainer {
     fn get_id(&self) -> EntityID {
         self.entity.clone()
@@ -4591,8 +4935,8 @@ impl Entity for ConstraintLayoutContainer {
 }
 
 impl ConstraintLayoutContainer {
-    pub fn new(entity: EntityID, children: Vec<String>)->Self{
-        ConstraintLayoutContainer{
+    pub fn new(entity: EntityID, children: Vec<String>) -> Self {
+        ConstraintLayoutContainer {
             entity: entity,
             children: children,
         }
@@ -4835,7 +5179,7 @@ impl CustomComponentRegistry {
     /// Create a component instance using the registered factory
     pub fn create_component(
         &self,
-        id: &str, 
+        id: &str,
         component_type: &str,
         attributes: &Map<String, Value>,
         builder: &mut crate::DiagramBuilder,
@@ -4843,7 +5187,7 @@ impl CustomComponentRegistry {
     ) -> Result<crate::diagram_builder::DiagramTreeNode> {
         match self.factories.get(component_type) {
             Some(factory) => factory(id, attributes, builder, parser),
-            None => bail!("Unknown custom component type: {}", component_type)
+            None => bail!("Unknown custom component type: {}", component_type),
         }
     }
 
@@ -4863,7 +5207,7 @@ impl CustomComponentRegistry {
     ) -> Option<
         &Arc<
             dyn Fn(
-                     &str,
+                    &str,
                     &serde_json::Map<String, serde_json::Value>,
                     &mut crate::diagram_builder::DiagramBuilder,
                     &JsonLinesParser,
@@ -6172,11 +6516,25 @@ impl JsonLinesParser {
                     None
                 };
 
+                // Parse ports
+                let source_port = parse_port(&entity.attributes, "source_port");
+                let target_port = parse_port(&entity.attributes, "target_port");
+
+                let arrow_start =
+                    get_bool_attr(&entity.attributes, &["arrow_start", "arrow_begin"], false);
+                let arrow_end = get_bool_attr(&entity.attributes, &["arrow_end"], false);
+                let arrow_size = get_float_attr(&entity.attributes, &["arrow_size"], 8.0);
+
                 let options = ConnectorOptions {
                     connector_type,
                     stroke_color,
                     stroke_width,
                     curve_offset,
+                    source_port,
+                    target_port,
+                    arrow_start,
+                    arrow_end,
+                    arrow_size,
                 };
 
                 // Create connector
@@ -6972,6 +7330,21 @@ impl JsonLinesParser {
     }
 }
 
+fn parse_port(attributes: &Map<String, Value>, key: &str) -> Port {
+    let port_str = get_string_attr(attributes, &[key], "center");
+    match port_str.as_str() {
+        "top" => Port::Top,
+        "bottom" => Port::Bottom,
+        "left" => Port::Left,
+        "right" => Port::Right,
+        "top_left" | "topleft" => Port::TopLeft,
+        "top_right" | "topright" => Port::TopRight,
+        "bottom_left" | "bottomleft" => Port::BottomLeft,
+        "bottom_right" | "bottomright" => Port::BottomRight,
+        _ => Port::Center,
+    }
+}
+
 ===/src/utils.rs===
 use crate::components::*;
 
@@ -7007,6 +7380,7 @@ pub struct DiagramBuilder {
     // Maps entity IDS to their transforms for positioning, rotation, scaling, etc.
     pub transforms: HashMap<EntityID, Transform>,
     pub entityTypes: HashMap<EntityID, EntityType>,
+    pub absolute_positions: HashMap<EntityID, (Float, Float)>,
 
     // Components
     points: HashMap<EntityID, PointShape>,
@@ -7100,6 +7474,7 @@ impl DiagramBuilder {
 
             pending_root_nodes: Vec::new(),
             custom_components: CustomComponentRegistry::new(),
+            absolute_positions: HashMap::new(),
         }
     }
 
@@ -7142,6 +7517,7 @@ impl DiagramBuilder {
         self.images.clear();
         self.transforms.clear();
         self.points.clear();
+        self.absolute_positions.clear();
 
         // Note: We don't clear custom_components as those are reusable function definitions
         // Note: We don't clear measure_text function as it should persist across diagrams
@@ -7233,7 +7609,8 @@ impl DiagramBuilder {
     }
 
     // Convenience methods for common operations
-    pub fn get_position(&self, entity_id: EntityID) -> (Float, Float) {
+    // Get the local position
+    pub fn get_local_position(&self, entity_id: EntityID) -> (Float, Float) {
         let transform = self.get_transform(entity_id);
         (transform.matrix[4], transform.matrix[5]) // e, f components
     }
@@ -7281,7 +7658,7 @@ impl DiagramBuilder {
     }
 
     pub fn set_rotation(&mut self, entity_id: EntityID, angle_degrees: Float) {
-        let pos = self.get_position(entity_id.clone());
+        let pos = self.get_local_position(entity_id.clone());
         let size = self.get_size(entity_id.clone());
 
         // Rotate around center of element
@@ -7554,7 +7931,6 @@ impl DiagramBuilder {
         target_id: EntityID,
         options: ConnectorOptions,
     ) -> DiagramTreeNode {
-
         self.new_entity(id.clone(), EntityType::ConnectorShape);
 
         // Create start and end points
@@ -7962,11 +8338,109 @@ impl DiagramBuilder {
         &self.spacers[&id]
     }
 
+    /// Get the position of a specific port on an element
+    pub fn get_port_position(&self, entity_id: &EntityID, port: &Port) -> (Float, Float) {
+    let size = self.get_size(entity_id.clone());
+
+    // Get absolute position (for elements with rotation, this includes the transform)
+    let absolute_pos = self
+        .absolute_positions
+        .get(entity_id)
+        .copied()
+        .unwrap_or_else(|| {
+            println!("⚠️  WARNING: No absolute position cached for {}", entity_id);
+            self.get_local_position(entity_id.clone())
+        });
+
+    // Calculate port offset based on size
+    let (offset_x, offset_y) = match port {
+        Port::Center => (size.0 / 2.0, size.1 / 2.0),
+        Port::Top => (size.0 / 2.0, 0.0),
+        Port::Bottom => (size.0 / 2.0, size.1),
+        Port::Left => (0.0, size.1 / 2.0),
+        Port::Right => (size.0, size.1 / 2.0),
+        Port::TopLeft => (0.0, 0.0),
+        Port::TopRight => (size.0, 0.0),
+        Port::BottomLeft => (0.0, size.1),
+        Port::BottomRight => (size.0, size.1),
+    };
+
+    // ADD THIS DEBUG LINE:
+    println!("  🔌 Port {:?} on {} (size {:.1}x{:.1}): absolute_pos=({:.1},{:.1}), offset=({:.1},{:.1})", 
+             port, entity_id, size.0, size.1, absolute_pos.0, absolute_pos.1, offset_x, offset_y);
+
+    // For rotated elements, we'd need to transform the port offset
+    // through the element's rotation transform here
+    let transform = self.get_transform(entity_id.clone());
+    let rotation_scale_transform = Transform {
+        matrix: [
+            transform.matrix[0], // a (scale/rotation)
+            transform.matrix[1], // b (rotation)
+            transform.matrix[2], // c (rotation)
+            transform.matrix[3], // d (scale/rotation)
+            0.0,                 // no translation
+            0.0,
+        ],
+    };
+
+    let transformed_offset = rotation_scale_transform.transform_point(offset_x, offset_y);
+
+    println!("     After transform: offset=({:.1},{:.1}), final=({:.1},{:.1})",
+             transformed_offset.0, transformed_offset.1,
+             absolute_pos.0 + transformed_offset.0,
+             absolute_pos.1 + transformed_offset.1);
+
+    (
+        absolute_pos.0 + transformed_offset.0,
+        absolute_pos.1 + transformed_offset.1,
+    )
+}
+
     pub fn get_absolute_center(&self, entity_id: &EntityID) -> (Float, Float) {
         let size = self.get_size(entity_id.clone());
-        let pos = self.get_position(entity_id.clone()); // Already absolute!
 
-        (pos.0 + size.0 / 2.0, pos.1 + size.1 / 2.0)
+        // Local center point (relative to element's origin)
+        let local_center = (size.0 / 2.0, size.1 / 2.0);
+
+        // Get the transform for this element
+        let transform = self.get_transform(entity_id.clone());
+
+        // Use cached absolute position
+        let absolute_pos = self
+            .absolute_positions
+            .get(entity_id)
+            .copied()
+            .unwrap_or_else(|| {
+                println!(
+                    "⚠️  WARNING: No absolute position cached for {}, using local position",
+                    entity_id
+                );
+                // Fallback to local position (won't be correct for nested elements)
+                self.get_local_position(entity_id.clone())
+            });
+
+        // For elements with rotation/scale, we need to transform the center point
+        // Extract just rotation/scale (no translation) from the transform
+        let rotation_scale_transform = Transform {
+            matrix: [
+                transform.matrix[0], // a (scale/rotation)
+                transform.matrix[1], // b (rotation)
+                transform.matrix[2], // c (rotation)
+                transform.matrix[3], // d (scale/rotation)
+                0.0,                 // e (no translation)
+                0.0,                 // f (no translation)
+            ],
+        };
+
+        // Transform the local center through rotation/scale
+        let transformed_center =
+            rotation_scale_transform.transform_point(local_center.0, local_center.1);
+
+        // Add to absolute position
+        (
+            absolute_pos.0 + transformed_center.0,
+            absolute_pos.1 + transformed_center.1,
+        )
     }
 
     pub fn get_custom_component(
