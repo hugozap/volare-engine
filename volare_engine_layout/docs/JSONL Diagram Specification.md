@@ -5,17 +5,26 @@ This specification describes the JSON Lines format for creating documents using 
 
 ## Basic Structure
 
-Each entity follows this format:
-```json
-{"id": "unique_id", "type": "entity_type", "attribute1": "value1", "attribute2": "value2"}
-```
+**CRITICAL: The first line of every JSONL document MUST be the root element.**
 
 ### Format Rules:
-- **One JSON object per line** - no formatted/pretty JSON
+- **First line is always root** - The very first object in the file must be your root container (typically `id:"root"`) with a `children` array referencing other elements
+- **One JSON object per line** - no formatted/pretty JSON  
 - **No blank lines** between objects
-- **First element must be root container** with children array
 - **Children can be referenced before being defined** - forward references are supported
 - **All IDs must be unique** within the document
+
+### Example:
+```jsonl
+{"id":"root","type":"vstack","children":["header","body"]}
+{"id":"header","type":"text","content":"Title"}
+{"id":"body","type":"text","content":"Content"}
+```
+❌ **WRONG - root is not first:**
+```jsonl
+{"id":"header","type":"text","content":"Title"}
+{"id":"root","type":"vstack","children":["header"]}
+```
 
 ---
 

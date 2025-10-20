@@ -48,17 +48,12 @@ impl BranchItem {
 #[derive(Clone, Debug)]
 pub struct Category {
     pub name: String,
-    pub left_items: Vec<BranchItem>,
-    pub right_items: Vec<BranchItem>,
+    pub items: Vec<BranchItem>,
 }
 
 impl Category {
-    pub fn new(name: String, left_items: Vec<BranchItem>, right_items: Vec<BranchItem>) -> Self {
-        Category {
-            name,
-            left_items,
-            right_items,
-        }
+    pub fn new(name: String, items: Vec<BranchItem>) -> Self {
+        Category { name, items }
     }
 }
 pub fn create_ishikawa(
@@ -69,6 +64,29 @@ pub fn create_ishikawa(
 ) -> Result<DiagramTreeNode> {
     // Parse attributes
     let problem = get_string_attr(attrs, &["problem"], "..");
+    let problem = get_string_attr(attrs, &["problem"], "..");
+
+    // Parse categories from attributes
+    let categories_value = attrs.get("categories");
+    let mut categories: Vec<Category> = Vec::new();
+
+    if let Some(Value::Array(categories_json)) = categories_value {
+        for cat_value in categories_json {
+            if let Value::Object(cat_obj) = cat_value {
+                let name = get_string_attr(&cat_obj, &["name"], "");
+
+                let items_json = if let Some(Value::Array(items)) = cat_obj.get("items") {
+                    items.clone()
+                } else {
+                    Vec::new()
+                };
+
+                let items = parse_branch_items(&items_json)?;
+
+                categories.push(Category { name, items });
+            }
+        }
+    }
 
     // IDs
     let spine_id = format!("{}_spine", id);
@@ -106,56 +124,8 @@ pub fn create_ishikawa(
         },
     );
 
-    // Test categories
-    let top_categories = vec![
-        Category::new(
-            "Personas".to_string(),
-            vec![
-                BranchItem::with_children(
-                    "Capacitación".to_string(),
-                    vec![
-                        BranchItem::new("Falta cursos..".to_string()),
-                        BranchItem::new("Calidad cursos regular".to_string()),
-                    ],
-                ),
-                BranchItem::new("Alta rotación".to_string()),
-                BranchItem::new("Otra causa".to_string()),
-            ],
-            vec![
-                BranchItem::new("Bajos salarios".to_string()),
-                // BranchItem::new("Falta motivación".to_string()),
-            ],
-        ),
-        Category::new(
-            "Procesos".to_string(),
-            vec![BranchItem::new("Documentación incompleta".to_string())],
-            vec![BranchItem::new("Falta de revisiones".to_string())],
-        ),
-    ];
-
-    let bottom_categories = vec![
-        Category::new(
-            "Tecnología".to_string(),
-            vec![
-                BranchItem::new("Hardware obsoleto".to_string()),
-                BranchItem::with_children(
-                    "Software".to_string(),
-                    vec![
-                        BranchItem::new("Sin parches".to_string()),
-                        BranchItem::new("Versiones antiguas".to_string()),
-                    ],
-                ),
-            ],
-            vec![BranchItem::new("Falta integración".to_string())],
-        ),
-        Category::new(
-            "Ambiente".to_string(),
-            vec![BranchItem::new("Temperatura inestable".to_string())],
-            vec![BranchItem::new(
-                "Humedad alta y otros problemas adicionales".to_string(),
-            )],
-        ),
-    ];
+    // Automatically distribute categories between top and bottom
+    let (top_categories, bottom_categories) = distribute_categories(categories);
 
     // Create branches
     let mut all_branches = Vec::new();
@@ -183,14 +153,16 @@ pub fn create_ishikawa(
         head_id.clone(),
         spine_start_point_id.clone(),
     ]));
-
     // Top branches
     for (i, category) in top_categories.iter().enumerate() {
+        // Automatically distribute items between left and right
+        let (left_items, right_items) = distribute_items(category.items.clone());
+
         let branch = create_top_branch(
             &format!("{}_top_{}", id, i),
             &category.name,
-            category.left_items.clone(),
-            category.right_items.clone(),
+            left_items,
+            right_items,
             builder,
         )?;
 
@@ -206,11 +178,14 @@ pub fn create_ishikawa(
 
     // Bottom branches
     for (i, category) in bottom_categories.iter().enumerate() {
+        // Automatically distribute items between left and right
+        let (left_items, right_items) = distribute_items(category.items.clone());
+
         let branch = create_bottom_branch(
             &format!("{}_bottom_{}", id, i),
             &category.name,
-            category.left_items.clone(),
-            category.right_items.clone(),
+            left_items,
+            right_items,
             builder,
         )?;
 
@@ -224,7 +199,6 @@ pub fn create_ishikawa(
             spine_start_point_id.clone(),
         ));
     }
-
     // Distribuir horizontalmente las ramas SUPERIORES
     if !top_branch_ids.is_empty() {
         // Primera rama superior alineada con el derecho de la espina
@@ -235,7 +209,7 @@ pub fn create_ishikawa(
 
         // Espaciar ramas superiores entre sí
         if top_branch_ids.len() > 1 {
-            let spacing = 80.0;
+            let spacing = 40.0;
             for i in 1..top_branch_ids.len() {
                 // constraints.push(SimpleConstraint::RightOf(
                 //     top_branch_ids[i].clone(),
@@ -272,7 +246,7 @@ pub fn create_ishikawa(
 
         // Espaciar ramas inferiores entre sí
         if bottom_branch_ids.len() > 1 {
-            let spacing = 80.0;
+            let spacing = 40.0;
             for i in 1..bottom_branch_ids.len() {
                 // constraints.push(SimpleConstraint::RightOf(
                 //     bottom_branch_ids[i].clone(),
@@ -341,6 +315,66 @@ pub fn create_ishikawa(
         builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
 
     Ok(container)
+}
+
+/// Automatically distribute items between left and right columns
+fn distribute_items(items: Vec<BranchItem>) -> (Vec<BranchItem>, Vec<BranchItem>) {
+    let total = items.len();
+    let mid = (total + 1) / 2; // Round up for left side
+
+    let mut left_items = Vec::new();
+    let mut right_items = Vec::new();
+
+    for (i, item) in items.into_iter().enumerate() {
+        if i < mid {
+            left_items.push(item);
+        } else {
+            right_items.push(item);
+        }
+    }
+
+    (left_items, right_items)
+}
+
+/// Automatically distribute categories between top and bottom branches
+fn distribute_categories(categories: Vec<Category>) -> (Vec<Category>, Vec<Category>) {
+    let total = categories.len();
+    let mid = (total + 1) / 2; // Round up for top
+
+    let mut top_categories = Vec::new();
+    let mut bottom_categories = Vec::new();
+
+    for (i, category) in categories.into_iter().enumerate() {
+        if i < mid {
+            top_categories.push(category);
+        } else {
+            bottom_categories.push(category);
+        }
+    }
+
+    (top_categories, bottom_categories)
+}
+
+/// Recursively parse branch items from JSON
+fn parse_branch_items(items_json: &[Value]) -> Result<Vec<BranchItem>> {
+    let mut items = Vec::new();
+
+    for item_value in items_json {
+        if let Value::Object(item_obj) = item_value {
+            let name = get_string_attr(&item_obj, &["name"], "");
+
+            // Parse children array
+            let children = if let Some(Value::Array(children_json)) = item_obj.get("children") {
+                parse_branch_items(children_json)?
+            } else {
+                Vec::new()
+            };
+
+            items.push(BranchItem { name, children });
+        }
+    }
+
+    Ok(items)
 }
 
 /// Creates a top branch with connector lines
@@ -447,8 +481,33 @@ fn create_top_branch(
     let mut left_nodes = Vec::new();
     for (i, item) in left_items.iter().enumerate() {
         let item_node =
-            create_left_item_with_connector(&format!("{}_left_{}", id, i), item, builder)?;
-        left_nodes.push(item_node);
+            create_left_item(&format!("{}_left_{}", id, i), item, builder)?;
+        // create a group with the branch and connecto
+        let pt = builder.new_point(format!("{}_connect_point", item_node.entity_id.clone()));
+        let spacer = builder.new_spacer(format!("{}_spacer", item_node.entity_id.clone()),SpacerOptions{
+            width: 20.0,
+            height: 0.0,
+            direction: SpacerDirection::Horizontal,
+        });
+
+        let connector = builder.new_connector(format!("{}_connector", item_node.entity_id.clone()), 
+            item_node.entity_id.clone(), pt.entity_id.clone(), ConnectorOptions { 
+                source_port: Port::Right,
+                target_port: Port::Left,
+                connector_type: ConnectorType::Straight,
+                stroke_color: BODY_COLOR.to_owned(),
+                stroke_width: 1.0,
+                arrow_end: false,
+                arrow_start: false,
+                arrow_size: 0.0,
+                curve_offset: None,
+        });
+        let items = vec![item_node.clone(), spacer.clone(), pt.clone()];
+        let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
+        let container_group = builder.new_group(format!("{}_container_group", item_node.entity_id.clone()), vec![hstack, connector]);
+        
+
+        left_nodes.push(container_group);
     }
 
     left_nodes.insert(0, left_col_top_spacer);
@@ -458,8 +517,33 @@ fn create_top_branch(
     let mut right_nodes = Vec::new();
     for (i, item) in right_items.iter().enumerate() {
         let item_node =
-            create_right_item_with_connector(&format!("{}_right_{}", id, i), item, builder)?;
-        right_nodes.push(item_node);
+            create_right_item(&format!("{}_right_{}", id, i), item, builder)?;
+         // create a group with the branch and connecto
+        let pt = builder.new_point(format!("{}_connect_point", item_node.entity_id.clone()));
+        let spacer = builder.new_spacer(format!("{}_spacer", item_node.entity_id.clone()),SpacerOptions{
+            width: 20.0,
+            height: 0.0,
+            direction: SpacerDirection::Horizontal,
+        });
+
+        let connector = builder.new_connector(format!("{}_connector", item_node.entity_id.clone()), 
+            item_node.entity_id.clone(), pt.entity_id.clone(), ConnectorOptions { 
+                source_port: Port::Left,
+                target_port: Port::Right,
+                connector_type: ConnectorType::Straight,
+                stroke_color: BODY_COLOR.to_owned(),
+                stroke_width: 1.0,
+                arrow_end: false,
+                arrow_start: false,
+                arrow_size: 0.0,
+                curve_offset: None,
+        });
+        let items = vec![pt.clone(), spacer.clone(), item_node.clone(),];
+        let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
+        let container_group = builder.new_group(format!("{}_container_group", item_node.entity_id.clone()), vec![hstack, connector]);
+        
+        
+        right_nodes.push(container_group);
     }
 
     right_nodes.insert(0, right_col_top_spacer);
@@ -615,9 +699,35 @@ fn create_bottom_branch(
     let mut left_nodes = Vec::new();
     for (i, item) in left_items.iter().enumerate() {
         let item_node =
-            create_left_item_with_connector(&format!("{}_left_{}", id, i), item, builder)?;
-        left_nodes.push(item_node);
+            create_left_item(&format!("{}_left_{}", id, i), item, builder)?;
+        // create a group with the branch and connecto
+        let pt = builder.new_point(format!("{}_connect_point", item_node.entity_id.clone()));
+        let spacer = builder.new_spacer(format!("{}_spacer", item_node.entity_id.clone()),SpacerOptions{
+            width: 20.0,
+            height: 0.0,
+            direction: SpacerDirection::Horizontal,
+        });
+
+        let connector = builder.new_connector(format!("{}_connector", item_node.entity_id.clone()), 
+            item_node.entity_id.clone(), pt.entity_id.clone(), ConnectorOptions { 
+                source_port: Port::Right,
+                target_port: Port::Left,
+                connector_type: ConnectorType::Straight,
+                stroke_color: BODY_COLOR.to_owned(),
+                stroke_width: 1.0,
+                arrow_end: false,
+                arrow_start: false,
+                arrow_size: 0.0,
+                curve_offset: None,
+        });
+        let items = vec![item_node.clone(), spacer.clone(), pt.clone()];
+        let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
+        let container_group = builder.new_group(format!("{}_container_group", item_node.entity_id.clone()), vec![hstack, connector]);
+        
+
+        left_nodes.push(container_group);
     }
+
     left_nodes.insert(0, left_col_top_spacer);
     left_nodes.push(left_col_bottom_spacer);
 
@@ -625,8 +735,33 @@ fn create_bottom_branch(
     let mut right_nodes = Vec::new();
     for (i, item) in right_items.iter().enumerate() {
         let item_node =
-            create_right_item_with_connector(&format!("{}_right_{}", id, i), item, builder)?;
-        right_nodes.push(item_node);
+            create_right_item(&format!("{}_right_{}", id, i), item, builder)?;
+         // create a group with the branch and connecto
+        let pt = builder.new_point(format!("{}_connect_point", item_node.entity_id.clone()));
+        let spacer = builder.new_spacer(format!("{}_spacer", item_node.entity_id.clone()),SpacerOptions{
+            width: 20.0,
+            height: 0.0,
+            direction: SpacerDirection::Horizontal,
+        });
+
+        let connector = builder.new_connector(format!("{}_connector", item_node.entity_id.clone()), 
+            item_node.entity_id.clone(), pt.entity_id.clone(), ConnectorOptions { 
+                source_port: Port::Left,
+                target_port: Port::Right,
+                connector_type: ConnectorType::Straight,
+                stroke_color: BODY_COLOR.to_owned(),
+                stroke_width: 1.0,
+                arrow_end: false,
+                arrow_start: false,
+                arrow_size: 0.0,
+                curve_offset: None,
+        });
+        let items = vec![pt.clone(), spacer.clone(), item_node.clone(),];
+        let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
+        let container_group = builder.new_group(format!("{}_container_group", item_node.entity_id.clone()), vec![hstack, connector]);
+        
+        
+        right_nodes.push(container_group);
     }
 
     right_nodes.insert(0, right_col_top_spacer);
@@ -678,73 +813,15 @@ fn create_bottom_branch(
         builder.new_constraint_layout_container(id.to_string(), children_with_pos, constraints);
     Ok(branch)
 }
-/// Creates a left item with a horizontal connector line
-fn create_left_item_with_connector(
-    id: &str,
-    item: &BranchItem,
-    builder: &mut DiagramBuilder,
-) -> Result<DiagramTreeNode> {
-    let item_content = create_left_item(id, item, builder)?;
 
-    // Create connector line (horizontal line pointing right)
-    let connector_id = format!("{}_connector", id);
-    let connector = builder.new_rectangle(
-        connector_id,
-        RectOptions {
-            width_behavior: SizeBehavior::Fixed(CONNECTOR_GAP),
-            height_behavior: SizeBehavior::Fixed(1.0),
-            fill_color: Fill::Color(BODY_COLOR.to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
-        },
-    );
 
-    // Combine item and connector horizontally
-    let hstack = builder.new_hstack(
-        format!("{}_with_connector", id),
-        vec![item_content, connector],
-        VerticalAlignment::Center,
-    );
-
-    Ok(hstack)
-}
-
-/// Creates a right item with a horizontal connector line
-fn create_right_item_with_connector(
-    id: &str,
-    item: &BranchItem,
-    builder: &mut DiagramBuilder,
-) -> Result<DiagramTreeNode> {
-    let item_content = create_right_item(id, item, builder)?;
-
-    // Create connector line (horizontal line pointing left)
-    let connector_id = format!("{}_connector", id);
-    let connector = builder.new_rectangle(
-        connector_id,
-        RectOptions {
-            width_behavior: SizeBehavior::Fixed(CONNECTOR_GAP),
-            height_behavior: SizeBehavior::Fixed(1.0),
-            fill_color: Fill::Color(BODY_COLOR.to_string()),
-            stroke_width: 0.0,
-            ..Default::default()
-        },
-    );
-
-    // Combine connector and item horizontally (connector first for right side)
-    let hstack = builder.new_hstack(
-        format!("{}_with_connector", id),
-        vec![connector, item_content],
-        VerticalAlignment::Center,
-    );
-
-    Ok(hstack)
-}
 /// Creates a left column item (children first, then text)
 fn create_left_item(
     id: &str,
     item: &BranchItem,
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
+    let mut g_items = Vec::new();
     if item.children.is_empty() {
         let item_text = builder.new_text(
             format!("{}_text", id),
@@ -762,26 +839,26 @@ fn create_left_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
-
         Ok(item_box)
+
     } else {
         let mut children_nodes = Vec::new();
         for (i, child) in item.children.iter().enumerate() {
             let child_node =
-                create_left_item_with_connector(&format!("{}_child_{}", id, i), child, builder)?;
+                create_left_item(&format!("{}_child_{}", id, i), child, builder)?;
             children_nodes.push(child_node);
         }
 
         let children_vstack = builder.new_vstack(
             format!("{}_children", id),
-            children_nodes,
+            children_nodes.clone(),
             HorizontalAlignment::Right,
         );
 
@@ -801,7 +878,7 @@ fn create_left_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
@@ -809,13 +886,42 @@ fn create_left_item(
             },
         );
 
+        let separator = builder.new_spacer(format!("{}_separator", id), SpacerOptions { width: 16.0, height: 0.0, direction: SpacerDirection::Horizontal });
         let hstack = builder.new_hstack(
             id.to_string(),
-            vec![children_vstack, item_box],
+            vec![children_vstack, separator,  item_box.clone()],
             VerticalAlignment::Center,
         );
 
-        Ok(hstack)
+        // create connectors between item and children
+        for (_, child) in children_nodes.iter().enumerate() {
+            // Create connector from item to child
+            let con = builder.new_connector(
+                format!(
+                    "{}_{}_connection",
+                    item_box.entity_id.clone(),
+                    child.entity_id.clone()
+                ),
+                item_box.entity_id.clone(),
+                child.entity_id.clone(),
+                ConnectorOptions {
+                    connector_type: ConnectorType::Orthogonal,
+                    stroke_color: BODY_COLOR.to_owned(),
+                    stroke_width: 1.0,
+                    curve_offset: Some(-1.0),
+                    source_port: Port::Left,
+                    target_port: Port::Right,
+                    arrow_start: false,
+                    arrow_end: false,
+                    arrow_size: 0.0,
+                },
+            );
+            g_items.push(con);
+        }
+        g_items.push(hstack);
+        let container_g = builder.new_group(format!("{}_container", id), g_items);
+
+        Ok(container_g)
     }
 }
 /// Creates a right column item (text first, then children)
@@ -824,6 +930,8 @@ fn create_right_item(
     item: &BranchItem,
     builder: &mut DiagramBuilder,
 ) -> Result<DiagramTreeNode> {
+    let mut g_items = Vec::new();
+
     if item.children.is_empty() {
         let item_text = builder.new_text(
             format!("{}_text", id),
@@ -841,7 +949,7 @@ fn create_right_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
@@ -854,13 +962,13 @@ fn create_right_item(
         let mut children_nodes = Vec::new();
         for (i, child) in item.children.iter().enumerate() {
             let child_node =
-                create_right_item_with_connector(&format!("{}_child_{}", id, i), child, builder)?;
+                create_right_item(&format!("{}_child_{}", id, i), child, builder)?;
             children_nodes.push(child_node);
         }
 
         let children_vstack = builder.new_vstack(
             format!("{}_children", id),
-            children_nodes,
+            children_nodes.clone(),
             HorizontalAlignment::Left,
         );
 
@@ -880,21 +988,51 @@ fn create_right_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
+        let separator = builder.new_spacer(format!("{}_separator", id), SpacerOptions { width: 16.0, height: 0.0, direction: SpacerDirection::Horizontal });
 
         let hstack = builder.new_hstack(
             id.to_string(),
-            vec![item_box, children_vstack],
+            vec![item_box.clone(), separator, children_vstack],
             VerticalAlignment::Center,
         );
 
-        Ok(hstack)
+        // create connectors between item and children
+        for (_, child) in children_nodes.iter().enumerate() {
+            // Create connector from item to child
+            let con = builder.new_connector(
+                format!(
+                    "{}_{}_connection",
+                    item_box.entity_id.clone(),
+                    child.entity_id.clone()
+                ),
+                item_box.entity_id.clone(),
+                child.entity_id.clone(),
+                ConnectorOptions {
+                    connector_type: ConnectorType::Orthogonal,
+                    stroke_color: BODY_COLOR.to_owned(),
+                    stroke_width: 1.0,
+                    curve_offset: Some(-2.0),
+                    source_port: Port::Right,
+                    target_port: Port::Left,
+                    arrow_start: false,
+                    arrow_end: false,
+                    arrow_size: 0.0,
+                },
+            );
+            g_items.push(con);
+        }
+        g_items.push(hstack);
+
+        let container_g = builder.new_group(format!("{}_container", id), g_items);
+
+        Ok(container_g)
     }
 }
 
