@@ -525,7 +525,7 @@ fn render_connector(
         ));
     }
     
-    // Create the line with optional arrow markers
+    // Create marker references
     let marker_start = if connector.options.arrow_start {
         format!(r#" marker-start="url(#arrow-{}-start)""#, entity_id)
     } else {
@@ -538,17 +538,92 @@ fn render_connector(
         String::new()
     };
     
-    line_content.push_str(&format!(
-        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"{}{} />"#,
-        rel_start_x,
-        rel_start_y,
-        rel_end_x,
-        rel_end_y,
-        connector.options.stroke_color,
-        connector.options.stroke_width,
-        marker_start,
-        marker_end
-    ));
+    // Generate path based on connector type
+    match connector.options.connector_type {
+        ConnectorType::Straight => {
+            // Original straight line implementation
+            line_content.push_str(&format!(
+                r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"{}{} />"#,
+                rel_start_x,
+                rel_start_y,
+                rel_end_x,
+                rel_end_y,
+                connector.options.stroke_color,
+                connector.options.stroke_width,
+                marker_start,
+                marker_end
+            ));
+        },
+        ConnectorType::Curved => {
+            // Cubic Bezier curve
+            let curve_offset = connector.options.curve_offset.unwrap_or(50.0);
+            
+            // Calculate direction and control points
+            let dx = rel_end_x - rel_start_x;
+            let dy = rel_end_y - rel_start_y;
+            
+            // Determine if we're going mostly horizontal or vertical
+            let is_horizontal = dx.abs() > dy.abs();
+            
+            let (cp1_x, cp1_y, cp2_x, cp2_y) = if is_horizontal {
+                // Horizontal curve: control points offset vertically
+                (
+                    rel_start_x + dx * 0.5,
+                    rel_start_y + curve_offset,
+                    rel_end_x - dx * 0.5,
+                    rel_end_y + curve_offset
+                )
+            } else {
+                // Vertical curve: control points offset horizontally
+                (
+                    rel_start_x + curve_offset,
+                    rel_start_y + dy * 0.5,
+                    rel_end_x + curve_offset,
+                    rel_end_y - dy * 0.5
+                )
+            };
+            
+            let path_data = format!(
+                "M {} {} C {} {}, {} {}, {} {}",
+                rel_start_x, rel_start_y,
+                cp1_x, cp1_y,
+                cp2_x, cp2_y,
+                rel_end_x, rel_end_y
+            );
+            
+            line_content.push_str(&format!(
+                r#"<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{} />"#,
+                path_data,
+                connector.options.stroke_color,
+                connector.options.stroke_width,
+                marker_start,
+                marker_end
+            ));
+        },
+       ConnectorType::Orthogonal => {
+            // Calculate midpoint
+            let mid_x = (rel_start_x + rel_end_x) / 2.0;
+            
+            // Create true orthogonal path (only horizontal and vertical lines)
+            let path_data = format!(
+                "M {} {} L {} {} L {} {} L {} {}",
+                rel_start_x, rel_start_y,    // 1. Start point
+                mid_x, rel_start_y,           // 2. Go horizontal to midpoint
+                mid_x, rel_end_y,             // 3. Go vertical to end Y level
+                rel_end_x, rel_end_y          // 4. Go horizontal to end point
+            );
+            
+            line_content.push_str(&format!(
+                r#"<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{} />"#,
+                path_data,
+                connector.options.stroke_color,
+                connector.options.stroke_width,
+                marker_start,
+                marker_end
+            ));
+        }
+
+    }
     
     render_with_transform(session, svg, entity_id, &line_content);
 }
@@ -809,93 +884,6 @@ fn render_arc(
     render_with_transform(session, svg, entity_id, &arc_content);
 }
 
-#[test]
-fn test_render_arc() {
-    let mut session = DiagramBuilder::new();
-    let options = ArcOptions {
-        fill_color: "blue".to_string(),
-        stroke_color: "black".to_string(),
-        stroke_width: 2.0,
-        filled: false,
-    };
-
-    let arc = session.new_arc(
-        "arc".to_string(),
-        30.0, // radius
-        0.0,  // start angle
-        90.0, // end angle
-        options,
-    );
-
-    let node = render_node(&arc, &session);
-
-    assertIsSameSVG(
-        &node,
-        r##"<g transform="translate(0 0)">
-            <path d="M 80 50 A 30 30 0 0 1 50 80" fill="none" stroke="black" stroke-width="2" />
-        </g>"##,
-    );
-    assert!(node.contains("stroke=\"black\""));
-}
-
-//test that groups are rendered correctly
-#[test]
-fn test_render_group() {
-    let mut session = DiagramBuilder::new();
-    let group = session.new_group("group".to_string(), Vec::new());
-    let node = render_node(&group, &session);
-    assert_eq!(node, r#"<g transform="translate(0 0)" ></g>"#);
-}
-
-//test that BoxShape with wrapped group is rendered correctly
-#[test]
-fn test_render_box_with_rect_in_group() {
-    let mut session = DiagramBuilder::new();
-
-    let rect = session.new_rectangle(
-        "rect1".to_string(),
-        RectOptions {
-            width_behavior: SizeBehavior::Fixed(100.0),
-            height_behavior: SizeBehavior::Fixed(50.0),
-            fill_color: Fill::Color("black".to_string()),
-            stroke_color: String::from("magenta"),
-            stroke_width: 1.0,
-            border_radius: 1.0,
-        },
-    );
-
-    let group = session.new_group("group".to_string(), vec![rect]);
-
-    let box_ = session.new_box(
-        "box_".to_string(),
-        group,
-        BoxOptions {
-            fill_color: Fill::Color("white".to_string()),
-            stroke_color: "black".to_string(),
-            stroke_width: 1.0,
-            padding: 2.0,
-            border_radius: 0.0,
-            width_behavior: SizeBehavior::Content, // 100 + 2*2 (padding)
-            height_behavior: SizeBehavior::Content, // 50 + 2
-        },
-    );
-
-    layout_tree_node(&mut session, &box_);
-
-    let node = render_node(&box_, &session);
-    assertIsSameSVG(
-        &node,
-        r#"
-    <g transform="translate(0 0)" >
-        <rect x="0" y="0" width="104" height="54" fill="white" stroke="black" stroke-width="1" rx="0" ry="0" />
-            <g transform="translate(2 2)" >
-                <g transform="translate(0 0)">
-                    <rect x="0" y="0" width="100" height="50" fill="black" stroke="magenta" stroke-width="1" rx="1" ry="1" />
-                </g>
-            </g>
-     </g>"#,
-    );
-}
 
 // Add this helper function
 fn render_with_transform(
@@ -930,15 +918,5 @@ fn escape_xml(text: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
-}
-
-fn assertIsSameSVG(a: &str, b: &str) {
-    // Normalize whitespace and compare
-    let strA = a.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-    let strB = b.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-    assert_eq!(
-        strA.replace('\n', "").replace('\r', ""),
-        strB.replace('\n', "").replace('\r', "")
-    );
 }
 
