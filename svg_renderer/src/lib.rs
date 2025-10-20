@@ -22,7 +22,18 @@ impl<W: Write> Renderer<W> for SVGRenderer {
             root_bounds.width, root_bounds.height,
             root_bounds.x, root_bounds.y, root_bounds.width, root_bounds.height
         ));
+
+         svg.push_str(r#"<defs>"#);
+        add_arrow_markers(&mut svg, session, diagram_node);
+        svg.push_str(r#"</defs>"#);
+
         svg.push_str(render_node(diagram_node, session).as_str());
+
+        // Render all connectors in a separate group at the end (on top)
+        svg.push_str(r#"<g id="connectors-layer">"#);
+        render_all_connectors(diagram_node, session, &mut svg);
+        svg.push_str("</g>");
+
         //close svg tag
         svg.push_str("</svg>");
         svg.push_str("\n");
@@ -36,71 +47,104 @@ impl<W: Write> Renderer<W> for SVGRenderer {
     }
 }
 
-// Render a node and its children
-fn render_node<'a>(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
-    let mut svg = String::new();
-
+/// Renders a node and its children, but skips connectors
+fn render_node(node: &DiagramTreeNode, session: &DiagramBuilder) -> String {
+    // Skip connectors - they'll be rendered in a separate pass
+    if node.entity_type == EntityType::ConnectorShape {
+        return String::new();
+    }
+    
+    // Render this node normally
     let entity_id = node.entity_id.clone();
+    let mut result = String::new();
 
     match node.entity_type {
-        EntityType::GroupShape => {
-            render_group(session, &mut svg, entity_id, node);
-        }
-        EntityType::BoxShape => {
-            render_box(session, &mut svg, entity_id, node);
-        }
-        EntityType::TextShape => {
-            render_text(session, &mut svg, entity_id, node);
-        }
-        EntityType::VerticalStackShape => {
-            render_vertical_stack(session, &mut svg, entity_id, node);
-        }
-        EntityType::HorizontalStackShape => {
-            render_horizontal_stack(session, &mut svg, entity_id, node);
-        }
-        EntityType::LineShape => {
-            render_line(session, &mut svg, entity_id, node);
-        }
-        EntityType::ArrowShape => {
-            render_arrow(session, &mut svg, entity_id, node);
-        }
-        EntityType::EllipseShape => {
-            render_ellipse(session, &mut svg, entity_id, node);
-        }
-        //table
-        EntityType::TableShape => {
-            render_table(session, &mut svg, entity_id, node);
-        }
-        //Image
-        EntityType::ImageShape => {
-            render_image(session, &mut svg, entity_id, node);
-        }
-
-        EntityType::PolyLine => {
-            render_polyline(session, &mut svg, entity_id, node);
-        }
-
-        EntityType::FreeContainer => {
-            render_free_container(session, &mut svg, entity_id, node);
-        }
-
-        EntityType::ConstraintLayoutContainer => {
-            render_constraint_layout_container(session, &mut svg, entity_id, node);
-        }
-
-        EntityType::RectShape => {
-            render_rectangle(session, &mut svg, entity_id, node);
-        }
-
-        EntityType::ArcShape => {
-            render_arc(session, &mut svg, entity_id, node);
-        }
-
+        EntityType::TextShape => render_text(session, &mut result, entity_id.clone(), node),
+        EntityType::BoxShape => render_box(session, &mut result, entity_id.clone(), node),
+        EntityType::RectShape => render_rectangle(session, &mut result, entity_id.clone(), node),
+        EntityType::LineShape => render_line(session, &mut result, entity_id.clone(), node),
+        EntityType::ArrowShape => render_arrow(session, &mut result, entity_id.clone(), node),
+        EntityType::EllipseShape => render_ellipse(session, &mut result, entity_id.clone(), node),
+        EntityType::GroupShape => render_group(session, &mut result, entity_id.clone(), node),
+        EntityType::TableShape => render_table(session, &mut result, entity_id.clone(), node),
+        EntityType::ImageShape => render_image(session, &mut result, entity_id.clone(), node),
+        EntityType::PolyLine => render_polyline(session, &mut result, entity_id.clone(), node),
+        EntityType::FreeContainer => render_free_container(session, &mut result, entity_id.clone(), node),
+        EntityType::ArcShape => render_arc(session, &mut result, entity_id.clone(), node),
+        EntityType::VerticalStackShape => render_vertical_stack(session, &mut result, entity_id.clone(), node),
+        EntityType::HorizontalStackShape => render_horizontal_stack(session, &mut result, entity_id.clone(), node),
+        EntityType::ConstraintLayoutContainer => render_constraint_layout_container(session, &mut result, entity_id.clone(), node),
+        EntityType::ConnectorShape => {}, // Skip - handled separately
         _ => {}
     }
 
-    svg
+    result
 }
+
+/// Collects all unique arrow configurations and creates marker definitions
+fn add_arrow_markers(svg: &mut String, session: &DiagramBuilder, node: &DiagramTreeNode) {
+    let mut markers = std::collections::HashSet::new();
+    collect_connector_markers(node, session, &mut markers);
+    
+    for marker_id in markers {
+        svg.push_str(&marker_id);
+    }
+}
+
+/// Recursively collects all connector marker definitions
+fn collect_connector_markers(
+    node: &DiagramTreeNode,
+    session: &DiagramBuilder,
+    markers: &mut std::collections::HashSet<String>,
+) {
+    if node.entity_type == EntityType::ConnectorShape {
+        let connector = session.get_connector(node.entity_id.clone());
+        
+        if connector.options.arrow_start || connector.options.arrow_end {
+            let marker_id = format!("arrow-{}", node.entity_id);
+            let color = &connector.options.stroke_color;
+            let size = connector.options.arrow_size;
+            
+            if connector.options.arrow_end {
+                markers.insert(format!(
+                    r#"<marker id="{}-end" markerWidth="{}" markerHeight="{}" refX="{}" refY="{}" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L0,{} L{},{} z" fill="{}" />
+                    </marker>"#,
+                    marker_id, size, size, size, size / 2.0,
+                    size, size, size / 2.0, color
+                ));
+            }
+            
+            if connector.options.arrow_start {
+                markers.insert(format!(
+                    r#"<marker id="{}-start" markerWidth="{}" markerHeight="{}" refX="0" refY="{}" orient="auto" markerUnits="strokeWidth">
+                        <path d="M{},0 L{},{} L{},{} z" fill="{}" />
+                    </marker>"#,
+                    marker_id, size, size, size / 2.0,
+                    size, size, size / 2.0, size, size, color
+                ));
+            }
+        }
+    }
+    
+    for child in &node.children {
+        collect_connector_markers(child, session, markers);
+    }
+}
+
+/// Recursively finds and renders all connectors in the tree
+fn render_all_connectors(node: &DiagramTreeNode, session: &DiagramBuilder, svg: &mut String) {
+    // If this is a connector, render it
+    if node.entity_type == EntityType::ConnectorShape {
+        render_connector(session, svg, node.entity_id.clone(), node);
+    }
+    
+    // Recursively process all children
+    for child in &node.children {
+        render_all_connectors(child, session, svg);
+    }
+}
+
 
 fn render_box(
     session: &DiagramBuilder,
@@ -337,8 +381,8 @@ fn render_line(
         }
 
         LinePointReference::PointID(id) => {
-            let pos = session.get_position(id);
-            let line_pos = session.get_position(line_shape.entity.clone());
+            let pos = session.get_local_position(id);
+            let line_pos = session.get_local_position(line_shape.entity.clone());
 
             // This is required to avoid applying transformation twice
             p_start.x = pos.0 - line_pos.0; // Convert to line-relative coords
@@ -353,8 +397,8 @@ fn render_line(
         }
 
         LinePointReference::PointID(id) => {
-            let pos = session.get_position(id);
-            let line_pos = session.get_position(line_shape.entity.clone());
+            let pos = session.get_local_position(id);
+            let line_pos = session.get_local_position(line_shape.entity.clone());
 
             // This is required to avoid applying transformation twice
             p_end.x = pos.0 - line_pos.0; // Convert to line-relative coords
@@ -375,6 +419,88 @@ fn render_line(
 
     render_with_transform(session, svg, entity_id, &line_content);
 }
+fn render_connector(
+    session: &DiagramBuilder,
+    svg: &mut String,
+    entity_id: EntityID,
+    node: &DiagramTreeNode,
+) {
+    let connector = session.get_connector(node.entity_id.clone());
+    
+    // Get point positions
+    let start_pos = session.get_local_position(connector.start_point_id.clone());
+    let end_pos = session.get_local_position(connector.end_point_id.clone());
+    let connector_pos = session.get_local_position(connector.entity.clone());
+    
+    // Convert to relative coordinates
+    let rel_start_x = start_pos.0 - connector_pos.0;
+    let rel_start_y = start_pos.1 - connector_pos.1;
+    let rel_end_x = end_pos.0 - connector_pos.0;
+    let rel_end_y = end_pos.1 - connector_pos.1;
+    
+    let mut line_content = String::new();
+    
+    // Add arrow marker definitions if needed
+    if connector.options.arrow_start || connector.options.arrow_end {
+        let marker_id = format!("arrow-{}", entity_id);
+        line_content.push_str(&format!(
+            r#"<defs>
+                <marker id="{}-end" markerWidth="{}" markerHeight="{}" refX="{}" refY="{}" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,{} L{},{}  z" fill="{}" />
+                </marker>
+                <marker id="{}-start" markerWidth="{}" markerHeight="{}" refX="0" refY="{}" orient="auto" markerUnits="strokeWidth">
+                    <path d="M{},0 L{},{} L{},{}  z" fill="{}" />
+                </marker>
+            </defs>"#,
+            marker_id, 
+            connector.options.arrow_size, 
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.stroke_color,
+            marker_id,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.arrow_size / 2.0,
+            connector.options.arrow_size,
+            connector.options.arrow_size,
+            connector.options.stroke_color
+        ));
+    }
+    
+    // Create the line with optional arrow markers
+    let marker_start = if connector.options.arrow_start {
+        format!(r#" marker-start="url(#arrow-{}-start)""#, entity_id)
+    } else {
+        String::new()
+    };
+    
+    let marker_end = if connector.options.arrow_end {
+        format!(r#" marker-end="url(#arrow-{}-end)""#, entity_id)
+    } else {
+        String::new()
+    };
+    
+    line_content.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"{}{} />"#,
+        rel_start_x,
+        rel_start_y,
+        rel_end_x,
+        rel_end_y,
+        connector.options.stroke_color,
+        connector.options.stroke_width,
+        marker_start,
+        marker_end
+    ));
+    
+    render_with_transform(session, svg, entity_id, &line_content);
+}
 
 fn render_rectangle(
     session: &DiagramBuilder,
@@ -384,6 +510,7 @@ fn render_rectangle(
 ) {
     let size = session.get_size(entity_id.clone());
     let rect_shape = session.get_rectangle(node.entity_id.clone());
+
 
     let rect_content = format!(
         r#"<rect x="0" y="0" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="{}" rx="{}" ry="{}" />"#,
@@ -514,7 +641,7 @@ fn render_text(
     // Render lines
     for line_id in text_shape.lines.iter() {
         let line = session.get_text_line(line_id.clone());
-        let line_pos = session.get_position(line.entity.clone());
+        let line_pos = session.get_local_position(line.entity.clone());
 
         text_content.push_str(&format!(
             r#"<tspan x="{}" y="{}" alignment-baseline="hanging">"#,

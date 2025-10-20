@@ -1,0 +1,10 @@
+{"id":"root","type":"free_container","width":400,"height":300,"children":["center","top","right","bottom","left","conn_top","conn_right","conn_bottom","conn_left"]}
+{"id":"center","type":"rect","x":160,"y":120,"width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":2}
+{"id":"top","type":"rect","x":160,"y":20,"width":80,"height":40,"fill":"lightcoral","stroke":"red","stroke_width":2}
+{"id":"right","type":"rect","x":300,"y":130,"width":80,"height":40,"fill":"lightgreen","stroke":"green","stroke_width":2}
+{"id":"bottom","type":"rect","x":160,"y":240,"width":80,"height":40,"fill":"lightyellow","stroke":"orange","stroke_width":2}
+{"id":"left","type":"rect","x":20,"y":130,"width":80,"height":40,"fill":"lightpink","stroke":"purple","stroke_width":2}
+{"id":"conn_top","type":"connector","source":"center","source_port":"top","target":"top","target_port":"bottom","arrow_end":true,"stroke_color":"red","stroke_width":2,"arrow_size":12}
+{"id":"conn_right","type":"connector","source":"center","source_port":"right","target":"right","target_port":"left","arrow_end":true,"stroke_color":"green","stroke_width":2,"arrow_size":12}
+{"id":"conn_bottom","type":"connector","source":"center","source_port":"bottom","target":"bottom","target_port":"top","arrow_end":true,"stroke_color":"orange","stroke_width":2,"arrow_size":12}
+{"id":"conn_left","type":"connector","source":"center","source_port":"left","target":"left","target_port":"right","arrow_end":true,"stroke_color":"purple","stroke_width":2,"arrow_size":8}

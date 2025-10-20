@@ -310,11 +310,11 @@ pub fn create_ishikawa(
         //     bottom_branch_ids[0].clone(), // ✅ FIRST branch
         // ]));
 
-        constraints.push(SimpleConstraint::HorizontalSpacing(
-            bottom_branch_ids.last().unwrap().to_string(),
-            head_id.clone(),
-            50.0,
-        ));
+        // constraints.push(SimpleConstraint::HorizontalSpacing(
+        //     bottom_branch_ids.last().unwrap().to_string(),
+        //     head_id.clone(),
+        //     50.0,
+        // ));
 
         // Espaciar ramas inferiores entre sí
         if bottom_branch_ids.len() > 1 {
@@ -343,11 +343,11 @@ pub fn create_ishikawa(
     if !top_branch_ids.is_empty() {
         let last_top = &top_branch_ids.last().unwrap();
         // constraints.push(SimpleConstraint::LeftOf(last_top.clone(), head_id.clone()));
-        constraints.push(SimpleConstraint::HorizontalSpacing(
-            last_top.to_string(),
-            head_id.clone(),
-            50.0,
-        ));
+        // constraints.push(SimpleConstraint::HorizontalSpacing(
+        //     last_top.to_string(),
+        //     head_id.clone(),
+        //     50.0,
+        // ));
     }
 
     // Última rama inferior debe estar a la izquierda de la cabeza

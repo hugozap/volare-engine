@@ -107,14 +107,14 @@ mod debug_rotation_positioning {
         layout_tree_node(&mut builder, &hstack);
         
         println!("🔍 AFTER LAYOUT:");
-        println!("  Normal rect position: {:?}", builder.get_position("normal_rect".to_string()));
+        println!("  Normal rect position: {:?}", builder.get_local_position("normal_rect".to_string()));
         println!("  Normal rect bounds: {:?}", builder.get_effective_bounds("normal_rect".to_string()));
         
-        println!("  Rotated rect position: {:?}", builder.get_position("rotated_rect".to_string()));
+        println!("  Rotated rect position: {:?}", builder.get_local_position("rotated_rect".to_string()));
         println!("  Rotated rect bounds: {:?}", builder.get_effective_bounds("rotated_rect".to_string()));
         println!("  Rotated rect transform: {:?}", builder.get_transform("rotated_rect".to_string()));
         
-        println!("  Normal rect2 position: {:?}", builder.get_position("normal_rect2".to_string()));
+        println!("  Normal rect2 position: {:?}", builder.get_local_position("normal_rect2".to_string()));
         println!("  Normal rect2 bounds: {:?}", builder.get_effective_bounds("normal_rect2".to_string()));
         
         println!("  Stack total size: {:?}", builder.get_size("root".to_string()));

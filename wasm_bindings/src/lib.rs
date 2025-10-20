@@ -87,7 +87,7 @@ impl VolareEngine {
         let diagram = parser.build(&root_id, &mut self.builder)
             .map_err(|e| JsValue::from_str(&format!("Build error: {}", e)))?;
 
-        layout::layout_tree_node(&mut self.builder, &diagram);
+        layout::layout_diagram(&mut self.builder, &diagram);
 
         let mut svg_output = Vec::new();
         let svg_renderer = SVGRenderer {};
