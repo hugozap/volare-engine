@@ -209,7 +209,7 @@ pub fn create_ishikawa(
 
         // Espaciar ramas superiores entre sí
         if top_branch_ids.len() > 1 {
-            let spacing = 80.0;
+            let spacing = 40.0;
             for i in 1..top_branch_ids.len() {
                 // constraints.push(SimpleConstraint::RightOf(
                 //     top_branch_ids[i].clone(),
@@ -246,7 +246,7 @@ pub fn create_ishikawa(
 
         // Espaciar ramas inferiores entre sí
         if bottom_branch_ids.len() > 1 {
-            let spacing = 80.0;
+            let spacing = 40.0;
             for i in 1..bottom_branch_ids.len() {
                 // constraints.push(SimpleConstraint::RightOf(
                 //     bottom_branch_ids[i].clone(),
@@ -530,7 +530,7 @@ fn create_top_branch(
             item_node.entity_id.clone(), pt.entity_id.clone(), ConnectorOptions { 
                 source_port: Port::Left,
                 target_port: Port::Right,
-                connector_type: ConnectorType::Curved,
+                connector_type: ConnectorType::Straight,
                 stroke_color: BODY_COLOR.to_owned(),
                 stroke_width: 1.0,
                 arrow_end: false,
@@ -712,7 +712,7 @@ fn create_bottom_branch(
             item_node.entity_id.clone(), pt.entity_id.clone(), ConnectorOptions { 
                 source_port: Port::Right,
                 target_port: Port::Left,
-                connector_type: ConnectorType::Curved,
+                connector_type: ConnectorType::Straight,
                 stroke_color: BODY_COLOR.to_owned(),
                 stroke_width: 1.0,
                 arrow_end: false,
@@ -839,7 +839,7 @@ fn create_left_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
@@ -878,7 +878,7 @@ fn create_left_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
@@ -886,7 +886,7 @@ fn create_left_item(
             },
         );
 
-        let separator = builder.new_spacer(format!("{}_separator", id), SpacerOptions { width: 12.0, height: 0.0, direction: SpacerDirection::Horizontal });
+        let separator = builder.new_spacer(format!("{}_separator", id), SpacerOptions { width: 16.0, height: 0.0, direction: SpacerDirection::Horizontal });
         let hstack = builder.new_hstack(
             id.to_string(),
             vec![children_vstack, separator,  item_box.clone()],
@@ -905,10 +905,10 @@ fn create_left_item(
                 item_box.entity_id.clone(),
                 child.entity_id.clone(),
                 ConnectorOptions {
-                    connector_type: ConnectorType::Straight,
+                    connector_type: ConnectorType::Orthogonal,
                     stroke_color: BODY_COLOR.to_owned(),
                     stroke_width: 1.0,
-                    curve_offset: None,
+                    curve_offset: Some(-1.0),
                     source_port: Port::Left,
                     target_port: Port::Right,
                     arrow_start: false,
@@ -949,7 +949,7 @@ fn create_right_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
@@ -988,14 +988,14 @@ fn create_right_item(
             item_text,
             BoxOptions {
                 padding: 3.0,
-                width_behavior: SizeBehavior::Fixed(ITEM_BOX_WIDTH),
+                width_behavior: SizeBehavior::Content,
                 height_behavior: SizeBehavior::Content,
                 stroke_width: 0.0,
                 stroke_color: "transparent".to_string(),
                 ..Default::default()
             },
         );
-        let separator = builder.new_spacer(format!("{}_separator", id), SpacerOptions { width: 12.0, height: 0.0, direction: SpacerDirection::Horizontal });
+        let separator = builder.new_spacer(format!("{}_separator", id), SpacerOptions { width: 16.0, height: 0.0, direction: SpacerDirection::Horizontal });
 
         let hstack = builder.new_hstack(
             id.to_string(),
@@ -1015,10 +1015,10 @@ fn create_right_item(
                 item_box.entity_id.clone(),
                 child.entity_id.clone(),
                 ConnectorOptions {
-                    connector_type: ConnectorType::Straight,
+                    connector_type: ConnectorType::Orthogonal,
                     stroke_color: BODY_COLOR.to_owned(),
                     stroke_width: 1.0,
-                    curve_offset: None,
+                    curve_offset: Some(-2.0),
                     source_port: Port::Right,
                     target_port: Port::Left,
                     arrow_start: false,

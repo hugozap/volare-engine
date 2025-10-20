@@ -10,9 +10,7 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point,
-    ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine,
-    VerticalAlignment,
+    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
 };
 
 use crate::transform::Transform;
@@ -372,7 +370,7 @@ pub fn layout_line(session: &mut DiagramBuilder, shape_line: &ShapeLine) {
     );
 }
 pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector) {
-    // Get port positions instead of centers
+    // Get port positions
     let (start_x, start_y) =
         session.get_port_position(&connector.source_id, &connector.options.source_port);
     let (end_x, end_y) =
@@ -384,10 +382,64 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     session.set_position(connector.start_point_id.clone(), start_x, start_y);
     session.set_position(connector.end_point_id.clone(), end_x, end_y);
 
-    let min_x = start_x.min(end_x);
-    let max_x = start_x.max(end_x);
-    let min_y = start_y.min(end_y);
-    let max_y = start_y.max(end_y);
+    // Calculate bounding box based on connector type
+    let (min_x, max_x, min_y, max_y) = match connector.options.connector_type {
+        ConnectorType::Curved => {
+            // For curved connectors, we need to account for the curve's bounding box
+            // The curve extends beyond the straight line between points
+            let curve_offset = connector.options.curve_offset.unwrap_or(50.0);
+            
+            // Determine curve direction based on relative positions
+            let dx = end_x - start_x;
+            let dy = end_y - start_y;
+            
+            // For horizontal curves (primary direction is horizontal)
+            let extends_horizontally = dx.abs() > dy.abs();
+            
+            let (min_x, max_x) = if extends_horizontally {
+                (start_x.min(end_x), start_x.max(end_x))
+            } else {
+                // Vertical curve - control points extend horizontally
+                let curve_extent = curve_offset.abs();
+                (
+                    start_x.min(end_x) - curve_extent,
+                    start_x.max(end_x) + curve_extent
+                )
+            };
+            
+            let (min_y, max_y) = if extends_horizontally {
+                // Horizontal curve - control points extend vertically
+                let curve_extent = curve_offset.abs();
+                (
+                    start_y.min(end_y) - curve_extent,
+                    start_y.max(end_y) + curve_extent
+                )
+            } else {
+                (start_y.min(end_y), start_y.max(end_y))
+            };
+            
+            (min_x, max_x, min_y, max_y)
+        },
+        ConnectorType::Orthogonal => {
+            // For orthogonal connectors, add some buffer for the segments
+            let buffer = 20.0; // Buffer for orthogonal segments
+            (
+                start_x.min(end_x) - buffer,
+                start_x.max(end_x) + buffer,
+                start_y.min(end_y) - buffer,
+                start_y.max(end_y) + buffer
+            )
+        },
+        ConnectorType::Straight => {
+            // Straight line - just use the endpoints
+            (
+                start_x.min(end_x),
+                start_x.max(end_x),
+                start_y.min(end_y),
+                start_y.max(end_y)
+            )
+        }
+    };
 
     let width = max_x - min_x;
     let height = max_y - min_y;
