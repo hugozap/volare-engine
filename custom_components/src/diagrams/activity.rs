@@ -5,6 +5,7 @@ use crate::*;
 use anyhow::{bail, Result};
 use serde_json::{from_value, Map, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
+use volare_engine_layout::transform::Transform;
 
 // Basic activity types
 #[derive(Clone, Debug)]
@@ -366,7 +367,7 @@ fn create_layout_constraints(
                 (rows_map.get(&prev_row), rows_map.get(&curr_row))
             {
                 if let (Some(prev_rep), Some(curr_rep)) = (prev_acts.first(), curr_acts.first()) {
-                    constraints.push(SimpleConstraint::Below(curr_rep.clone(), prev_rep.clone()));
+                   
 
                     constraints.push(SimpleConstraint::VerticalSpacing(
                         prev_rep.clone(),
@@ -965,10 +966,14 @@ pub fn create_activity_diagram(
         flows.len()
     );
 
-    let wrapper = builder.new_box(format!("{}_wrapper", id), diagram_container, BoxOptions{
-    fill_color: Fill::Color("white".to_string()),
-    ..Default::default()
-    });
+    let wrapper = builder.new_box(
+        format!("{}_wrapper", id),
+        diagram_container,
+        BoxOptions {
+            fill_color: Fill::Color("white".to_string()),
+            ..Default::default()
+        },
+    );
 
     Ok(wrapper)
 }
