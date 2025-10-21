@@ -164,18 +164,32 @@ impl Default for Port {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum OrthogonalRoutingStrategy {
+    // 2-segment strategies (one turn, 3 points)
+    HV,  // Horizontal then Vertical (Start → Horizontal → Vertical → End)
+    VH,  // Vertical then Horizontal (Start → Vertical → Horizontal → End)
+    
+    // 3-segment strategies (two turns, 4 points, with midpoint)
+    HVH,  // Horizontal-Vertical-Horizontal (Start → H → V → H → End)
+    VHV,  // Vertical-Horizontal-Vertical (Start → V → H → V → End)
+    
+    // Smart strategy
+    Auto,  // Choose best based on direction
+}
+
+#[derive(Clone, Debug)]
 pub struct ConnectorOptions {
     pub connector_type: ConnectorType,
     pub stroke_color: String,
     pub stroke_width: Float,
     pub curve_offset: Option<Float>,
-    pub source_port: Port, //
-    pub target_port: Port, //
-
-    pub arrow_start: bool, // : arrow at start
-    pub arrow_end: bool,   // : arrow at end
-    pub arrow_size: Float, // : arrow size
+    pub source_port: Port,
+    pub target_port: Port,
+    pub arrow_start: bool,
+    pub arrow_end: bool,
+    pub arrow_size: Float,
+    pub routing_strategy: OrthogonalRoutingStrategy,  
 }
 
 impl Default for ConnectorOptions {
@@ -190,6 +204,7 @@ impl Default for ConnectorOptions {
             arrow_start: false,
             arrow_end: false,
             arrow_size: 10.0,
+            routing_strategy: OrthogonalRoutingStrategy::HVH,
         }
     }
 }

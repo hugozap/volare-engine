@@ -18,13 +18,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 //     let input = r##"
 // {"id":"test","type":"ishikawa","problem":"problem goes here"}"##;
 
-    let input = r##"{"id":"root","type":"hstack","children":["box1","box2","box3","conn1","conn2"],"spacing":50}
-{"id":"box1","type":"rect","width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":2}
-{"id":"box2","type":"rect","width":80,"height":60,"fill":"lightgreen","stroke":"green","stroke_width":2}
-{"id":"box3","type":"rect","width":80,"height":60,"fill":"lightyellow","stroke":"orange","stroke_width":2}
-{"id":"conn1","type":"connector","source":"box1","source_port":"right","target":"box2","target_port":"left","stroke_color":"red","stroke_width":2}
-{"id":"conn2","type":"connector","source":"box2","source_port":"right","target":"box3","target_port":"left","stroke_color":"green","stroke_width":2}
-"##;
+//     let input = r##"{"id":"root","type":"hstack","children":["box1","box2","box3","conn1","conn2"],"spacing":50}
+// {"id":"box1","type":"rect","width":80,"height":60,"fill":"lightblue","stroke":"blue","stroke_width":2}
+// {"id":"box2","type":"rect","width":80,"height":60,"fill":"lightgreen","stroke":"green","stroke_width":2}
+// {"id":"box3","type":"rect","width":80,"height":60,"fill":"lightyellow","stroke":"orange","stroke_width":2}
+// {"id":"conn1","type":"connector","source":"box1","source_port":"right","target":"box2","target_port":"left","stroke_color":"red","stroke_width":2}
+// {"id":"conn2","type":"connector","source":"box2","source_port":"right","target":"box3","target_port":"left","stroke_color":"green","stroke_width":2}
+// "##;
+
+let input = r##"{"id":"root","type":"activity_diagram","swimlanes":[{"name":"Lane 1","activities":[{"id":"start","label":"Start","type":"start"},{"id":"decision","label":"Check","type":"decision"}]},{"name":"Lane 2","activities":[{"id":"actA","label":"Option A","type":"normal"},{"id":"merge","label":"Merge","type":"merge"}]},{"name":"Lane 3","activities":[{"id":"actB","label":"Option B","type":"normal"}]}],"flows":[{"from":"start","to":"decision"},{"from":"decision","to":"actA","condition":"Yes"},{"from":"decision","to":"actB","condition":"No"},{"from":"actA","to":"merge"},{"from":"actB","to":"merge"}]}"##;
+
+
  // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
     let root_id = parser.parse_string(input)?;

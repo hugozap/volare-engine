@@ -549,28 +549,129 @@ fn render_connector(
                 marker_end
             ));
         },
-       ConnectorType::Orthogonal => {
-            // Calculate midpoint
-            let mid_x = (rel_start_x + rel_end_x) / 2.0;
-            
-            // Create true orthogonal path (only horizontal and vertical lines)
-            let path_data = format!(
-                "M {} {} L {} {} L {} {} L {} {}",
+      ConnectorType::Orthogonal => {
+    let dx = rel_end_x - rel_start_x;
+    let dy = rel_end_y - rel_start_y;
+    
+    let path_data = match connector.options.routing_strategy {
+        // 2-segment strategies (one turn)
+        OrthogonalRoutingStrategy::HV => {
+            // Horizontal first, then vertical
+            // Path: Start → go horizontal to target X → go vertical to target Y
+            format!(
+                "M {} {} L {} {} L {} {}",
                 rel_start_x, rel_start_y,    // 1. Start point
-                mid_x, rel_start_y,           // 2. Go horizontal to midpoint
-                mid_x, rel_end_y,             // 3. Go vertical to end Y level
-                rel_end_x, rel_end_y          // 4. Go horizontal to end point
-            );
-            
-            line_content.push_str(&format!(
-                r#"<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{} />"#,
-                path_data,
-                connector.options.stroke_color,
-                connector.options.stroke_width,
-                marker_start,
-                marker_end
-            ));
+                rel_end_x, rel_start_y,      // 2. Horizontal to target X
+                rel_end_x, rel_end_y         // 3. Vertical to target Y
+            )
         }
+        
+        OrthogonalRoutingStrategy::VH => {
+            // Vertical first, then horizontal
+            // Path: Start → go vertical to target Y → go horizontal to target X
+            format!(
+                "M {} {} L {} {} L {} {}",
+                rel_start_x, rel_start_y,    // 1. Start point
+                rel_start_x, rel_end_y,      // 2. Vertical to target Y
+                rel_end_x, rel_end_y         // 3. Horizontal to target X
+            )
+        }
+        
+        // 3-segment strategies (two turns, with midpoint)
+        OrthogonalRoutingStrategy::HVH => {
+            // Horizontal-Vertical-Horizontal
+            let mid_x = (rel_start_x + rel_end_x) / 2.0;
+            format!(
+                "M {} {} L {} {} L {} {} L {} {}",
+                rel_start_x, rel_start_y,    // 1. Start
+                mid_x, rel_start_y,          // 2. Horizontal to midpoint
+                mid_x, rel_end_y,            // 3. Vertical to target Y
+                rel_end_x, rel_end_y         // 4. Horizontal to target X
+            )
+        }
+        
+        OrthogonalRoutingStrategy::VHV => {
+            // Vertical-Horizontal-Vertical
+            if dx.abs() < 5.0 {
+                // Nearly vertical - simplify to straight line
+                format!(
+                    "M {} {} L {} {}",
+                    rel_start_x, rel_start_y,
+                    rel_end_x, rel_end_y
+                )
+            } else if dy.abs() < 5.0 {
+                // Nearly horizontal - simplify to straight line
+                format!(
+                    "M {} {} L {} {}",
+                    rel_start_x, rel_start_y,
+                    rel_end_x, rel_end_y
+                )
+            } else {
+                // Full VHV with midpoint
+                let mid_y = (rel_start_y + rel_end_y) / 2.0;
+                format!(
+                    "M {} {} L {} {} L {} {} L {} {}",
+                    rel_start_x, rel_start_y,    // 1. Start
+                    rel_start_x, mid_y,          // 2. Vertical to midpoint
+                    rel_end_x, mid_y,            // 3. Horizontal to target X
+                    rel_end_x, rel_end_y         // 4. Vertical to target Y
+                )
+            }
+        }
+        
+        OrthogonalRoutingStrategy::Auto => {
+            // Choose based on which direction is dominant
+            if dy.abs() > dx.abs() {
+                // More vertical distance: use VHV
+                if dx.abs() < 5.0 {
+                    // Nearly vertical - straight line
+                    format!(
+                        "M {} {} L {} {}",
+                        rel_start_x, rel_start_y,
+                        rel_end_x, rel_end_y
+                    )
+                } else {
+                    let mid_y = (rel_start_y + rel_end_y) / 2.0;
+                    format!(
+                        "M {} {} L {} {} L {} {} L {} {}",
+                        rel_start_x, rel_start_y,
+                        rel_start_x, mid_y,
+                        rel_end_x, mid_y,
+                        rel_end_x, rel_end_y
+                    )
+                }
+            } else {
+                // More horizontal distance: use HVH
+                if dy.abs() < 5.0 {
+                    // Nearly horizontal - straight line
+                    format!(
+                        "M {} {} L {} {}",
+                        rel_start_x, rel_start_y,
+                        rel_end_x, rel_end_y
+                    )
+                } else {
+                    let mid_x = (rel_start_x + rel_end_x) / 2.0;
+                    format!(
+                        "M {} {} L {} {} L {} {} L {} {}",
+                        rel_start_x, rel_start_y,
+                        mid_x, rel_start_y,
+                        mid_x, rel_end_y,
+                        rel_end_x, rel_end_y
+                    )
+                }
+            }
+        }
+    };
+    
+    line_content.push_str(&format!(
+        r#"<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{} />"#,
+        path_data,
+        connector.options.stroke_color,
+        connector.options.stroke_width,
+        marker_start,
+        marker_end
+    ));
+           }
 
     }
     

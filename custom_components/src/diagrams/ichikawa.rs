@@ -501,6 +501,7 @@ fn create_top_branch(
                 arrow_start: false,
                 arrow_size: 0.0,
                 curve_offset: None,
+                ..Default::default()
         });
         let items = vec![item_node.clone(), spacer.clone(), pt.clone()];
         let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
@@ -537,6 +538,7 @@ fn create_top_branch(
                 arrow_start: false,
                 arrow_size: 0.0,
                 curve_offset: None,
+                ..Default::default()
         });
         let items = vec![pt.clone(), spacer.clone(), item_node.clone(),];
         let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
@@ -719,6 +721,7 @@ fn create_bottom_branch(
                 arrow_start: false,
                 arrow_size: 0.0,
                 curve_offset: None,
+                ..Default::default()
         });
         let items = vec![item_node.clone(), spacer.clone(), pt.clone()];
         let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
@@ -755,6 +758,7 @@ fn create_bottom_branch(
                 arrow_start: false,
                 arrow_size: 0.0,
                 curve_offset: None,
+                ..Default::default()
         });
         let items = vec![pt.clone(), spacer.clone(), item_node.clone(),];
         let hstack = builder.new_hstack(format!("{}_container_stack", item_node.entity_id.clone()), items, VerticalAlignment::Center);
@@ -914,6 +918,7 @@ fn create_left_item(
                     arrow_start: false,
                     arrow_end: false,
                     arrow_size: 0.0,
+                    ..Default::default()
                 },
             );
             g_items.push(con);
@@ -1024,6 +1029,7 @@ fn create_right_item(
                     arrow_start: false,
                     arrow_end: false,
                     arrow_size: 0.0,
+                    ..Default::default()
                 },
             );
             g_items.push(con);

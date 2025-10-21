@@ -108,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create a table with 10 ellipses
     let mut table_items_ellipses: Vec<DiagramTreeNode> = Vec::new();
     for i in 0..10 {
-        let ellipse = session.new_elipse(
+        let ellipse = session.new_ellipse(
             format!("table_ellipse_{}", i).to_string(),
             (10.0, 10.0),
             EllipseOptions {
@@ -144,7 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Add a couple of ellipses
 
     //Create an ellipse and wrap it with a box
-    let ellipse = session.new_elipse(
+    let ellipse = session.new_ellipse(
         "ellipse1".to_string(),
         (10.0, 10.0),
         EllipseOptions {
@@ -158,7 +158,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //Now add 10 ellipses
     for i in 0..10 {
-        let ellipse = session.new_elipse(
+        let ellipse = session.new_ellipse(
             format!("ellipse{}", i).to_string(),
             (10.0, 10.0),
             EllipseOptions {
@@ -222,7 +222,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    let red_circle = session.new_elipse(
+    let red_circle = session.new_ellipse(
         "redcircle".to_string(),
         (15.0, 15.0), // radius
         EllipseOptions {
@@ -266,7 +266,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let blue_box = session.new_box("bluebox".to_string(), blue_text, box_options);
 
-    let green_ellipse = session.new_elipse(
+    let green_ellipse = session.new_ellipse(
         "greeneclipse".to_string(),
         (30.0, 20.0),
         EllipseOptions {

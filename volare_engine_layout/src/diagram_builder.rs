@@ -608,7 +608,7 @@ impl DiagramBuilder {
         }
     }
 
-    pub fn new_elipse(
+    pub fn new_ellipse(
         &mut self,
         id: EntityID,
         radius: (Float, Float),
@@ -1090,6 +1090,10 @@ impl DiagramBuilder {
             absolute_pos.0 + transformed_center.0,
             absolute_pos.1 + transformed_center.1,
         )
+    }
+
+    pub fn add_to_pending_nodes(&mut self, elem: DiagramTreeNode) {
+        self.pending_root_nodes.push(elem);
     }
 
     pub fn get_custom_component(

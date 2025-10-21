@@ -951,6 +951,8 @@ impl JsonLinesParser {
                     arrow_start,
                     arrow_end,
                     arrow_size,
+                    // TODO: read from params
+                    routing_strategy: OrthogonalRoutingStrategy::Auto,
                 };
 
                 // Create connector
@@ -986,7 +988,7 @@ impl JsonLinesParser {
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_elipse(entity_id.to_string(), radius, options))
+                Ok(builder.new_ellipse(entity_id.to_string(), radius, options))
             }
 
             "arc" => {
