@@ -167,15 +167,15 @@ impl Default for Port {
 #[derive(Clone, Debug, PartialEq)]
 pub enum OrthogonalRoutingStrategy {
     // 2-segment strategies (one turn, 3 points)
-    HV,  // Horizontal then Vertical (Start → Horizontal → Vertical → End)
-    VH,  // Vertical then Horizontal (Start → Vertical → Horizontal → End)
-    
+    HV, // Horizontal then Vertical (Start → Horizontal → Vertical → End)
+    VH, // Vertical then Horizontal (Start → Vertical → Horizontal → End)
+
     // 3-segment strategies (two turns, 4 points, with midpoint)
-    HVH,  // Horizontal-Vertical-Horizontal (Start → H → V → H → End)
-    VHV,  // Vertical-Horizontal-Vertical (Start → V → H → V → End)
-    
+    HVH, // Horizontal-Vertical-Horizontal (Start → H → V → H → End)
+    VHV, // Vertical-Horizontal-Vertical (Start → V → H → V → End)
+
     // Smart strategy
-    Auto,  // Choose best based on direction
+    Auto, // Choose best based on direction
 }
 
 #[derive(Clone, Debug)]
@@ -189,7 +189,7 @@ pub struct ConnectorOptions {
     pub arrow_start: bool,
     pub arrow_end: bool,
     pub arrow_size: Float,
-    pub routing_strategy: OrthogonalRoutingStrategy,  
+    pub routing_strategy: OrthogonalRoutingStrategy,
 }
 
 impl Default for ConnectorOptions {
@@ -730,7 +730,7 @@ impl Entity for ShapeText {
 }
 
 //struct with text options: font family, font size
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct TextOptions {
     pub font_family: String,
     pub font_size: f32,
@@ -754,10 +754,22 @@ impl Clone for TextOptions {
     }
 }
 
+impl Default for TextOptions {
+    fn default() -> Self {
+        TextOptions {
+            font_family: "Arial".to_string(),
+            font_size: 12.0,
+            text_color: "black".to_string(),
+            line_width: 200,
+            line_spacing: 8.0,
+            font_weight: 400,
+        }
+    }
+}
 impl TextOptions {
     pub fn new() -> TextOptions {
         TextOptions {
-            font_family: String::from("Roboto"),
+            font_family: String::from("Arial"),
             font_size: 12.0,
             text_color: String::from("black"),
             line_width: 20,

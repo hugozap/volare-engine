@@ -252,6 +252,7 @@ fn create_activity_node(
                     font_size: 12.0,
                     text_color: PRIMARY_TEXT.to_owned(),
                     line_width: 400,
+                    line_spacing: 8.0,
                     ..Default::default()
                 },
             );
@@ -265,6 +266,8 @@ fn create_activity_node(
                     stroke_color: "#01579B".to_owned(),
                     stroke_width: 2.0,
                     border_radius: 4.0,
+                    width_behavior: SizeBehavior::Fixed(140.0),
+                    horizontal_alignment: HorizontalAlignment::Center,
                     ..Default::default()
                 },
             );
@@ -380,8 +383,6 @@ fn create_layout_constraints(
         }
     }
 
-    // REMOVED STEP 3 - no row-based horizontal spacing
-
     // 3. Align activities within each swimlane vertically (same X position)
     for swimlane in swimlanes {
         let lane_activities: Vec<String> = swimlane
@@ -413,7 +414,7 @@ fn create_layout_constraints(
             constraints.push(SimpleConstraint::HorizontalSpacing(
                 lane_representatives[i - 1].clone(),
                 lane_representatives[i].clone(),
-                150.0,
+                250.0,
             ));
             println!(
                 "    Swimlane {} spaced from swimlane {} (spacing: 150)",
@@ -507,8 +508,7 @@ fn create_flow_connector(
                             )
                         }
                     } else if total_branches == 3 {
-                        // Three-way decision: distribute Left, Bottom, Right based on actual positions
-                        // Find lane positions of all targets
+                        // Three-way decision
                         let target_lanes: Vec<(usize, &str)> = outgoing_flows
                             .iter()
                             .filter_map(|f| {
@@ -521,31 +521,84 @@ fn create_flow_connector(
                         let mut sorted_targets = target_lanes.clone();
                         sorted_targets.sort_by_key(|(lane, _)| *lane);
 
+                        // Check if all targets are on the same side of the decision
+                        let all_targets_right =
+                            sorted_targets.iter().all(|(lane, _)| *lane > from_l);
+                        let all_targets_left =
+                            sorted_targets.iter().all(|(lane, _)| *lane < from_l);
+
                         // Find position of current target in sorted order
                         let position = sorted_targets
                             .iter()
                             .position(|(_, id)| *id == flow.to.as_str())
                             .unwrap_or(1);
 
-                        match position {
-                            0 => (
-                                ConnectorType::Orthogonal,
-                                Port::Left,
-                                Port::Top,
-                                OrthogonalRoutingStrategy::HV,
-                            ),
-                            1 => (
-                                ConnectorType::Orthogonal,
-                                Port::Bottom,
-                                Port::Top,
-                                OrthogonalRoutingStrategy::VHV,
-                            ),
-                            _ => (
-                                ConnectorType::Orthogonal,
-                                Port::Right,
-                                Port::Top,
-                                OrthogonalRoutingStrategy::HV,
-                            ),
+                        if all_targets_right {
+                            // All targets to the right: use Right, Bottom, Right (or BottomRight)
+                            match position {
+                                0 => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Right,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::HV,
+                                ), // Closest
+                                1 => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Bottom,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::VHV,
+                                ), // Middle
+                                _ => (
+                                    ConnectorType::Orthogonal,
+                                    Port::BottomRight,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::HV,
+                                ), // Farthest
+                            }
+                        } else if all_targets_left {
+                            // All targets to the left: use Left, Bottom, Left (or BottomLeft)
+                            match position {
+                                0 => (
+                                    ConnectorType::Orthogonal,
+                                    Port::BottomLeft,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::HV,
+                                ), // Farthest
+                                1 => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Bottom,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::VHV,
+                                ), // Middle
+                                _ => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Left,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::HV,
+                                ), // Closest
+                            }
+                        } else {
+                            // Mixed: targets on both sides - use standard Left, Bottom, Right
+                            match position {
+                                0 => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Left,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::HV,
+                                ),
+                                1 => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Bottom,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::VHV,
+                                ),
+                                _ => (
+                                    ConnectorType::Orthogonal,
+                                    Port::Right,
+                                    Port::Top,
+                                    OrthogonalRoutingStrategy::HV,
+                                ),
+                            }
                         }
                     } else if total_branches >= 4 {
                         // Four or more branches: distribute around diamond
@@ -659,7 +712,6 @@ fn find_activity_lane(activity_id: &str, swimlanes: &[Swimlane]) -> Option<usize
     }
     None
 }
-
 pub fn create_activity_diagram(
     id: &str,
     attrs: &Map<String, Value>,
@@ -720,18 +772,172 @@ pub fn create_activity_diagram(
         );
     }
 
-    // Create constraints
-    let constraints = create_layout_constraints(&swimlanes, &activity_rows);
+    // Create swimlane visual elements
+    println!("  🏊 Creating swimlane visuals...");
+    let mut lane_backgrounds = Vec::new();
+    let mut lane_headers = Vec::new();
+    let mut lane_visual_constraints = Vec::new();
 
-    // Create constraint container for activities ONLY
+    // Calculate lane width based on activity spacing
+    // Each lane should align with its activities
+    let lane_spacing = 150.0; // This matches the spacing in create_layout_constraints
+    let lane_width = 250.0; // Width of each lane background (wider than spacing to have overlap or padding)
+
+    for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
+        // Skip empty lanes
+        if swimlane.activities.is_empty() {
+            continue;
+        }
+
+        // Create lane background with alternating colors
+        let bg_color = if lane_idx % 2 == 0 {
+            "#FAFAFA"
+        } else {
+            "#FFFFFF"
+        };
+
+        let lane_bg = builder.new_rectangle(
+            format!("lane_{}_bg", lane_idx),
+            RectOptions {
+                width_behavior: SizeBehavior::Fixed(lane_width),
+                height_behavior: SizeBehavior::Fixed(800.0),
+                fill_color: Fill::Color(bg_color.to_owned()),
+                stroke_color: "#E0E0E0".to_owned(),
+                stroke_width: 1.0,
+                border_radius: 0.0,
+            },
+        );
+        lane_backgrounds.push((lane_bg, None));
+
+        // Create lane header
+        let header_text = builder.new_text(
+            format!("lane_{}_header_text", lane_idx),
+            &swimlane.name,
+            TextOptions {
+                font_size: 14.0,
+                text_color: "#666666".to_owned(),
+                line_width: 200,
+                ..Default::default()
+            },
+        );
+
+        let lane_header = builder.new_box(
+            format!("lane_{}_header", lane_idx),
+            header_text,
+            BoxOptions {
+                padding: 8.0,
+                fill_color: Fill::Color("#E8E8E8".to_owned()),
+                stroke_color: "#CCCCCC".to_owned(),
+                stroke_width: 1.0,
+                border_radius: 0.0,
+                horizontal_alignment: HorizontalAlignment::Center,
+                ..Default::default()
+            },
+        );
+        lane_headers.push((lane_header, None));
+    }
+
+    // Get list of non-empty lane indices
+    let non_empty_lanes: Vec<usize> = (0..swimlanes.len())
+        .filter(|i| !swimlanes[*i].activities.is_empty())
+        .collect();
+
+    // Align all headers at top
+    let header_ids: Vec<String> = non_empty_lanes
+        .iter()
+        .map(|i| format!("lane_{}_header", i))
+        .collect();
+
+    if !header_ids.is_empty() {
+        lane_visual_constraints.push(SimpleConstraint::AlignTop(header_ids.clone()));
+    }
+
+    // Align all backgrounds at top
+    let bg_ids: Vec<String> = non_empty_lanes
+        .iter()
+        .map(|i| format!("lane_{}_bg", i))
+        .collect();
+
+    if !bg_ids.is_empty() {
+        lane_visual_constraints.push(SimpleConstraint::AlignTop(bg_ids));
+    }
+
+    // Space backgrounds adjacently (touching, no gaps)
+    for i in 1..non_empty_lanes.len() {
+        let prev_lane = non_empty_lanes[i - 1];
+        let curr_lane = non_empty_lanes[i];
+
+        lane_visual_constraints.push(SimpleConstraint::HorizontalSpacing(
+            format!("lane_{}_bg", prev_lane),
+            format!("lane_{}_bg", curr_lane),
+            0.0,
+        ));
+    }
+
+    // Align each header with its background center
+    for lane_idx in &non_empty_lanes {
+        lane_visual_constraints.push(SimpleConstraint::AlignCenterHorizontal(vec![
+            format!("lane_{}_header", lane_idx),
+            format!("lane_{}_bg", lane_idx),
+        ]));
+    }
+
+    //NOW align background centers with activity centers
+    // for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
+    //     if let Some(first_activity) = swimlane.activities.first() {
+    //         let bg_id = format!("lane_{}_bg", lane_idx);
+
+    //        // Center background with first activity in lane
+    //         lane_visual_constraints.push(SimpleConstraint::AlignLeft(vec![
+    //             bg_id.clone(),
+    //             first_activity.id.clone(),
+    //         ]));
+    //     }
+    // }
+
+
+    // Just position first activity below headers
+    if let Some(first_row_activity) = activity_rows
+        .iter()
+        .find(|(_, row)| **row == 0)
+        .map(|(id, _)| id.clone())
+    {
+        if let Some(first_header) = header_ids.first() {
+            lane_visual_constraints.push(SimpleConstraint::Below(
+                first_row_activity.clone(),
+                first_header.clone(),
+            ));
+            lane_visual_constraints.push(SimpleConstraint::VerticalSpacing(
+                first_header.clone(),
+                first_row_activity,
+                30.0,
+            ));
+        }
+    }
+
+    // Combine all nodes: backgrounds first (render behind), then headers, then activities
+    let mut all_children = Vec::new();
+    all_children.extend(lane_backgrounds); // Backgrounds render first (behind)
+    all_children.extend(lane_headers); // Headers next
+    all_children.extend(activity_children); // Activities on top
+
+    // Create constraints for activities layout
+    let mut activity_constraints = create_layout_constraints(&swimlanes, &activity_rows);
+
+    // Add lane visual constraints
+    activity_constraints.extend(lane_visual_constraints);
+
+    println!("  📐 Total constraints: {}", activity_constraints.len());
+
+    // Create constraint container for everything
     println!("  📦 Creating constraint layout container...");
-    let activities_container =
-        builder.new_constraint_layout_container(id.to_string(), activity_children, constraints);
+    let diagram_container =
+        builder.new_constraint_layout_container(id.to_string(), all_children, activity_constraints);
 
     // Create connectors and register them at root level
     println!("  🔗 Creating connectors and registering at root level...");
     for flow in &flows {
-        let connector = create_flow_connector(flow, &activity_rows, &swimlanes, &flows, builder)?; // Pass &flows
+        let connector = create_flow_connector(flow, &activity_rows, &swimlanes, &flows, builder)?;
         builder.register_root_level_node(connector);
         let cond_str = flow
             .condition
@@ -745,9 +951,11 @@ pub fn create_activity_diagram(
     }
 
     println!(
-        "  ✅ Activity diagram created with {} connectors at root level",
+        "  ✅ Activity diagram created with {} swimlanes, {} activities, {} connectors",
+        swimlanes.len(),
+        all_activities.len(),
         flows.len()
     );
 
-    Ok(activities_container)
+    Ok(diagram_container)
 }
