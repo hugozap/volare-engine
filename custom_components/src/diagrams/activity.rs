@@ -475,9 +475,6 @@ fn create_flow_connector(
                         OrthogonalRoutingStrategy::VHV,
                     )
                 } else if is_below && is_decision_branch {
-                    // Different lanes, target below, branching from decision
-                    // Use different ports for each branch
-
                     let branch_index = outgoing_flows
                         .iter()
                         .position(|f| f.to == flow.to)
@@ -488,8 +485,12 @@ fn create_flow_connector(
                     if total_branches == 2 {
                         // Binary decision
                         if branch_index == 0 {
-                            let source_port = if from_l < to_l { Port::Right} else {Port::Left};
-                            // First branch: Right port with HV routing (horizontal then vertical)
+                            // First branch: use side port based on target position
+                            let source_port = if from_l < to_l {
+                                Port::Right
+                            } else {
+                                Port::Left
+                            };
                             (
                                 ConnectorType::Orthogonal,
                                 source_port,
@@ -497,7 +498,7 @@ fn create_flow_connector(
                                 OrthogonalRoutingStrategy::HV,
                             )
                         } else {
-                            // Second branch: Bottom port with VHV routing (straight or with turns)
+                            // Second branch: always use Bottom port
                             (
                                 ConnectorType::Orthogonal,
                                 Port::Bottom,
@@ -506,8 +507,27 @@ fn create_flow_connector(
                             )
                         }
                     } else if total_branches == 3 {
-                        // Three-way decision: Left, Bottom, Right
-                        match branch_index {
+                        // Three-way decision: distribute Left, Bottom, Right based on actual positions
+                        // Find lane positions of all targets
+                        let target_lanes: Vec<(usize, &str)> = outgoing_flows
+                            .iter()
+                            .filter_map(|f| {
+                                find_activity_lane(&f.to, swimlanes)
+                                    .map(|lane| (lane, f.to.as_str()))
+                            })
+                            .collect();
+
+                        // Sort by lane to get left-to-right order
+                        let mut sorted_targets = target_lanes.clone();
+                        sorted_targets.sort_by_key(|(lane, _)| *lane);
+
+                        // Find position of current target in sorted order
+                        let position = sorted_targets
+                            .iter()
+                            .position(|(_, id)| *id == flow.to.as_str())
+                            .unwrap_or(1);
+
+                        match position {
                             0 => (
                                 ConnectorType::Orthogonal,
                                 Port::Left,
@@ -527,9 +547,26 @@ fn create_flow_connector(
                                 OrthogonalRoutingStrategy::HV,
                             ),
                         }
-                    } else if total_branches == 4 {
-                        // Four-way: Left, Bottom, Right, Top
-                        match branch_index {
+                    } else if total_branches >= 4 {
+                        // Four or more branches: distribute around diamond
+                        let target_lanes: Vec<(usize, &str)> = outgoing_flows
+                            .iter()
+                            .filter_map(|f| {
+                                find_activity_lane(&f.to, swimlanes)
+                                    .map(|lane| (lane, f.to.as_str()))
+                            })
+                            .collect();
+
+                        let mut sorted_targets = target_lanes.clone();
+                        sorted_targets.sort_by_key(|(lane, _)| *lane);
+
+                        let position = sorted_targets
+                            .iter()
+                            .position(|(_, id)| *id == flow.to.as_str())
+                            .unwrap_or(0);
+
+                        // Distribute around 4 ports based on position
+                        match position % 4 {
                             0 => (
                                 ConnectorType::Orthogonal,
                                 Port::Left,
@@ -556,33 +593,13 @@ fn create_flow_connector(
                             ),
                         }
                     } else {
-                        // More than 4: distribute around all sides
-                        match branch_index % 4 {
-                            0 => (
-                                ConnectorType::Orthogonal,
-                                Port::Right,
-                                Port::Top,
-                                OrthogonalRoutingStrategy::HV,
-                            ),
-                            1 => (
-                                ConnectorType::Orthogonal,
-                                Port::Bottom,
-                                Port::Top,
-                                OrthogonalRoutingStrategy::VHV,
-                            ),
-                            2 => (
-                                ConnectorType::Orthogonal,
-                                Port::Left,
-                                Port::Top,
-                                OrthogonalRoutingStrategy::HV,
-                            ),
-                            _ => (
-                                ConnectorType::Orthogonal,
-                                Port::Top,
-                                Port::Bottom,
-                                OrthogonalRoutingStrategy::VHV,
-                            ),
-                        }
+                        // Fallback for unexpected cases
+                        (
+                            ConnectorType::Orthogonal,
+                            Port::Bottom,
+                            Port::Top,
+                            OrthogonalRoutingStrategy::VHV,
+                        )
                     }
                 } else if is_below {
                     // Different lanes, target below, not a branch (e.g., merge)
