@@ -341,6 +341,15 @@ fn create_layout_constraints(
             .push(activity_id.clone());
     }
 
+    // Fixed activity widths
+    for lane in swimlanes {
+        for activity in lane.activities.clone() {
+            if matches!(activity.activity_type, ActivityType::Normal) {
+                constraints.push(SimpleConstraint::FixedWidth(activity.id, 150.0));
+            }
+        }
+    }
+
     // Get sorted row indices
     let mut row_indices: Vec<usize> = rows_map.keys().cloned().collect();
     row_indices.sort();
@@ -414,7 +423,7 @@ fn create_layout_constraints(
             constraints.push(SimpleConstraint::HorizontalSpacing(
                 lane_representatives[i - 1].clone(),
                 lane_representatives[i].clone(),
-                250.0,
+                150.0,
             ));
             println!(
                 "    Swimlane {} spaced from swimlane {} (spacing: 150)",
@@ -882,19 +891,18 @@ pub fn create_activity_diagram(
         ]));
     }
 
-    //NOW align background centers with activity centers
-    // for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
-    //     if let Some(first_activity) = swimlane.activities.first() {
-    //         let bg_id = format!("lane_{}_bg", lane_idx);
+    // NOW align background centers with activity centers
+    for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
+        if let Some(first_activity) = swimlane.activities.first() {
+            let bg_id = format!("lane_{}_bg", lane_idx);
 
-    //        // Center background with first activity in lane
-    //         lane_visual_constraints.push(SimpleConstraint::AlignLeft(vec![
-    //             bg_id.clone(),
-    //             first_activity.id.clone(),
-    //         ]));
-    //     }
-    // }
-
+            // Center background with first activity in lane
+            lane_visual_constraints.push(SimpleConstraint::AlignCenterHorizontal(vec![
+                bg_id.clone(),
+                first_activity.id.clone(),
+            ]));
+        }
+    }
 
     // Just position first activity below headers
     if let Some(first_row_activity) = activity_rows
@@ -957,5 +965,10 @@ pub fn create_activity_diagram(
         flows.len()
     );
 
-    Ok(diagram_container)
+    let wrapper = builder.new_box(format!("{}_wrapper", id), diagram_container, BoxOptions{
+    fill_color: Fill::Color("white".to_string()),
+    ..Default::default()
+    });
+
+    Ok(wrapper)
 }

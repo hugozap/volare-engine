@@ -62,6 +62,7 @@ pub enum SimpleConstraint {
     FixedSize(EntityID, Float, Float),
     /// Fix an entity's position to specific coordinates
     FixedPosition(EntityID, Float, Float),
+    FixedX(EntityID, Float),
 
     // ===== STACK CONSTRAINTS =====
     /// Arrange entities in a horizontal line with optional spacing
@@ -126,6 +127,20 @@ impl ConstraintSystem {
 
     pub fn add_constraint(&mut self, constraint: SimpleConstraint) -> Result<()> {
         match constraint {
+            SimpleConstraint::FixedX(entity, x) => {
+                let vars = self.variables.get(&entity);
+                if vars.is_none() {
+                    bail!("entity not registered in constraint system {}", entity);
+                }
+
+                let vars = vars.unwrap();
+                self.solver
+                    .add_constraint(vars.x | EQ(REQUIRED) | x)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed position x constraint: {:?}", e)
+                    })?;
+            }
+
             SimpleConstraint::FixedPosition(entity, x, y) => {
                 let vars = self.variables.get(&entity);
                 if vars.is_none() {
