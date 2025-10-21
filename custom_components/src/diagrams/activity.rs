@@ -488,10 +488,11 @@ fn create_flow_connector(
                     if total_branches == 2 {
                         // Binary decision
                         if branch_index == 0 {
+                            let source_port = if from_l < to_l { Port::Right} else {Port::Left};
                             // First branch: Right port with HV routing (horizontal then vertical)
                             (
                                 ConnectorType::Orthogonal,
-                                Port::Right,
+                                source_port,
                                 Port::Top,
                                 OrthogonalRoutingStrategy::HV,
                             )
