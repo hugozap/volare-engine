@@ -64,7 +64,7 @@
             line-height: 1.4;
             resize: none;
             background: #4a4949;
-            color: rgb(170, 170, 170)6e6
+            color: rgb(170, 170, 170);
         }
         textarea:focus {
             outline: none;
@@ -224,6 +224,8 @@ Example (Volare format):
         let currentSvgContent = '';
         let volareEngine = null;
 
+        const STORAGE_KEY = 'volare-jsonl-input';
+
         // Canvas 2D Text Measurement Function
         class TextMeasurement {
             constructor() {
@@ -282,6 +284,46 @@ Example (Volare format):
 
         // Create global text measurement instance
         const textMeasurement = new TextMeasurement();
+
+        // LocalStorage functions
+        function saveToLocalStorage(value) {
+            try {
+                localStorage.setItem(STORAGE_KEY, value);
+            } catch (error) {
+                console.warn('Failed to save to localStorage:', error);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                return localStorage.getItem(STORAGE_KEY) || '';
+            } catch (error) {
+                console.warn('Failed to load from localStorage:', error);
+                return '';
+            }
+        }
+
+        // Setup textarea auto-save
+        function setupAutoSave() {
+            const textarea = document.getElementById('jsonl-input');
+            
+            // Load saved content on page load
+            const savedContent = loadFromLocalStorage();
+            if (savedContent) {
+                textarea.value = savedContent;
+                updateStatus('📂 Loaded saved content from previous session.', 'success');
+            }
+
+            // Save content on input with debouncing
+            let saveTimeout;
+            textarea.addEventListener('input', () => {
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => {
+                    saveToLocalStorage(textarea.value);
+                    console.log('Content auto-saved to localStorage');
+                }, 500); // Save 500ms after user stops typing
+            });
+        }
 
         // Initialize WASM on page load
         async function initWasm() {
@@ -451,6 +493,7 @@ Example (Volare format):
             }
 
             textarea.value = example;
+            saveToLocalStorage(example);
             updateStatus(`📋 Loaded ${type} example. Click "Render SVG" to see output.`, 'info');
         };
 
@@ -496,7 +539,9 @@ Example (Volare format):
 
         // Clear input
         window.clearInput = function() {
-            document.getElementById('jsonl-input').value = '';
+            const textarea = document.getElementById('jsonl-input');
+            textarea.value = '';
+            saveToLocalStorage('');
             updateStatus('🗑️ Input cleared.', 'info');
         };
 
@@ -538,6 +583,7 @@ Example (Volare format):
         // Initialize on page load
         window.addEventListener('load', async () => {
             updateStatus('🔄 Loading WASM module...', 'info');
+            setupAutoSave(); // Setup localStorage auto-save
             await initWasm();
         });
 
