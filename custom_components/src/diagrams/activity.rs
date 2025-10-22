@@ -259,7 +259,7 @@ fn create_activity_node(
             );
 
             let box_node = builder.new_box(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 text,
                 BoxOptions {
                     padding: 12.0,
@@ -273,14 +273,17 @@ fn create_activity_node(
                 },
             );
 
-            Ok(box_node)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![box_node]);
+
+            Ok(group)
         }
 
         ActivityType::Decision | ActivityType::Merge => {
             // Diamond shape (rotated square)
             // Note: We'll make it a square now, rotation would need additional support
             let rect = builder.new_rectangle(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 RectOptions {
                     width_behavior: SizeBehavior::Fixed(50.0),
                     height_behavior: SizeBehavior::Fixed(50.0),
@@ -291,13 +294,16 @@ fn create_activity_node(
                 },
             );
 
-            Ok(rect)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![rect]);
+
+            Ok(group)
         }
 
         ActivityType::Start => {
             // Small filled circle
             let circle = builder.new_ellipse(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 (15.0, 15.0),
                 EllipseOptions {
                     fill_color: "#4CAF50".to_owned(),
@@ -306,13 +312,16 @@ fn create_activity_node(
                 },
             );
 
-            Ok(circle)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![circle]);
+
+            Ok(group)
         }
 
         ActivityType::End => {
             // Circle with thick border (double circle effect)
             let circle = builder.new_ellipse(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 (15.0, 15.0),
                 EllipseOptions {
                     fill_color: "#F44336".to_owned(),
@@ -321,7 +330,10 @@ fn create_activity_node(
                 },
             );
 
-            Ok(circle)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![circle]);
+
+            Ok(group)
         }
     }
 }
@@ -834,8 +846,8 @@ pub fn create_activity_diagram(
             },
         );
 
-        let lane_header = builder.new_box(
-            format!("lane_{}_header", lane_idx),
+        let lane_header_box = builder.new_box(
+            format!("lane_{}_header_inner", lane_idx),
             header_text,
             BoxOptions {
                 padding: 8.0,
@@ -846,6 +858,12 @@ pub fn create_activity_diagram(
                 horizontal_alignment: HorizontalAlignment::Center,
                 ..Default::default()
             },
+        );
+
+        // Wrap in a group to prevent constraint solver from resizing it
+        let lane_header = builder.new_group(
+            format!("lane_{}_header", lane_idx),
+            vec![lane_header_box]
         );
         lane_headers.push((lane_header, None));
     }
@@ -936,11 +954,62 @@ pub fn create_activity_diagram(
         }
     }
 
+    // Make lane backgrounds stretch dynamically to cover all content
+    let helper_node = if !bg_ids.is_empty() {
+        // 1. Ensure all backgrounds have the same height
+        lane_visual_constraints.push(SimpleConstraint::SameHeight(bg_ids.clone()));
+
+        // 2. Align all background bottoms together
+        lane_visual_constraints.push(SimpleConstraint::AlignBottom(bg_ids.clone()));
+
+        // 3. Find the last (bottommost) activity in the diagram and create a spacing constraint
+        // We'll create a dummy point below the last activity and align bg bottoms to it
+        if let Some((_bottom_activity_id, max_row)) = activity_rows.iter().max_by_key(|(_, row)| *row) {
+            if let Some((last_activity_id, _)) = activity_rows.iter().find(|(_, row)| *row == max_row) {
+                // Create an invisible helper point positioned below the last activity
+                // This point will serve as the target for the background bottom
+                let helper_id = format!("bg_bottom_helper");
+                let _helper_point = builder.new_point(helper_id.clone());
+
+                // Position the helper 60px below the last activity
+                // helper.y = last_activity.y + last_activity.height + 60
+                lane_visual_constraints.push(SimpleConstraint::VerticalSpacing(
+                    last_activity_id.clone(),
+                    helper_id.clone(),
+                    60.0,
+                ));
+
+                // Align background bottom with helper point (top)
+                // bg.y + bg.height = helper.y + helper.height (where helper.height = 0)
+                // This means: bg.y + bg.height = helper.y
+                if let Some(first_bg) = bg_ids.first() {
+                    lane_visual_constraints.push(SimpleConstraint::AlignBottom(vec![
+                        helper_id.clone(),
+                        first_bg.clone(),
+                    ]));
+                }
+
+                Some((helper_id, _helper_point))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Combine all nodes: backgrounds first (render behind), then headers, then activities
     let mut all_children = Vec::new();
     all_children.extend(lane_backgrounds); // Backgrounds render first (behind)
     all_children.extend(lane_headers); // Headers next
     all_children.extend(activity_children); // Activities on top
+
+    // Add helper node if it exists (it won't be visible but needs to be in the layout for constraints)
+    if let Some((_helper_id, helper_point)) = helper_node {
+        all_children.push((helper_point, None));
+    }
 
     // Create constraints for activities layout
     let mut activity_constraints = create_layout_constraints(&swimlanes, &activity_rows);
