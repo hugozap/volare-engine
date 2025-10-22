@@ -697,7 +697,7 @@ fn create_flow_connector(
         connector_id.clone(),
         flow.from.clone(),
         flow.to.clone(),
-        flow.condition.clone().unwrap_or("NO LABEL".to_string()),
+        flow.condition.clone().unwrap_or("".to_string()),
         ConnectorOptions {
             connector_type,
             stroke_color: "#424242".to_owned(),
@@ -865,14 +865,23 @@ pub fn create_activity_diagram(
         lane_visual_constraints.push(SimpleConstraint::AlignTop(header_ids.clone()));
     }
 
-    // Align all backgrounds at top
+    // Align all backgrounds at top with headers
+    // This ensures backgrounds start from the same Y position as headers
     let bg_ids: Vec<String> = non_empty_lanes
         .iter()
         .map(|i| format!("lane_{}_bg", i))
         .collect();
 
-    if !bg_ids.is_empty() {
-        lane_visual_constraints.push(SimpleConstraint::AlignTop(bg_ids));
+    if !bg_ids.is_empty() && !header_ids.is_empty() {
+        // Align backgrounds with each other
+        lane_visual_constraints.push(SimpleConstraint::AlignTop(bg_ids.clone()));
+
+        // Align the first background with the first header at the top
+        // This anchors the entire swimlane structure
+        lane_visual_constraints.push(SimpleConstraint::AlignTop(vec![
+            bg_ids[0].clone(),
+            header_ids[0].clone(),
+        ]));
     }
 
     // Space backgrounds adjacently (touching, no gaps)

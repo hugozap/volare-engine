@@ -457,17 +457,51 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     session.set_position(connector.entity.clone(), min_x, min_y);
     session.set_size(connector.entity.clone(), width, height);
 
-    // Position label
-    let mid_x = min_x + (max_x - min_x) / 2.0;
-    // TODO: debe usarse las mismas del label
-    let tw = session.measure_text.unwrap()(
-        connector.label.clone().unwrap_or("".to_string()).as_str(),
-        &TextOptions::default(),
-    );
-    let tx = min_x + (width - tw.0) / 2.0;
-    let ty = min_y - 12.0;
+    // Position label intelligently based on connector orientation
+    if let Some(label_text) = connector.label.clone() {
+        if !label_text.is_empty() {
+            // Get label dimensions
+            let label_size = session.measure_text.unwrap()(
+                label_text.as_str(),
+                &TextOptions::default(),
+            );
 
-    session.set_position(format!("{}_label_elem", connector.entity), tx, ty);
+            // Calculate connector midpoint (in absolute coordinates)
+            let mid_x = (start_x + end_x) / 2.0;
+            let mid_y = (start_y + end_y) / 2.0;
+
+            // Calculate connector vector and orientation
+            let dx = end_x - start_x;
+            let dy = end_y - start_y;
+            let length = (dx * dx + dy * dy).sqrt();
+
+            // Determine label offset based on connector orientation
+            let label_offset = 8.0; // Distance from connector line
+            let (label_x, label_y) = if length > 0.0 {
+                // Determine if connector is more horizontal or vertical
+                let is_horizontal = dx.abs() > dy.abs();
+
+                if is_horizontal {
+                    // For horizontal connectors: place label above (negative y direction)
+                    // Center horizontally on midpoint
+                    let lx = mid_x - label_size.0 / 2.0;
+                    let ly = mid_y - label_offset - label_size.1;
+                    (lx, ly)
+                } else {
+                    // For vertical connectors: place label to the right (positive x direction)
+                    // Center vertically on midpoint
+                    let lx = mid_x + label_offset;
+                    let ly = mid_y - label_size.1 / 2.0;
+                    (lx, ly)
+                }
+            } else {
+                // Fallback for zero-length connectors (shouldn't happen)
+                (mid_x - label_size.0 / 2.0, mid_y - label_offset - label_size.1)
+            };
+
+            session.set_position(format!("{}_label_elem", connector.entity), label_x, label_y);
+        }
+    }
 }
 /**
  * Updates the size of the arrow entity based on the start and end points
