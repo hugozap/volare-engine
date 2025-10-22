@@ -693,10 +693,11 @@ fn create_flow_connector(
             }
         };
 
-    let connector = builder.new_connector(
+    let connector = builder.new_connector_with_label(
         connector_id.clone(),
         flow.from.clone(),
         flow.to.clone(),
+        flow.condition.clone().unwrap_or("NO LABEL".to_string()),
         ConnectorOptions {
             connector_type,
             stroke_color: "#424242".to_owned(),
@@ -710,6 +711,8 @@ fn create_flow_connector(
             routing_strategy,
         },
     );
+
+    println!("Created connector with label {:?} {}", connector.entity_type, connector_id);
 
     Ok(connector)
 }

@@ -2900,6 +2900,7 @@ pub enum SimpleConstraint {
     FixedSize(EntityID, Float, Float),
     /// Fix an entity's position to specific coordinates
     FixedPosition(EntityID, Float, Float),
+    FixedX(EntityID, Float),
 
     // ===== STACK CONSTRAINTS =====
     /// Arrange entities in a horizontal line with optional spacing
@@ -2964,6 +2965,20 @@ impl ConstraintSystem {
 
     pub fn add_constraint(&mut self, constraint: SimpleConstraint) -> Result<()> {
         match constraint {
+            SimpleConstraint::FixedX(entity, x) => {
+                let vars = self.variables.get(&entity);
+                if vars.is_none() {
+                    bail!("entity not registered in constraint system {}", entity);
+                }
+
+                let vars = vars.unwrap();
+                self.solver
+                    .add_constraint(vars.x | EQ(REQUIRED) | x)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to add fixed position x constraint: {:?}", e)
+                    })?;
+            }
+
             SimpleConstraint::FixedPosition(entity, x, y) => {
                 let vars = self.variables.get(&entity);
                 if vars.is_none() {
@@ -3958,18 +3973,32 @@ impl Default for Port {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum OrthogonalRoutingStrategy {
+    // 2-segment strategies (one turn, 3 points)
+    HV, // Horizontal then Vertical (Start → Horizontal → Vertical → End)
+    VH, // Vertical then Horizontal (Start → Vertical → Horizontal → End)
+
+    // 3-segment strategies (two turns, 4 points, with midpoint)
+    HVH, // Horizontal-Vertical-Horizontal (Start → H → V → H → End)
+    VHV, // Vertical-Horizontal-Vertical (Start → V → H → V → End)
+
+    // Smart strategy
+    Auto, // Choose best based on direction
+}
+
+#[derive(Clone, Debug)]
 pub struct ConnectorOptions {
     pub connector_type: ConnectorType,
     pub stroke_color: String,
     pub stroke_width: Float,
     pub curve_offset: Option<Float>,
-    pub source_port: Port, //
-    pub target_port: Port, //
-
-    pub arrow_start: bool, // : arrow at start
-    pub arrow_end: bool,   // : arrow at end
-    pub arrow_size: Float, // : arrow size
+    pub source_port: Port,
+    pub target_port: Port,
+    pub arrow_start: bool,
+    pub arrow_end: bool,
+    pub arrow_size: Float,
+    pub routing_strategy: OrthogonalRoutingStrategy,
 }
 
 impl Default for ConnectorOptions {
@@ -3984,6 +4013,7 @@ impl Default for ConnectorOptions {
             arrow_start: false,
             arrow_end: false,
             arrow_size: 10.0,
+            routing_strategy: OrthogonalRoutingStrategy::HVH,
         }
     }
 }
@@ -4509,7 +4539,7 @@ impl Entity for ShapeText {
 }
 
 //struct with text options: font family, font size
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct TextOptions {
     pub font_family: String,
     pub font_size: f32,
@@ -4533,10 +4563,22 @@ impl Clone for TextOptions {
     }
 }
 
+impl Default for TextOptions {
+    fn default() -> Self {
+        TextOptions {
+            font_family: "Arial".to_string(),
+            font_size: 12.0,
+            text_color: "black".to_string(),
+            line_width: 200,
+            line_spacing: 8.0,
+            font_weight: 400,
+        }
+    }
+}
 impl TextOptions {
     pub fn new() -> TextOptions {
         TextOptions {
-            font_family: String::from("Roboto"),
+            font_family: String::from("Arial"),
             font_size: 12.0,
             text_color: String::from("black"),
             line_width: 20,
@@ -6598,6 +6640,8 @@ impl JsonLinesParser {
                     arrow_start,
                     arrow_end,
                     arrow_size,
+                    // TODO: read from params
+                    routing_strategy: OrthogonalRoutingStrategy::Auto,
                 };
 
                 // Create connector
@@ -6633,7 +6677,7 @@ impl JsonLinesParser {
                 // Parse and apply transforms
                 parse_transform_attributes(&entity.attributes, builder, entity_id.to_string());
 
-                Ok(builder.new_elipse(entity_id.to_string(), radius, options))
+                Ok(builder.new_ellipse(entity_id.to_string(), radius, options))
             }
 
             "arc" => {
@@ -8022,7 +8066,7 @@ impl DiagramBuilder {
         }
     }
 
-    pub fn new_elipse(
+    pub fn new_ellipse(
         &mut self,
         id: EntityID,
         radius: (Float, Float),
@@ -8504,6 +8548,10 @@ impl DiagramBuilder {
             absolute_pos.0 + transformed_center.0,
             absolute_pos.1 + transformed_center.1,
         )
+    }
+
+    pub fn add_to_pending_nodes(&mut self, elem: DiagramTreeNode) {
+        self.pending_root_nodes.push(elem);
     }
 
     pub fn get_custom_component(

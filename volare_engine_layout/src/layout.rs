@@ -10,7 +10,9 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
+    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment,
+    LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior,
+    SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -245,6 +247,7 @@ fn estimate_char_width(text_options: &TextOptions) -> Float {
  */
 
 pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
+    println!("layout_group called {}", shape_group.entity);
     // Calculate actual bounding box using positions, not just max dimensions
     let mut min_x = Float::INFINITY;
     let mut min_y = Float::INFINITY;
@@ -376,9 +379,11 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let (end_x, end_y) =
         session.get_port_position(&connector.target_id, &connector.options.target_port);
 
-    println!("🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})", 
-             connector.entity, start_x, start_y, end_x, end_y);
-    
+    println!(
+        "🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})",
+        connector.entity, start_x, start_y, end_x, end_y
+    );
+
     session.set_position(connector.start_point_id.clone(), start_x, start_y);
     session.set_position(connector.end_point_id.clone(), end_x, end_y);
 
@@ -388,14 +393,14 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
             // For curved connectors, we need to account for the curve's bounding box
             // The curve extends beyond the straight line between points
             let curve_offset = connector.options.curve_offset.unwrap_or(50.0);
-            
+
             // Determine curve direction based on relative positions
             let dx = end_x - start_x;
             let dy = end_y - start_y;
-            
+
             // For horizontal curves (primary direction is horizontal)
             let extends_horizontally = dx.abs() > dy.abs();
-            
+
             let (min_x, max_x) = if extends_horizontally {
                 (start_x.min(end_x), start_x.max(end_x))
             } else {
@@ -403,23 +408,23 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
                 let curve_extent = curve_offset.abs();
                 (
                     start_x.min(end_x) - curve_extent,
-                    start_x.max(end_x) + curve_extent
+                    start_x.max(end_x) + curve_extent,
                 )
             };
-            
+
             let (min_y, max_y) = if extends_horizontally {
                 // Horizontal curve - control points extend vertically
                 let curve_extent = curve_offset.abs();
                 (
                     start_y.min(end_y) - curve_extent,
-                    start_y.max(end_y) + curve_extent
+                    start_y.max(end_y) + curve_extent,
                 )
             } else {
                 (start_y.min(end_y), start_y.max(end_y))
             };
-            
+
             (min_x, max_x, min_y, max_y)
-        },
+        }
         ConnectorType::Orthogonal => {
             // For orthogonal connectors, add some buffer for the segments
             let buffer = 20.0; // Buffer for orthogonal segments
@@ -427,16 +432,16 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
                 start_x.min(end_x) - buffer,
                 start_x.max(end_x) + buffer,
                 start_y.min(end_y) - buffer,
-                start_y.max(end_y) + buffer
+                start_y.max(end_y) + buffer,
             )
-        },
+        }
         ConnectorType::Straight => {
             // Straight line - just use the endpoints
             (
                 start_x.min(end_x),
                 start_x.max(end_x),
                 start_y.min(end_y),
-                start_y.max(end_y)
+                start_y.max(end_y),
             )
         }
     };
@@ -444,11 +449,25 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let width = max_x - min_x;
     let height = max_y - min_y;
 
-    println!("   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})", 
-             min_x, min_y, width, height);
+    println!(
+        "   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})",
+        min_x, min_y, width, height
+    );
 
     session.set_position(connector.entity.clone(), min_x, min_y);
     session.set_size(connector.entity.clone(), width, height);
+
+    // Position label
+    let mid_x = min_x + (max_x - min_x) / 2.0;
+    // TODO: debe usarse las mismas del label
+    let tw = session.measure_text.unwrap()(
+        connector.label.clone().unwrap_or("".to_string()).as_str(),
+        &TextOptions::default(),
+    );
+    let tx = min_x + (width - tw.0) / 2.0;
+    let ty = min_y - 12.0;
+
+    session.set_position(format!("{}_label_elem", connector.entity), tx, ty);
 }
 /**
  * Updates the size of the arrow entity based on the start and end points

@@ -573,7 +573,9 @@ impl DiagramBuilder {
         DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
-    pub fn new_connector(
+    
+
+     pub fn new_connector(
         &mut self,
         id: EntityID,
         source_id: EntityID,
@@ -592,6 +594,7 @@ impl DiagramBuilder {
             target_id: target_id,
             start_point_id: start_point.entity_id.clone(),
             end_point_id: end_point.entity_id.clone(),
+            label: None,
             options: options,
         };
 
@@ -606,6 +609,48 @@ impl DiagramBuilder {
             entity_id: id.clone(),
             children: children,
         }
+    }
+
+    pub fn new_connector_with_label(
+        &mut self,
+        id: EntityID,
+        source_id: EntityID,
+        target_id: EntityID,
+        label: String,
+        options: ConnectorOptions,
+    ) -> DiagramTreeNode {
+        self.new_entity(id.clone(), EntityType::ConnectorShape);
+
+        let label_text = self.new_text(format!("{}_label_elem", id), &label, TextOptions::default());
+        
+
+        // Create start and end points
+        let start_point = self.new_point(format!("{}_start", id.clone()));
+        let end_point = self.new_point(format!("{}_end", id.clone()));
+
+        let connector = ShapeConnector {
+            entity: id.clone(),
+            source_id: source_id,
+            target_id: target_id,
+            start_point_id: start_point.entity_id.clone(),
+            end_point_id: end_point.entity_id.clone(),
+            label: Some(label.to_string()),
+            options: options,
+        };
+
+        self.connectors.insert(id.clone(), connector);
+
+        let mut children = Vec::new();
+        children.push(Box::new(start_point.clone()));
+        children.push(Box::new(end_point.clone()));
+
+        let con_node = DiagramTreeNode {
+            entity_type: EntityType::ConnectorShape,
+            entity_id: id.clone(),
+            children: children,
+        };
+
+        self.new_group(format!("{}_wrapper", id), vec![con_node, label_text])
     }
 
     pub fn new_ellipse(

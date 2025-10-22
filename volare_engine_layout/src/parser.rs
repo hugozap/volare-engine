@@ -895,6 +895,8 @@ impl JsonLinesParser {
 
                 let target_id =
                     get_string_attr(&entity.attributes, &["target", "target_id", "to"], "");
+                
+                let label = get_string_attr(&entity.attributes, &["label"], "");
 
                 if source_id.is_empty() || target_id.is_empty() {
                     bail!("Connector requires 'source' and 'target' attributes");
@@ -956,7 +958,7 @@ impl JsonLinesParser {
                 };
 
                 // Create connector
-                Ok(builder.new_connector(entity_id.to_string(), source_id, target_id, options))
+                Ok(builder.new_connector_with_label(entity_id.to_string(), source_id, target_id,label,options))
             }
 
             "ellipse" => {

@@ -142,6 +142,7 @@ pub struct ShapeConnector {
     pub target_id: EntityID,
     pub start_point_id: EntityID,
     pub end_point_id: EntityID,
+    pub label : Option<String>,
     pub options: ConnectorOptions,
 }
 
