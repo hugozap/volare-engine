@@ -177,6 +177,7 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
     }
 
     // Process activities in topological order
+    // Handle cycles by allowing placement based on ANY processed dependency
     let mut queue: VecDeque<String> = start_nodes.clone().into();
     let mut visited: HashSet<String> = HashSet::new();
 
@@ -193,17 +194,26 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
             if flow.from == current_id {
                 let target_id = &flow.to;
 
+                // Skip if already assigned
+                if activity_rows.contains_key(target_id) {
+                    continue;
+                }
+
                 // Get all dependencies of target
                 let deps = incoming.get(target_id).cloned().unwrap_or_default();
 
-                // Check if ALL dependencies have been processed
-                let all_deps_processed = deps.iter().all(|dep| activity_rows.contains_key(dep));
+                // Check if AT LEAST ONE dependency has been processed
+                // This allows us to handle cycles in the flow graph
+                let processed_deps: Vec<&String> = deps
+                    .iter()
+                    .filter(|dep| activity_rows.contains_key(*dep))
+                    .collect();
 
-                if all_deps_processed {
-                    // Calculate: MAX(all dependency rows) + 1
-                    let max_dep_row = deps
+                if !processed_deps.is_empty() {
+                    // Calculate: MAX(processed dependency rows) + 1
+                    let max_dep_row = processed_deps
                         .iter()
-                        .filter_map(|dep| activity_rows.get(dep))
+                        .filter_map(|dep| activity_rows.get(*dep))
                         .max()
                         .unwrap_or(&0);
 
@@ -212,7 +222,7 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
                     // Set the row
                     activity_rows.insert(target_id.clone(), target_row);
 
-                    println!("    {} → row {} (after {:?})", target_id, target_row, deps);
+                    println!("    {} → row {} (after {:?})", target_id, target_row, processed_deps);
 
                     queue.push_back(target_id.clone());
                 }
@@ -377,7 +387,9 @@ fn create_layout_constraints(
 
     println!("    Total rows: {}", row_indices.len());
 
-    // 1. Stack rows vertically
+    // 1. Stack rows vertically with proper spacing to prevent overlap
+    // Strategy: Make all activities in a row have at least the same height (matching the tallest)
+    // This ensures consistent spacing between rows
     if row_indices.len() > 1 {
         for i in 1..row_indices.len() {
             let prev_row = row_indices[i - 1];
@@ -386,9 +398,19 @@ fn create_layout_constraints(
             if let (Some(prev_acts), Some(curr_acts)) =
                 (rows_map.get(&prev_row), rows_map.get(&curr_row))
             {
-                if let (Some(prev_rep), Some(curr_rep)) = (prev_acts.first(), curr_acts.first()) {
-                   
+                // Ensure all activities in the previous row have at least the same height
+                // Apply the constraint to the inner elements because groups can't be resized
+                if prev_acts.len() > 1 {
+                    let inner_ids: Vec<String> = prev_acts
+                        .iter()
+                        .map(|id| format!("{}_inner", id))
+                        .collect();
+                    constraints.push(SimpleConstraint::AtLeastSameHeight(inner_ids));
+                }
 
+                // Use the first activity of each row for spacing calculation
+                // Since all have at least the same height, this works correctly
+                if let (Some(prev_rep), Some(curr_rep)) = (prev_acts.first(), curr_acts.first()) {
                     constraints.push(SimpleConstraint::VerticalSpacing(
                         prev_rep.clone(),
                         curr_rep.clone(),
