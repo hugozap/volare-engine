@@ -813,14 +813,26 @@ pub fn create_activity_diagram(
 
     // Calculate lane width based on activity spacing
     // Each lane should align with its activities
-    let lane_spacing = 150.0; // This matches the spacing in create_layout_constraints
-    let lane_width = 250.0; // Width of each lane background (wider than spacing to have overlap or padding)
+    let _lane_spacing = 150.0; // This matches the spacing in create_layout_constraints
 
     for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
         // Skip empty lanes
         if swimlane.activities.is_empty() {
             continue;
         }
+
+        // Calculate lane width based on widest activity type in the lane
+        // Default widths by activity type:
+        // - Normal activities: 140px (Fixed width) + padding = ~200px
+        // - Decision/Merge: 50px diamond + padding = ~100px
+        // - Start/End: 30px circles + padding = ~100px
+        let lane_width = if swimlane.activities.iter().any(|a| matches!(a.activity_type, ActivityType::Normal)) {
+            // Has normal activities - use wider lane
+            200.0
+        } else {
+            // Only has small elements (start, end, decision, merge)
+            100.0
+        };
 
         // Create lane background with alternating colors
         let bg_color = if lane_idx % 2 == 0 {
