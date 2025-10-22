@@ -1569,7 +1569,9 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
+    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment,
+    LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior,
+    SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -1804,6 +1806,7 @@ fn estimate_char_width(text_options: &TextOptions) -> Float {
  */
 
 pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
+    println!("layout_group called {}", shape_group.entity);
     // Calculate actual bounding box using positions, not just max dimensions
     let mut min_x = Float::INFINITY;
     let mut min_y = Float::INFINITY;
@@ -1935,9 +1938,11 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let (end_x, end_y) =
         session.get_port_position(&connector.target_id, &connector.options.target_port);
 
-    println!("🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})", 
-             connector.entity, start_x, start_y, end_x, end_y);
-    
+    println!(
+        "🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})",
+        connector.entity, start_x, start_y, end_x, end_y
+    );
+
     session.set_position(connector.start_point_id.clone(), start_x, start_y);
     session.set_position(connector.end_point_id.clone(), end_x, end_y);
 
@@ -1947,14 +1952,14 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
             // For curved connectors, we need to account for the curve's bounding box
             // The curve extends beyond the straight line between points
             let curve_offset = connector.options.curve_offset.unwrap_or(50.0);
-            
+
             // Determine curve direction based on relative positions
             let dx = end_x - start_x;
             let dy = end_y - start_y;
-            
+
             // For horizontal curves (primary direction is horizontal)
             let extends_horizontally = dx.abs() > dy.abs();
-            
+
             let (min_x, max_x) = if extends_horizontally {
                 (start_x.min(end_x), start_x.max(end_x))
             } else {
@@ -1962,23 +1967,23 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
                 let curve_extent = curve_offset.abs();
                 (
                     start_x.min(end_x) - curve_extent,
-                    start_x.max(end_x) + curve_extent
+                    start_x.max(end_x) + curve_extent,
                 )
             };
-            
+
             let (min_y, max_y) = if extends_horizontally {
                 // Horizontal curve - control points extend vertically
                 let curve_extent = curve_offset.abs();
                 (
                     start_y.min(end_y) - curve_extent,
-                    start_y.max(end_y) + curve_extent
+                    start_y.max(end_y) + curve_extent,
                 )
             } else {
                 (start_y.min(end_y), start_y.max(end_y))
             };
-            
+
             (min_x, max_x, min_y, max_y)
-        },
+        }
         ConnectorType::Orthogonal => {
             // For orthogonal connectors, add some buffer for the segments
             let buffer = 20.0; // Buffer for orthogonal segments
@@ -1986,16 +1991,16 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
                 start_x.min(end_x) - buffer,
                 start_x.max(end_x) + buffer,
                 start_y.min(end_y) - buffer,
-                start_y.max(end_y) + buffer
+                start_y.max(end_y) + buffer,
             )
-        },
+        }
         ConnectorType::Straight => {
             // Straight line - just use the endpoints
             (
                 start_x.min(end_x),
                 start_x.max(end_x),
                 start_y.min(end_y),
-                start_y.max(end_y)
+                start_y.max(end_y),
             )
         }
     };
@@ -2003,11 +2008,59 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let width = max_x - min_x;
     let height = max_y - min_y;
 
-    println!("   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})", 
-             min_x, min_y, width, height);
+    println!(
+        "   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})",
+        min_x, min_y, width, height
+    );
 
     session.set_position(connector.entity.clone(), min_x, min_y);
     session.set_size(connector.entity.clone(), width, height);
+
+    // Position label intelligently based on connector orientation
+    if let Some(label_text) = connector.label.clone() {
+        if !label_text.is_empty() {
+            // Get label dimensions
+            let label_size = session.measure_text.unwrap()(
+                label_text.as_str(),
+                &TextOptions::default(),
+            );
+
+            // Calculate connector midpoint (in absolute coordinates)
+            let mid_x = (start_x + end_x) / 2.0;
+            let mid_y = (start_y + end_y) / 2.0;
+
+            // Calculate connector vector and orientation
+            let dx = end_x - start_x;
+            let dy = end_y - start_y;
+            let length = (dx * dx + dy * dy).sqrt();
+
+            // Determine label offset based on connector orientation
+            let label_offset = 8.0; // Distance from connector line
+            let (label_x, label_y) = if length > 0.0 {
+                // Determine if connector is more horizontal or vertical
+                let is_horizontal = dx.abs() > dy.abs();
+
+                if is_horizontal {
+                    // For horizontal connectors: place label above (negative y direction)
+                    // Center horizontally on midpoint
+                    let lx = mid_x - label_size.0 / 2.0;
+                    let ly = mid_y - label_offset - label_size.1;
+                    (lx, ly)
+                } else {
+                    // For vertical connectors: place label to the right (positive x direction)
+                    // Center vertically on midpoint
+                    let lx = mid_x + label_offset;
+                    let ly = mid_y - label_size.1 / 2.0;
+                    (lx, ly)
+                }
+            } else {
+                // Fallback for zero-length connectors (shouldn't happen)
+                (mid_x - label_size.0 / 2.0, mid_y - label_offset - label_size.1)
+            };
+
+            session.set_position(format!("{}_label_elem", connector.entity), label_x, label_y);
+        }
+    }
 }
 /**
  * Updates the size of the arrow entity based on the start and end points
@@ -3951,6 +4004,7 @@ pub struct ShapeConnector {
     pub target_id: EntityID,
     pub start_point_id: EntityID,
     pub end_point_id: EntityID,
+    pub label : Option<String>,
     pub options: ConnectorOptions,
 }
 
@@ -6584,6 +6638,8 @@ impl JsonLinesParser {
 
                 let target_id =
                     get_string_attr(&entity.attributes, &["target", "target_id", "to"], "");
+                
+                let label = get_string_attr(&entity.attributes, &["label"], "");
 
                 if source_id.is_empty() || target_id.is_empty() {
                     bail!("Connector requires 'source' and 'target' attributes");
@@ -6645,7 +6701,7 @@ impl JsonLinesParser {
                 };
 
                 // Create connector
-                Ok(builder.new_connector(entity_id.to_string(), source_id, target_id, options))
+                Ok(builder.new_connector_with_label(entity_id.to_string(), source_id, target_id,label,options))
             }
 
             "ellipse" => {
@@ -8031,7 +8087,9 @@ impl DiagramBuilder {
         DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
-    pub fn new_connector(
+    
+
+     pub fn new_connector(
         &mut self,
         id: EntityID,
         source_id: EntityID,
@@ -8050,6 +8108,7 @@ impl DiagramBuilder {
             target_id: target_id,
             start_point_id: start_point.entity_id.clone(),
             end_point_id: end_point.entity_id.clone(),
+            label: None,
             options: options,
         };
 
@@ -8064,6 +8123,48 @@ impl DiagramBuilder {
             entity_id: id.clone(),
             children: children,
         }
+    }
+
+    pub fn new_connector_with_label(
+        &mut self,
+        id: EntityID,
+        source_id: EntityID,
+        target_id: EntityID,
+        label: String,
+        options: ConnectorOptions,
+    ) -> DiagramTreeNode {
+        self.new_entity(id.clone(), EntityType::ConnectorShape);
+
+        let label_text = self.new_text(format!("{}_label_elem", id), &label, TextOptions::default());
+        
+
+        // Create start and end points
+        let start_point = self.new_point(format!("{}_start", id.clone()));
+        let end_point = self.new_point(format!("{}_end", id.clone()));
+
+        let connector = ShapeConnector {
+            entity: id.clone(),
+            source_id: source_id,
+            target_id: target_id,
+            start_point_id: start_point.entity_id.clone(),
+            end_point_id: end_point.entity_id.clone(),
+            label: Some(label.to_string()),
+            options: options,
+        };
+
+        self.connectors.insert(id.clone(), connector);
+
+        let mut children = Vec::new();
+        children.push(Box::new(start_point.clone()));
+        children.push(Box::new(end_point.clone()));
+
+        let con_node = DiagramTreeNode {
+            entity_type: EntityType::ConnectorShape,
+            entity_id: id.clone(),
+            children: children,
+        };
+
+        self.new_group(format!("{}_wrapper", id), vec![con_node, label_text])
     }
 
     pub fn new_ellipse(

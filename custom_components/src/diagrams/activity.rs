@@ -133,7 +133,6 @@ fn parse_flows(attrs: &Map<String, Value>) -> Result<Vec<Flow>> {
     Ok(flows)
 }
 
-// Calculate which row each activity should be placed in based on flow dependencies
 fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<String, usize> {
     println!("  🧮 Calculating activity rows...");
 
@@ -176,57 +175,133 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
         activity_rows.insert(start_id.clone(), 0);
     }
 
-    // Process activities in topological order
-    // Handle cycles by allowing placement based on ANY processed dependency
-    let mut queue: VecDeque<String> = start_nodes.clone().into();
-    let mut visited: HashSet<String> = HashSet::new();
+    // Build outgoing flows map to detect backward edges
+    let mut outgoing: HashMap<String, Vec<String>> = HashMap::new();
+    for flow in flows {
+        outgoing
+            .entry(flow.from.clone())
+            .or_insert_with(Vec::new)
+            .push(flow.to.clone());
+    }
 
-    while let Some(current_id) = queue.pop_front() {
-        if visited.contains(&current_id) {
-            continue;
-        }
-        visited.insert(current_id.clone());
+    // Process activities in multiple passes
+    let max_passes = activities.len() * 2;
+    let mut pass = 0;
 
-        let current_row = *activity_rows.get(&current_id).unwrap();
+    while pass < max_passes {
+        pass += 1;
+        let mut made_progress = false;
 
-        // Find all outgoing flows from current activity
-        for flow in flows {
-            if flow.from == current_id {
-                let target_id = &flow.to;
+        // Try to place all unplaced activities
+        for activity in activities {
+            let target_id = &activity.id;
 
-                // Skip if already assigned
-                if activity_rows.contains_key(target_id) {
-                    continue;
-                }
+            // Skip if already assigned
+            if activity_rows.contains_key(target_id) {
+                continue;
+            }
 
-                // Get all dependencies of target
-                let deps = incoming.get(target_id).cloned().unwrap_or_default();
+            // Get all dependencies of target
+            let deps = incoming.get(target_id).cloned().unwrap_or_default();
+            if deps.is_empty() {
+                continue; // Should have been caught as start node
+            }
 
-                // Check if AT LEAST ONE dependency has been processed
-                // This allows us to handle cycles in the flow graph
-                let processed_deps: Vec<&String> = deps
-                    .iter()
-                    .filter(|dep| activity_rows.contains_key(*dep))
-                    .collect();
+            // Split dependencies into forward and backward flows
+            // A backward flow is one where the source node hasn't been assigned yet
+            // OR where the source would be at a higher row than we'd place this node
+            let mut forward_deps: Vec<&String> = Vec::new();
+            let mut backward_deps: Vec<&String> = Vec::new();
+            let mut unprocessed_deps: Vec<&String> = Vec::new();
 
-                if !processed_deps.is_empty() {
-                    // Calculate: MAX(processed dependency rows) + 1
-                    let max_dep_row = processed_deps
-                        .iter()
-                        .filter_map(|dep| activity_rows.get(*dep))
-                        .max()
-                        .unwrap_or(&0);
+            for dep in &deps {
+                if let Some(&dep_row) = activity_rows.get(dep) {
+                    // Check if this creates a backward edge
+                    // A backward edge would mean the dependency is at a higher row
+                    // This is a heuristic - we consider it backward if adding this node
+                    // would create a cycle back to a node we haven't processed yet
 
-                    let target_row = max_dep_row + 1;
-
-                    // Set the row
-                    activity_rows.insert(target_id.clone(), target_row);
-
-                    println!("    {} → row {} (after {:?})", target_id, target_row, processed_deps);
-
-                    queue.push_back(target_id.clone());
+                    // For now, treat all processed dependencies as forward
+                    forward_deps.push(dep);
+                } else {
+                    // Dependency not processed yet
+                    unprocessed_deps.push(dep);
                 }
             }
+
+            // Identify backward dependencies: unprocessed deps that would create cycles
+            // A simple heuristic: if an unprocessed dep has this node in its forward path,
+            // it's a backward edge. For simplicity, we'll check if the unprocessed dep
+            // has a path to any of our forward dependencies.
+            for unproc_dep in &unprocessed_deps {
+                // Check if this unprocessed dependency could reach any forward dependency
+                // If yes, it's creating a cycle (backward edge)
+                let mut is_backward = false;
+
+                // Simple check: does the unprocessed dependency have us in its outputs?
+                if let Some(unproc_outputs) = outgoing.get(*unproc_dep) {
+                    if unproc_outputs.contains(target_id) {
+                        is_backward = true;
+                    }
+                }
+
+                if is_backward {
+                    backward_deps.push(unproc_dep);
+                } else {
+                    // Consider it a forward dependency that just hasn't been processed yet
+                    // Don't place this node until it's ready
+                }
+            }
+
+            // Can we place this node?
+            // Yes if: we have at least one forward dependency AND all non-backward deps are processed
+            let non_backward_deps_count = deps.len() - backward_deps.len();
+            let can_place =
+                forward_deps.len() == non_backward_deps_count && !forward_deps.is_empty();
+
+            if !can_place {
+                continue; // Not ready yet
+            }
+
+            // Calculate row based on forward dependencies only
+            let deps_rows: Vec<usize> = forward_deps
+                .iter()
+                .filter_map(|dep| activity_rows.get(*dep).copied())
+                .collect();
+
+            let max_dep_row = deps_rows.iter().max().unwrap_or(&0);
+
+            // Check if this is a convergence point with multiple forward flows at similar rows
+            let near_max_count = deps_rows
+                .iter()
+                .filter(|r| **r >= max_dep_row.saturating_sub(1))
+                .count();
+
+            // If multiple forward dependencies converge at similar levels, add extra spacing
+            let target_row = if near_max_count > 1 {
+                // Convergence point - add extra row spacing
+                println!(
+                    "    {} is a convergence point ({} flows from rows near {})",
+                    target_id, near_max_count, max_dep_row
+                );
+                max_dep_row + 2
+            } else {
+                max_dep_row + 1
+            };
+
+            // Set the row
+            activity_rows.insert(target_id.clone(), target_row);
+            made_progress = true;
+
+            println!(
+                "    {} → row {} (after forward deps: {:?}, ignoring backward deps: {:?})",
+                target_id, target_row, forward_deps, backward_deps
+            );
+        }
+
+        // If we didn't make any progress this pass, we're done (or stuck)
+        if !made_progress {
+            break;
         }
     }
 
@@ -247,7 +322,6 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
 
     activity_rows
 }
-
 // Create visual node for an activity based on its type
 fn create_activity_node(
     activity: &Activity,
@@ -300,11 +374,11 @@ fn create_activity_node(
             let diamond = builder.new_polyline(
                 format!("{}_inner", activity.id),
                 vec![
-                    (25.0, 0.0),    // Top
-                    (50.0, 25.0),   // Right
-                    (25.0, 50.0),   // Bottom
-                    (0.0, 25.0),    // Left
-                    (25.0, 0.0),    // Close path
+                    (25.0, 0.0),  // Top
+                    (50.0, 25.0), // Right
+                    (25.0, 50.0), // Bottom
+                    (0.0, 25.0),  // Left
+                    (25.0, 0.0),  // Close path
                 ],
                 LineOptions {
                     stroke_color: "#F57F17".to_owned(),
@@ -401,10 +475,8 @@ fn create_layout_constraints(
                 // Ensure all activities in the previous row have at least the same height
                 // Apply the constraint to the inner elements because groups can't be resized
                 if prev_acts.len() > 1 {
-                    let inner_ids: Vec<String> = prev_acts
-                        .iter()
-                        .map(|id| format!("{}_inner", id))
-                        .collect();
+                    let inner_ids: Vec<String> =
+                        prev_acts.iter().map(|id| format!("{}_inner", id)).collect();
                     constraints.push(SimpleConstraint::AtLeastSameHeight(inner_ids));
                 }
 
@@ -754,7 +826,10 @@ fn create_flow_connector(
         },
     );
 
-    println!("Created connector with label {:?} {}", connector.entity_type, connector_id);
+    println!(
+        "Created connector with label {:?} {}",
+        connector.entity_type, connector_id
+    );
 
     Ok(connector)
 }
@@ -848,7 +923,11 @@ pub fn create_activity_diagram(
         // - Normal activities: 140px (Fixed width) + padding = ~200px
         // - Decision/Merge: 50px diamond + padding = ~100px
         // - Start/End: 30px circles + padding = ~100px
-        let lane_width = if swimlane.activities.iter().any(|a| matches!(a.activity_type, ActivityType::Normal)) {
+        let lane_width = if swimlane
+            .activities
+            .iter()
+            .any(|a| matches!(a.activity_type, ActivityType::Normal))
+        {
             // Has normal activities - use wider lane
             200.0
         } else {
@@ -903,10 +982,8 @@ pub fn create_activity_diagram(
         );
 
         // Wrap in a group to prevent constraint solver from resizing it
-        let lane_header = builder.new_group(
-            format!("lane_{}_header", lane_idx),
-            vec![lane_header_box]
-        );
+        let lane_header =
+            builder.new_group(format!("lane_{}_header", lane_idx), vec![lane_header_box]);
         lane_headers.push((lane_header, None));
     }
 
@@ -1006,8 +1083,12 @@ pub fn create_activity_diagram(
 
         // 3. Find the last (bottommost) activity in the diagram and create a spacing constraint
         // We'll create a dummy point below the last activity and align bg bottoms to it
-        if let Some((_bottom_activity_id, max_row)) = activity_rows.iter().max_by_key(|(_, row)| *row) {
-            if let Some((last_activity_id, _)) = activity_rows.iter().find(|(_, row)| *row == max_row) {
+        if let Some((_bottom_activity_id, max_row)) =
+            activity_rows.iter().max_by_key(|(_, row)| *row)
+        {
+            if let Some((last_activity_id, _)) =
+                activity_rows.iter().find(|(_, row)| *row == max_row)
+            {
                 // Create an invisible helper point positioned below the last activity
                 // This point will serve as the target for the background bottom
                 let helper_id = format!("bg_bottom_helper");

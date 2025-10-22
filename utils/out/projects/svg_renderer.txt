@@ -189,10 +189,45 @@ fn render_all_connectors(node: &DiagramTreeNode, session: &DiagramBuilder, svg: 
     if node.entity_type == EntityType::ConnectorShape {
         render_connector(session, svg, node.entity_id.clone(), node);
     }
-    
-    // Recursively process all children
-    for child in &node.children {
-        render_all_connectors(child, session, svg);
+    // If this is a group (potentially a connector wrapper), render it with its children
+    else if node.entity_type == EntityType::GroupShape {
+        // Check if this group contains a connector
+        let has_connector = node.children.iter().any(|child| child.entity_type == EntityType::ConnectorShape);
+
+        if has_connector {
+            // This is a connector wrapper group - render it with transform
+            let transform = session.get_transform(node.entity_id.clone());
+            let transform_str = transform.to_svg_string();
+
+            if transform_str.is_empty() {
+                svg.push_str("<g>");
+            } else {
+                svg.push_str(&format!(r#"<g transform="{}">"#, transform_str));
+            }
+
+            // Render all children (connector and label)
+            for child in &node.children {
+                if child.entity_type == EntityType::ConnectorShape {
+                    render_connector(session, svg, child.entity_id.clone(), child);
+                } else if child.entity_type == EntityType::TextShape {
+                    // Render the label text
+                    render_text(session, svg, child.entity_id.clone(), child);
+                }
+            }
+
+            svg.push_str("</g>");
+        } else {
+            // Not a connector wrapper, recurse into children
+            for child in &node.children {
+                render_all_connectors(child, session, svg);
+            }
+        }
+    }
+    else {
+        // Recursively process all children for other node types
+        for child in &node.children {
+            render_all_connectors(child, session, svg);
+        }
     }
 }
 

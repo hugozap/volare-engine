@@ -2864,8 +2864,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // {"id":"conn2","type":"connector","source":"box2","source_port":"right","target":"box3","target_port":"left","stroke_color":"green","stroke_width":2}
 // "##;
 
-let input = r##"{"id":"root","type":"activity_diagram","swimlanes":[{"name":"Lane 1","activities":[{"id":"start","label":"Start","type":"start"},{"id":"decision","label":"Check","type":"decision"}]},{"name":"Lane 2","activities":[{"id":"actA","label":"Option A","type":"normal"},{"id":"merge","label":"Merge","type":"merge"}]},{"name":"Lane 3","activities":[{"id":"actB","label":"Option B","type":"normal"}]}],"flows":[{"from":"start","to":"decision"},{"from":"decision","to":"actA","condition":"Yes"},{"from":"decision","to":"actB","condition":"No"},{"from":"actA","to":"merge"},{"from":"actB","to":"merge"}]}"##;
-
+// let input = r##"{"id":"root","type":"activity_diagram","swimlanes":[{"name":"Lane 1","activities":[{"id":"start","label":"Start","type":"start"},{"id":"decision","label":"Check","type":"decision"}]},{"name":"Lane 2","activities":[{"id":"actA","label":"Option A","type":"normal"},{"id":"merge","label":"Merge","type":"merge"}]},{"name":"Lane 3","activities":[{"id":"actB","label":"Option B","type":"normal"}]}],"flows":[{"from":"start","to":"decision"},{"from":"decision","to":"actA","condition":"Yes"},{"from":"decision","to":"actB","condition":"No"},{"from":"actA","to":"merge"},{"from":"actB","to":"merge"}]}"##;
+let input = r##"{"id":"root","type":"activity_diagram","swimlanes":[{"name":"User","activities":[{"id":"start","label":"Start","type":"start"},{"id":"login","label":"Enter Credentials","type":"normal"},{"id":"success","label":"Access Dashboard","type":"normal"}]},{"name":"System","activities":[{"id":"validate","label":"Validate User","type":"decision"},{"id":"error","label":"Show Error","type":"normal"},{"id":"retry","label":"Retry?","type":"decision"}]},{"name":"Admin","activities":[{"id":"end","label":"End","type":"end"}]}],"flows":[{"from":"start","to":"login","condition":"begin"},{"from":"login","to":"validate","condition":"submit"},{"from":"validate","to":"success","condition":"[valid credentials]"},{"from":"validate","to":"error","condition":"[invalid credentials]"},{"from":"error","to":"retry","condition":"handle error"},{"from":"retry","to":"login","condition":"[yes, retry]"},{"from":"retry","to":"end","condition":"[no, exit]"},{"from":"success","to":"end","condition":"logout"}]}"##;
 
  // Parse the JSON Lines
     let mut parser = parser::JsonLinesParser::new();
@@ -5382,7 +5382,9 @@ use crate::{
     ShapeLine, ShapeText, Table, VerticalStack,
 };
 use crate::{
-    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment, LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior, SpacerDirection, TextLine, VerticalAlignment
+    ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment,
+    LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior,
+    SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -5617,6 +5619,7 @@ fn estimate_char_width(text_options: &TextOptions) -> Float {
  */
 
 pub fn layout_group(session: &mut DiagramBuilder, shape_group: &ShapeGroup) {
+    println!("layout_group called {}", shape_group.entity);
     // Calculate actual bounding box using positions, not just max dimensions
     let mut min_x = Float::INFINITY;
     let mut min_y = Float::INFINITY;
@@ -5748,9 +5751,11 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let (end_x, end_y) =
         session.get_port_position(&connector.target_id, &connector.options.target_port);
 
-    println!("🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})", 
-             connector.entity, start_x, start_y, end_x, end_y);
-    
+    println!(
+        "🔗 Connector {} connecting ({:.1}, {:.1}) to ({:.1}, {:.1})",
+        connector.entity, start_x, start_y, end_x, end_y
+    );
+
     session.set_position(connector.start_point_id.clone(), start_x, start_y);
     session.set_position(connector.end_point_id.clone(), end_x, end_y);
 
@@ -5760,14 +5765,14 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
             // For curved connectors, we need to account for the curve's bounding box
             // The curve extends beyond the straight line between points
             let curve_offset = connector.options.curve_offset.unwrap_or(50.0);
-            
+
             // Determine curve direction based on relative positions
             let dx = end_x - start_x;
             let dy = end_y - start_y;
-            
+
             // For horizontal curves (primary direction is horizontal)
             let extends_horizontally = dx.abs() > dy.abs();
-            
+
             let (min_x, max_x) = if extends_horizontally {
                 (start_x.min(end_x), start_x.max(end_x))
             } else {
@@ -5775,23 +5780,23 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
                 let curve_extent = curve_offset.abs();
                 (
                     start_x.min(end_x) - curve_extent,
-                    start_x.max(end_x) + curve_extent
+                    start_x.max(end_x) + curve_extent,
                 )
             };
-            
+
             let (min_y, max_y) = if extends_horizontally {
                 // Horizontal curve - control points extend vertically
                 let curve_extent = curve_offset.abs();
                 (
                     start_y.min(end_y) - curve_extent,
-                    start_y.max(end_y) + curve_extent
+                    start_y.max(end_y) + curve_extent,
                 )
             } else {
                 (start_y.min(end_y), start_y.max(end_y))
             };
-            
+
             (min_x, max_x, min_y, max_y)
-        },
+        }
         ConnectorType::Orthogonal => {
             // For orthogonal connectors, add some buffer for the segments
             let buffer = 20.0; // Buffer for orthogonal segments
@@ -5799,16 +5804,16 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
                 start_x.min(end_x) - buffer,
                 start_x.max(end_x) + buffer,
                 start_y.min(end_y) - buffer,
-                start_y.max(end_y) + buffer
+                start_y.max(end_y) + buffer,
             )
-        },
+        }
         ConnectorType::Straight => {
             // Straight line - just use the endpoints
             (
                 start_x.min(end_x),
                 start_x.max(end_x),
                 start_y.min(end_y),
-                start_y.max(end_y)
+                start_y.max(end_y),
             )
         }
     };
@@ -5816,11 +5821,59 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     let width = max_x - min_x;
     let height = max_y - min_y;
 
-    println!("   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})", 
-             min_x, min_y, width, height);
+    println!(
+        "   Connector bounds: pos=({:.1}, {:.1}), size=({:.1}, {:.1})",
+        min_x, min_y, width, height
+    );
 
     session.set_position(connector.entity.clone(), min_x, min_y);
     session.set_size(connector.entity.clone(), width, height);
+
+    // Position label intelligently based on connector orientation
+    if let Some(label_text) = connector.label.clone() {
+        if !label_text.is_empty() {
+            // Get label dimensions
+            let label_size = session.measure_text.unwrap()(
+                label_text.as_str(),
+                &TextOptions::default(),
+            );
+
+            // Calculate connector midpoint (in absolute coordinates)
+            let mid_x = (start_x + end_x) / 2.0;
+            let mid_y = (start_y + end_y) / 2.0;
+
+            // Calculate connector vector and orientation
+            let dx = end_x - start_x;
+            let dy = end_y - start_y;
+            let length = (dx * dx + dy * dy).sqrt();
+
+            // Determine label offset based on connector orientation
+            let label_offset = 8.0; // Distance from connector line
+            let (label_x, label_y) = if length > 0.0 {
+                // Determine if connector is more horizontal or vertical
+                let is_horizontal = dx.abs() > dy.abs();
+
+                if is_horizontal {
+                    // For horizontal connectors: place label above (negative y direction)
+                    // Center horizontally on midpoint
+                    let lx = mid_x - label_size.0 / 2.0;
+                    let ly = mid_y - label_offset - label_size.1;
+                    (lx, ly)
+                } else {
+                    // For vertical connectors: place label to the right (positive x direction)
+                    // Center vertically on midpoint
+                    let lx = mid_x + label_offset;
+                    let ly = mid_y - label_size.1 / 2.0;
+                    (lx, ly)
+                }
+            } else {
+                // Fallback for zero-length connectors (shouldn't happen)
+                (mid_x - label_size.0 / 2.0, mid_y - label_offset - label_size.1)
+            };
+
+            session.set_position(format!("{}_label_elem", connector.entity), label_x, label_y);
+        }
+    }
 }
 /**
  * Updates the size of the arrow entity based on the start and end points
@@ -7764,6 +7817,7 @@ pub struct ShapeConnector {
     pub target_id: EntityID,
     pub start_point_id: EntityID,
     pub end_point_id: EntityID,
+    pub label : Option<String>,
     pub options: ConnectorOptions,
 }
 
@@ -10397,6 +10451,8 @@ impl JsonLinesParser {
 
                 let target_id =
                     get_string_attr(&entity.attributes, &["target", "target_id", "to"], "");
+                
+                let label = get_string_attr(&entity.attributes, &["label"], "");
 
                 if source_id.is_empty() || target_id.is_empty() {
                     bail!("Connector requires 'source' and 'target' attributes");
@@ -10458,7 +10514,7 @@ impl JsonLinesParser {
                 };
 
                 // Create connector
-                Ok(builder.new_connector(entity_id.to_string(), source_id, target_id, options))
+                Ok(builder.new_connector_with_label(entity_id.to_string(), source_id, target_id,label,options))
             }
 
             "ellipse" => {
@@ -11844,7 +11900,9 @@ impl DiagramBuilder {
         DiagramTreeNode::new(EntityType::LineShape, line_id)
     }
 
-    pub fn new_connector(
+    
+
+     pub fn new_connector(
         &mut self,
         id: EntityID,
         source_id: EntityID,
@@ -11863,6 +11921,7 @@ impl DiagramBuilder {
             target_id: target_id,
             start_point_id: start_point.entity_id.clone(),
             end_point_id: end_point.entity_id.clone(),
+            label: None,
             options: options,
         };
 
@@ -11877,6 +11936,48 @@ impl DiagramBuilder {
             entity_id: id.clone(),
             children: children,
         }
+    }
+
+    pub fn new_connector_with_label(
+        &mut self,
+        id: EntityID,
+        source_id: EntityID,
+        target_id: EntityID,
+        label: String,
+        options: ConnectorOptions,
+    ) -> DiagramTreeNode {
+        self.new_entity(id.clone(), EntityType::ConnectorShape);
+
+        let label_text = self.new_text(format!("{}_label_elem", id), &label, TextOptions::default());
+        
+
+        // Create start and end points
+        let start_point = self.new_point(format!("{}_start", id.clone()));
+        let end_point = self.new_point(format!("{}_end", id.clone()));
+
+        let connector = ShapeConnector {
+            entity: id.clone(),
+            source_id: source_id,
+            target_id: target_id,
+            start_point_id: start_point.entity_id.clone(),
+            end_point_id: end_point.entity_id.clone(),
+            label: Some(label.to_string()),
+            options: options,
+        };
+
+        self.connectors.insert(id.clone(), connector);
+
+        let mut children = Vec::new();
+        children.push(Box::new(start_point.clone()));
+        children.push(Box::new(end_point.clone()));
+
+        let con_node = DiagramTreeNode {
+            entity_type: EntityType::ConnectorShape,
+            entity_id: id.clone(),
+            children: children,
+        };
+
+        self.new_group(format!("{}_wrapper", id), vec![con_node, label_text])
     }
 
     pub fn new_ellipse(
@@ -12752,6 +12853,7 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
     }
 
     // Process activities in topological order
+    // Handle cycles by allowing placement based on ANY processed dependency
     let mut queue: VecDeque<String> = start_nodes.clone().into();
     let mut visited: HashSet<String> = HashSet::new();
 
@@ -12768,17 +12870,26 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
             if flow.from == current_id {
                 let target_id = &flow.to;
 
+                // Skip if already assigned
+                if activity_rows.contains_key(target_id) {
+                    continue;
+                }
+
                 // Get all dependencies of target
                 let deps = incoming.get(target_id).cloned().unwrap_or_default();
 
-                // Check if ALL dependencies have been processed
-                let all_deps_processed = deps.iter().all(|dep| activity_rows.contains_key(dep));
+                // Check if AT LEAST ONE dependency has been processed
+                // This allows us to handle cycles in the flow graph
+                let processed_deps: Vec<&String> = deps
+                    .iter()
+                    .filter(|dep| activity_rows.contains_key(*dep))
+                    .collect();
 
-                if all_deps_processed {
-                    // Calculate: MAX(all dependency rows) + 1
-                    let max_dep_row = deps
+                if !processed_deps.is_empty() {
+                    // Calculate: MAX(processed dependency rows) + 1
+                    let max_dep_row = processed_deps
                         .iter()
-                        .filter_map(|dep| activity_rows.get(dep))
+                        .filter_map(|dep| activity_rows.get(*dep))
                         .max()
                         .unwrap_or(&0);
 
@@ -12787,7 +12898,7 @@ fn calculate_activity_rows(activities: &[Activity], flows: &[Flow]) -> HashMap<S
                     // Set the row
                     activity_rows.insert(target_id.clone(), target_row);
 
-                    println!("    {} → row {} (after {:?})", target_id, target_row, deps);
+                    println!("    {} → row {} (after {:?})", target_id, target_row, processed_deps);
 
                     queue.push_back(target_id.clone());
                 }
@@ -12834,7 +12945,7 @@ fn create_activity_node(
             );
 
             let box_node = builder.new_box(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 text,
                 BoxOptions {
                     padding: 12.0,
@@ -12848,31 +12959,45 @@ fn create_activity_node(
                 },
             );
 
-            Ok(box_node)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![box_node]);
+
+            Ok(group)
         }
 
         ActivityType::Decision | ActivityType::Merge => {
-            // Diamond shape (rotated square)
-            // Note: We'll make it a square now, rotation would need additional support
-            let rect = builder.new_rectangle(
-                activity.id.clone(),
-                RectOptions {
-                    width_behavior: SizeBehavior::Fixed(50.0),
-                    height_behavior: SizeBehavior::Fixed(50.0),
-                    fill_color: Fill::Color("#FFF9C4".to_owned()),
+            // Diamond shape using polyline
+            // Create a diamond: center at (25, 25), size 50x50
+            //  Top: (25, 0)
+            //  Right: (50, 25)
+            //  Bottom: (25, 50)
+            //  Left: (0, 25)
+            //  Close: back to (25, 0)
+            let diamond = builder.new_polyline(
+                format!("{}_inner", activity.id),
+                vec![
+                    (25.0, 0.0),    // Top
+                    (50.0, 25.0),   // Right
+                    (25.0, 50.0),   // Bottom
+                    (0.0, 25.0),    // Left
+                    (25.0, 0.0),    // Close path
+                ],
+                LineOptions {
                     stroke_color: "#F57F17".to_owned(),
                     stroke_width: 2.0,
-                    border_radius: 0.0,
                 },
             );
 
-            Ok(rect)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![diamond]);
+
+            Ok(group)
         }
 
         ActivityType::Start => {
             // Small filled circle
             let circle = builder.new_ellipse(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 (15.0, 15.0),
                 EllipseOptions {
                     fill_color: "#4CAF50".to_owned(),
@@ -12881,13 +13006,16 @@ fn create_activity_node(
                 },
             );
 
-            Ok(circle)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![circle]);
+
+            Ok(group)
         }
 
         ActivityType::End => {
             // Circle with thick border (double circle effect)
             let circle = builder.new_ellipse(
-                activity.id.clone(),
+                format!("{}_inner", activity.id),
                 (15.0, 15.0),
                 EllipseOptions {
                     fill_color: "#F44336".to_owned(),
@@ -12896,7 +13024,10 @@ fn create_activity_node(
                 },
             );
 
-            Ok(circle)
+            // Wrap in a group to prevent constraint solver from resizing it
+            let group = builder.new_group(activity.id.clone(), vec![circle]);
+
+            Ok(group)
         }
     }
 }
@@ -12932,7 +13063,9 @@ fn create_layout_constraints(
 
     println!("    Total rows: {}", row_indices.len());
 
-    // 1. Stack rows vertically
+    // 1. Stack rows vertically with proper spacing to prevent overlap
+    // Strategy: Make all activities in a row have at least the same height (matching the tallest)
+    // This ensures consistent spacing between rows
     if row_indices.len() > 1 {
         for i in 1..row_indices.len() {
             let prev_row = row_indices[i - 1];
@@ -12941,9 +13074,19 @@ fn create_layout_constraints(
             if let (Some(prev_acts), Some(curr_acts)) =
                 (rows_map.get(&prev_row), rows_map.get(&curr_row))
             {
-                if let (Some(prev_rep), Some(curr_rep)) = (prev_acts.first(), curr_acts.first()) {
-                   
+                // Ensure all activities in the previous row have at least the same height
+                // Apply the constraint to the inner elements because groups can't be resized
+                if prev_acts.len() > 1 {
+                    let inner_ids: Vec<String> = prev_acts
+                        .iter()
+                        .map(|id| format!("{}_inner", id))
+                        .collect();
+                    constraints.push(SimpleConstraint::AtLeastSameHeight(inner_ids));
+                }
 
+                // Use the first activity of each row for spacing calculation
+                // Since all have at least the same height, this works correctly
+                if let (Some(prev_rep), Some(curr_rep)) = (prev_acts.first(), curr_acts.first()) {
                     constraints.push(SimpleConstraint::VerticalSpacing(
                         prev_rep.clone(),
                         curr_rep.clone(),
@@ -13268,10 +13411,11 @@ fn create_flow_connector(
             }
         };
 
-    let connector = builder.new_connector(
+    let connector = builder.new_connector_with_label(
         connector_id.clone(),
         flow.from.clone(),
         flow.to.clone(),
+        flow.condition.clone().unwrap_or("".to_string()),
         ConnectorOptions {
             connector_type,
             stroke_color: "#424242".to_owned(),
@@ -13285,6 +13429,8 @@ fn create_flow_connector(
             routing_strategy,
         },
     );
+
+    println!("Created connector with label {:?} {}", connector.entity_type, connector_id);
 
     Ok(connector)
 }
@@ -13365,14 +13511,26 @@ pub fn create_activity_diagram(
 
     // Calculate lane width based on activity spacing
     // Each lane should align with its activities
-    let lane_spacing = 150.0; // This matches the spacing in create_layout_constraints
-    let lane_width = 250.0; // Width of each lane background (wider than spacing to have overlap or padding)
+    let _lane_spacing = 150.0; // This matches the spacing in create_layout_constraints
 
     for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
         // Skip empty lanes
         if swimlane.activities.is_empty() {
             continue;
         }
+
+        // Calculate lane width based on widest activity type in the lane
+        // Default widths by activity type:
+        // - Normal activities: 140px (Fixed width) + padding = ~200px
+        // - Decision/Merge: 50px diamond + padding = ~100px
+        // - Start/End: 30px circles + padding = ~100px
+        let lane_width = if swimlane.activities.iter().any(|a| matches!(a.activity_type, ActivityType::Normal)) {
+            // Has normal activities - use wider lane
+            200.0
+        } else {
+            // Only has small elements (start, end, decision, merge)
+            100.0
+        };
 
         // Create lane background with alternating colors
         let bg_color = if lane_idx % 2 == 0 {
@@ -13406,8 +13564,8 @@ pub fn create_activity_diagram(
             },
         );
 
-        let lane_header = builder.new_box(
-            format!("lane_{}_header", lane_idx),
+        let lane_header_box = builder.new_box(
+            format!("lane_{}_header_inner", lane_idx),
             header_text,
             BoxOptions {
                 padding: 8.0,
@@ -13418,6 +13576,12 @@ pub fn create_activity_diagram(
                 horizontal_alignment: HorizontalAlignment::Center,
                 ..Default::default()
             },
+        );
+
+        // Wrap in a group to prevent constraint solver from resizing it
+        let lane_header = builder.new_group(
+            format!("lane_{}_header", lane_idx),
+            vec![lane_header_box]
         );
         lane_headers.push((lane_header, None));
     }
@@ -13437,14 +13601,23 @@ pub fn create_activity_diagram(
         lane_visual_constraints.push(SimpleConstraint::AlignTop(header_ids.clone()));
     }
 
-    // Align all backgrounds at top
+    // Align all backgrounds at top with headers
+    // This ensures backgrounds start from the same Y position as headers
     let bg_ids: Vec<String> = non_empty_lanes
         .iter()
         .map(|i| format!("lane_{}_bg", i))
         .collect();
 
-    if !bg_ids.is_empty() {
-        lane_visual_constraints.push(SimpleConstraint::AlignTop(bg_ids));
+    if !bg_ids.is_empty() && !header_ids.is_empty() {
+        // Align backgrounds with each other
+        lane_visual_constraints.push(SimpleConstraint::AlignTop(bg_ids.clone()));
+
+        // Align the first background with the first header at the top
+        // This anchors the entire swimlane structure
+        lane_visual_constraints.push(SimpleConstraint::AlignTop(vec![
+            bg_ids[0].clone(),
+            header_ids[0].clone(),
+        ]));
     }
 
     // Space backgrounds adjacently (touching, no gaps)
@@ -13499,11 +13672,62 @@ pub fn create_activity_diagram(
         }
     }
 
+    // Make lane backgrounds stretch dynamically to cover all content
+    let helper_node = if !bg_ids.is_empty() {
+        // 1. Ensure all backgrounds have the same height
+        lane_visual_constraints.push(SimpleConstraint::SameHeight(bg_ids.clone()));
+
+        // 2. Align all background bottoms together
+        lane_visual_constraints.push(SimpleConstraint::AlignBottom(bg_ids.clone()));
+
+        // 3. Find the last (bottommost) activity in the diagram and create a spacing constraint
+        // We'll create a dummy point below the last activity and align bg bottoms to it
+        if let Some((_bottom_activity_id, max_row)) = activity_rows.iter().max_by_key(|(_, row)| *row) {
+            if let Some((last_activity_id, _)) = activity_rows.iter().find(|(_, row)| *row == max_row) {
+                // Create an invisible helper point positioned below the last activity
+                // This point will serve as the target for the background bottom
+                let helper_id = format!("bg_bottom_helper");
+                let _helper_point = builder.new_point(helper_id.clone());
+
+                // Position the helper 60px below the last activity
+                // helper.y = last_activity.y + last_activity.height + 60
+                lane_visual_constraints.push(SimpleConstraint::VerticalSpacing(
+                    last_activity_id.clone(),
+                    helper_id.clone(),
+                    60.0,
+                ));
+
+                // Align background bottom with helper point (top)
+                // bg.y + bg.height = helper.y + helper.height (where helper.height = 0)
+                // This means: bg.y + bg.height = helper.y
+                if let Some(first_bg) = bg_ids.first() {
+                    lane_visual_constraints.push(SimpleConstraint::AlignBottom(vec![
+                        helper_id.clone(),
+                        first_bg.clone(),
+                    ]));
+                }
+
+                Some((helper_id, _helper_point))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Combine all nodes: backgrounds first (render behind), then headers, then activities
     let mut all_children = Vec::new();
     all_children.extend(lane_backgrounds); // Backgrounds render first (behind)
     all_children.extend(lane_headers); // Headers next
     all_children.extend(activity_children); // Activities on top
+
+    // Add helper node if it exists (it won't be visible but needs to be in the layout for constraints)
+    if let Some((_helper_id, helper_point)) = helper_node {
+        all_children.push((helper_point, None));
+    }
 
     // Create constraints for activities layout
     let mut activity_constraints = create_layout_constraints(&swimlanes, &activity_rows);
@@ -15913,10 +16137,45 @@ fn render_all_connectors(node: &DiagramTreeNode, session: &DiagramBuilder, svg: 
     if node.entity_type == EntityType::ConnectorShape {
         render_connector(session, svg, node.entity_id.clone(), node);
     }
-    
-    // Recursively process all children
-    for child in &node.children {
-        render_all_connectors(child, session, svg);
+    // If this is a group (potentially a connector wrapper), render it with its children
+    else if node.entity_type == EntityType::GroupShape {
+        // Check if this group contains a connector
+        let has_connector = node.children.iter().any(|child| child.entity_type == EntityType::ConnectorShape);
+
+        if has_connector {
+            // This is a connector wrapper group - render it with transform
+            let transform = session.get_transform(node.entity_id.clone());
+            let transform_str = transform.to_svg_string();
+
+            if transform_str.is_empty() {
+                svg.push_str("<g>");
+            } else {
+                svg.push_str(&format!(r#"<g transform="{}">"#, transform_str));
+            }
+
+            // Render all children (connector and label)
+            for child in &node.children {
+                if child.entity_type == EntityType::ConnectorShape {
+                    render_connector(session, svg, child.entity_id.clone(), child);
+                } else if child.entity_type == EntityType::TextShape {
+                    // Render the label text
+                    render_text(session, svg, child.entity_id.clone(), child);
+                }
+            }
+
+            svg.push_str("</g>");
+        } else {
+            // Not a connector wrapper, recurse into children
+            for child in &node.children {
+                render_all_connectors(child, session, svg);
+            }
+        }
+    }
+    else {
+        // Recursively process all children for other node types
+        for child in &node.children {
+            render_all_connectors(child, session, svg);
+        }
     }
 }
 
