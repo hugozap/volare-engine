@@ -280,22 +280,30 @@ fn create_activity_node(
         }
 
         ActivityType::Decision | ActivityType::Merge => {
-            // Diamond shape (rotated square)
-            // Note: We'll make it a square now, rotation would need additional support
-            let rect = builder.new_rectangle(
+            // Diamond shape using polyline
+            // Create a diamond: center at (25, 25), size 50x50
+            //  Top: (25, 0)
+            //  Right: (50, 25)
+            //  Bottom: (25, 50)
+            //  Left: (0, 25)
+            //  Close: back to (25, 0)
+            let diamond = builder.new_polyline(
                 format!("{}_inner", activity.id),
-                RectOptions {
-                    width_behavior: SizeBehavior::Fixed(50.0),
-                    height_behavior: SizeBehavior::Fixed(50.0),
-                    fill_color: Fill::Color("#FFF9C4".to_owned()),
+                vec![
+                    (25.0, 0.0),    // Top
+                    (50.0, 25.0),   // Right
+                    (25.0, 50.0),   // Bottom
+                    (0.0, 25.0),    // Left
+                    (25.0, 0.0),    // Close path
+                ],
+                LineOptions {
                     stroke_color: "#F57F17".to_owned(),
                     stroke_width: 2.0,
-                    border_radius: 0.0,
                 },
             );
 
             // Wrap in a group to prevent constraint solver from resizing it
-            let group = builder.new_group(activity.id.clone(), vec![rect]);
+            let group = builder.new_group(activity.id.clone(), vec![diamond]);
 
             Ok(group)
         }
