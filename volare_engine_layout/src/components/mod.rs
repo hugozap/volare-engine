@@ -142,7 +142,7 @@ pub struct ShapeConnector {
     pub target_id: EntityID,
     pub start_point_id: EntityID,
     pub end_point_id: EntityID,
-    pub label : Option<String>,
+    pub label: Option<String>,
     pub options: ConnectorOptions,
 }
 
@@ -178,7 +178,6 @@ pub enum OrthogonalRoutingStrategy {
     // Smart strategy
     Auto, // Choose best based on direction
 }
-
 #[derive(Clone, Debug)]
 pub struct ConnectorOptions {
     pub connector_type: ConnectorType,
@@ -191,6 +190,21 @@ pub struct ConnectorOptions {
     pub arrow_end: bool,
     pub arrow_size: Float,
     pub routing_strategy: OrthogonalRoutingStrategy,
+    pub label_alignment: LabelAlignment,
+}
+
+// Add new enum for label alignment
+#[derive(Clone, Debug)]
+pub enum LabelAlignment {
+    Start,  // Near the source
+    Center, // At midpoint (current behavior)
+    End,    // Near the target
+}
+
+impl Default for LabelAlignment {
+    fn default() -> Self {
+        LabelAlignment::Center
+    }
 }
 
 impl Default for ConnectorOptions {
@@ -206,6 +220,7 @@ impl Default for ConnectorOptions {
             arrow_end: false,
             arrow_size: 10.0,
             routing_strategy: OrthogonalRoutingStrategy::HVH,
+            label_alignment: LabelAlignment::Center, // NEW FIELD
         }
     }
 }

@@ -372,13 +372,13 @@ fn create_activity_node(
             //  Left: (0, 25)
             //  Close: back to (25, 0)
             let diamond = builder.new_polyline(
-                format!("{}_inner", activity.id),
+                format!("{}_diamond", activity.id),
                 vec![
-                    (25.0, 0.0),  // Top
-                    (50.0, 25.0), // Right
-                    (25.0, 50.0), // Bottom
-                    (0.0, 25.0),  // Left
-                    (25.0, 0.0),  // Close path
+                    (8.33, 0.0),   // Top
+                    (16.67, 8.33), // Right
+                    (8.33, 16.67), // Bottom
+                    (0.0, 8.33),   // Left
+                    (8.33, 0.0),   // Close path
                 ],
                 LineOptions {
                     stroke_color: "#F57F17".to_owned(),
@@ -386,8 +386,27 @@ fn create_activity_node(
                 },
             );
 
+            // Add label text below the diamond
+            let label_text = builder.new_text(
+                format!("{}_label_text", activity.id),
+                &activity.label,
+                TextOptions {
+                    font_size: 10.0,
+                    text_color: "#000000".to_owned(),
+                    line_width: 200,
+                    ..Default::default()
+                },
+            );
+
+            // Create a vertical stack with diamond on top and label below
+            let stack = builder.new_vstack(
+                format!("{}_inner", activity.id),
+                vec![diamond, label_text],
+                HorizontalAlignment::Center,
+            );
+
             // Wrap in a group to prevent constraint solver from resizing it
-            let group = builder.new_group(activity.id.clone(), vec![diamond]);
+            let group = builder.new_group(activity.id.clone(), vec![stack]);
 
             Ok(group)
         }
@@ -486,7 +505,7 @@ fn create_layout_constraints(
                     constraints.push(SimpleConstraint::VerticalSpacing(
                         prev_rep.clone(),
                         curr_rep.clone(),
-                        60.0,
+                        100.0,
                     ));
 
                     println!("    Row {} below row {} (spacing: 60)", curr_row, prev_row);
@@ -538,10 +557,10 @@ fn create_layout_constraints(
             constraints.push(SimpleConstraint::HorizontalSpacing(
                 lane_representatives[i - 1].clone(),
                 lane_representatives[i].clone(),
-                150.0,
+                180.0,
             ));
             println!(
-                "    Swimlane {} spaced from swimlane {} (spacing: 150)",
+                "    Swimlane {} spaced from swimlane {} (spacing: 180)",
                 i,
                 i - 1
             );
@@ -575,13 +594,37 @@ fn create_flow_connector(
     let outgoing_flows: Vec<&Flow> = all_flows.iter().filter(|f| f.from == flow.from).collect();
 
     let is_decision_branch = outgoing_flows.len() > 1;
+    let mut label_alignment = LabelAlignment::Center;
 
+    // Determine connector type, ports, and routing strategy
     // Determine connector type, ports, and routing strategy
     let (connector_type, source_port, target_port, routing_strategy) =
         match (from_row, to_row, from_lane, to_lane) {
             (Some(from_r), Some(to_r), Some(from_l), Some(to_l)) => {
                 let same_lane = from_l == to_l;
                 let is_below = to_r > from_r;
+                let is_above = to_r < from_r;
+
+                // Determine label alignment based on flow characteristics
+                label_alignment = if is_above {
+                    // Backward flows: put label near the start to avoid overlap with forward flows
+                    LabelAlignment::Start
+                } else if is_decision_branch {
+                    // Decision branches: vary alignment based on branch index
+                    let branch_index = outgoing_flows
+                        .iter()
+                        .position(|f| f.to == flow.to)
+                        .unwrap_or(0);
+
+                    if branch_index == 0 {
+                        LabelAlignment::Start
+                    } else {
+                        LabelAlignment::End
+                    }
+                } else {
+                    // Normal flows: center (default)
+                    LabelAlignment::Start
+                };
 
                 if same_lane && is_below {
                     // Same lane, target below: straight down
@@ -591,13 +634,25 @@ fn create_flow_connector(
                         Port::Top,
                         OrthogonalRoutingStrategy::VHV,
                     )
-                } else if same_lane && !is_below {
-                    // Same lane, target above: straight up
+                } else if same_lane && is_above {
+                    // Same lane, target above: backward flow (loop)
+                    // Use side routing to avoid awkward upward flow from bottom
+                    // Exit from side, enter from side for clean horizontal approach
+                    let source_side_port = if from_l == 0 {
+                        Port::Right // Leftmost lane uses right
+                    } else {
+                        Port::Left // Other lanes use left
+                    };
+                    let target_side_port = if to_l == 0 {
+                        Port::Right // Leftmost lane uses right
+                    } else {
+                        Port::Left // Other lanes use left
+                    };
                     (
-                        ConnectorType::Straight,
-                        Port::Top,
-                        Port::Bottom,
-                        OrthogonalRoutingStrategy::VHV,
+                        ConnectorType::Orthogonal,
+                        source_side_port,
+                        target_side_port,
+                        OrthogonalRoutingStrategy::HVH,
                     )
                 } else if is_below && is_decision_branch {
                     let branch_index = outgoing_flows
@@ -628,7 +683,7 @@ fn create_flow_connector(
                                 ConnectorType::Orthogonal,
                                 Port::Bottom,
                                 Port::Top,
-                                OrthogonalRoutingStrategy::VHV,
+                                OrthogonalRoutingStrategy::HV,
                             )
                         }
                     } else if total_branches == 3 {
@@ -786,12 +841,32 @@ fn create_flow_connector(
                         Port::Top,
                         OrthogonalRoutingStrategy::VHV,
                     )
-                } else {
-                    // Different lanes, target above
+                } else if is_above {
+                    // Different lanes, target above: backward flow (loop)
+                    // Use side routing to create clean loop
+                    // Both source and target should use side ports for horizontal arrow
+                    let source_side_port = if from_l > to_l {
+                        Port::TopLeft // Source is left of target, exit from left
+                    } else {
+                        Port::TopRight // Source is right of target, exit from right
+                    };
+                    let target_side_port = if from_l > to_l {
+                        Port::Right // Source is left, so target receives from right
+                    } else {
+                        Port::Left // Source is right, so target receives from left
+                    };
                     (
                         ConnectorType::Orthogonal,
-                        Port::Top,
+                        source_side_port,
+                        target_side_port,
+                        OrthogonalRoutingStrategy::HVH,
+                    )
+                } else {
+                    // Shouldn't reach here, but provide default
+                    (
+                        ConnectorType::Orthogonal,
                         Port::Bottom,
+                        Port::Top,
                         OrthogonalRoutingStrategy::VHV,
                     )
                 }
@@ -823,6 +898,7 @@ fn create_flow_connector(
             arrow_size: 8.0,
             curve_offset: None,
             routing_strategy,
+            label_alignment,
         },
     );
 
@@ -910,7 +986,7 @@ pub fn create_activity_diagram(
 
     // Calculate lane width based on activity spacing
     // Each lane should align with its activities
-    let _lane_spacing = 150.0; // This matches the spacing in create_layout_constraints
+    let _lane_spacing = 300.0; // This matches the spacing in create_layout_constraints
 
     for (lane_idx, swimlane) in swimlanes.iter().enumerate() {
         // Skip empty lanes
@@ -1099,7 +1175,7 @@ pub fn create_activity_diagram(
                 lane_visual_constraints.push(SimpleConstraint::VerticalSpacing(
                     last_activity_id.clone(),
                     helper_id.clone(),
-                    60.0,
+                    80.0,
                 ));
 
                 // Align background bottom with helper point (top)

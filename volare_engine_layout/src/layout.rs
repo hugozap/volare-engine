@@ -11,8 +11,8 @@ use crate::{
 };
 use crate::{
     ConnectorType, ConstraintLayoutContainer, ConstraintSystem, HorizontalAlignment,
-    LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer, SizeBehavior,
-    SpacerDirection, TextLine, VerticalAlignment,
+    LabelAlignment, LinePointReference, Point, ShapeArc, ShapeConnector, ShapeRect, ShapeSpacer,
+    SizeBehavior, SpacerDirection, TextLine, VerticalAlignment,
 };
 
 use crate::transform::Transform;
@@ -461,14 +461,8 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
     if let Some(label_text) = connector.label.clone() {
         if !label_text.is_empty() {
             // Get label dimensions
-            let label_size = session.measure_text.unwrap()(
-                label_text.as_str(),
-                &TextOptions::default(),
-            );
-
-            // Calculate connector midpoint (in absolute coordinates)
-            let mid_x = (start_x + end_x) / 2.0;
-            let mid_y = (start_y + end_y) / 2.0;
+            let label_size =
+                session.measure_text.unwrap()(label_text.as_str(), &TextOptions::default());
 
             // Calculate connector vector and orientation
             let dx = end_x - start_x;
@@ -476,27 +470,54 @@ pub fn layout_connector(session: &mut DiagramBuilder, connector: &ShapeConnector
             let length = (dx * dx + dy * dy).sqrt();
 
             // Determine label offset based on connector orientation
-            let label_offset = 8.0; // Distance from connector line
+            let label_offset = 0.0; // Distance from connector line
+
+            // Get label alignment setting
+            let alignment = &connector.options.label_alignment;
+
             let (label_x, label_y) = if length > 0.0 {
                 // Determine if connector is more horizontal or vertical
                 let is_horizontal = dx.abs() > dy.abs();
 
+                // Calculate position along the connector based on alignment
+                let (position_x, position_y) = match alignment {
+                    LabelAlignment::Start => {
+                        // Position near start (10% along the line)
+                        (start_x + dx * 0.4, start_y + dy * 0.4)
+       
+                    }
+                    LabelAlignment::Center => {
+                        // Position at midpoint (current behavior)
+                        let mid_x = (start_x + end_x) / 2.0;
+                        let mid_y = (start_y + end_y) / 2.0;
+                        (mid_x, mid_y)
+                    }
+                    LabelAlignment::End => {
+                        // Position near end (85% along the line)
+                        // (start_x + dx * 0.85, start_y + dy * 0.85)
+                        (start_x + dx * 0.85, start_y + dy * 0.85)
+                    }
+                };
+
                 if is_horizontal {
                     // For horizontal connectors: place label above (negative y direction)
-                    // Center horizontally on midpoint
-                    let lx = mid_x - label_size.0 / 2.0;
-                    let ly = mid_y - label_offset - label_size.1;
+                    let lx = position_x - label_size.0 / 2.0;
+                    let ly = position_y - label_offset - label_size.1;
                     (lx, ly)
                 } else {
                     // For vertical connectors: place label to the right (positive x direction)
-                    // Center vertically on midpoint
-                    let lx = mid_x + label_offset;
-                    let ly = mid_y - label_size.1 / 2.0;
+                    let lx = position_x + label_offset;
+                    let ly = position_y - label_size.1 / 2.0;
                     (lx, ly)
                 }
             } else {
                 // Fallback for zero-length connectors (shouldn't happen)
-                (mid_x - label_size.0 / 2.0, mid_y - label_offset - label_size.1)
+                let mid_x = (start_x + end_x) / 2.0;
+                let mid_y = (start_y + end_y) / 2.0;
+                (
+                    mid_x - label_size.0 / 2.0,
+                    mid_y - label_offset - label_size.1,
+                )
             };
 
             session.set_position(format!("{}_label_elem", connector.entity), label_x, label_y);

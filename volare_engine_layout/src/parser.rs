@@ -955,6 +955,7 @@ impl JsonLinesParser {
                     arrow_size,
                     // TODO: read from params
                     routing_strategy: OrthogonalRoutingStrategy::Auto,
+                    label_alignment: LabelAlignment::Center,
                 };
 
                 // Create connector
