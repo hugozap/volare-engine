@@ -1,0 +1,42 @@
+# Build and deploy wasm artifacts to S3
+
+name: Build and Deploy Wasm to S3
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build Rust project
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - name: Build Wasm package
+        run: wasm-pack build wasm_bindings --target web --out-dir ../pkg
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }} # e.g., us-east-1
+
+      - name: Upload to S3
+        run: aws s3 sync ./pkg s3://your-s3-bucket-name/path/to/folder # Replace with your bucket name and path

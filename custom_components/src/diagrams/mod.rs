@@ -1,11 +1,12 @@
 mod ichikawa;
-mod activity;
+mod calendar;
 pub use ichikawa::create_ishikawa;
-pub use activity::create_activity_diagram;
 use volare_engine_layout::DiagramBuilder;
+
+use crate::diagrams::calendar::create_calendar;
 
 pub fn register_diagram_components(builder: &mut DiagramBuilder) {
     builder.register_custom_component("ishikawa", create_ishikawa);
-    builder.register_custom_component("activity_diagram", create_activity_diagram);
+    builder.register_custom_component("calendar", create_calendar);
     println!("📄 Diagram components registered");
 }
