@@ -115,11 +115,7 @@ fn days_in_month(year: u32, month: u32) -> u32 {
 /// Using Zeller's congruence algorithm
 fn first_day_of_week(year: u32, month: u32) -> u32 {
     let q = 1; // First day of month
-    let m = if month < 3 {
-        month + 12
-    } else {
-        month
-    };
+    let m = if month < 3 { month + 12 } else { month };
     let y = if month < 3 { year - 1 } else { year };
     let k = y % 100;
     let j = y / 100;
@@ -148,11 +144,14 @@ fn parse_date(date_str: &str) -> Result<(u32, u32, u32)> {
         bail!("Invalid date format. Expected YYYY-MM-DD");
     }
 
-    let year = parts[0].parse::<u32>()
+    let year = parts[0]
+        .parse::<u32>()
         .map_err(|_| anyhow::anyhow!("Invalid year"))?;
-    let month = parts[1].parse::<u32>()
+    let month = parts[1]
+        .parse::<u32>()
         .map_err(|_| anyhow::anyhow!("Invalid month"))?;
-    let day = parts[2].parse::<u32>()
+    let day = parts[2]
+        .parse::<u32>()
         .map_err(|_| anyhow::anyhow!("Invalid day"))?;
 
     if month < 1 || month > 12 {
@@ -206,7 +205,7 @@ fn calculate_month_data(date_str: &str, events: Vec<CalendarEvent>) -> Result<Mo
     for day in 1..=days {
         let day_index = first_day + day - 1;
         let is_weekend = (day_index % 7) >= 5;
-        
+
         // Filter events for this day
         let day_events: Vec<CalendarEvent> = events
             .iter()
@@ -334,7 +333,11 @@ pub fn create_calendar(
     for (i, day_name) in weekday_names.iter().enumerate() {
         let is_weekend = i >= 5;
         let bg_color = if is_weekend { bg_weekend } else { "#e9ecef" };
-        let text_color = if is_weekend { weekend_text } else { secondary_text };
+        let text_color = if is_weekend {
+            weekend_text
+        } else {
+            secondary_text
+        };
 
         let day_text = builder.new_text(
             format!("{}_weekday_text_{}", id, i),
@@ -427,35 +430,40 @@ pub fn create_calendar(
             // Create a group for day content (text + event indicators)
             let mut cell_content_children = vec![day_text];
 
-            // Add event indicators if there are events
+            // Add event names if there are events
             if !cell.events.is_empty() {
-                let mut event_indicators = Vec::new();
-                
                 for (event_idx, event) in cell.events.iter().take(3).enumerate() {
-                    let indicator_text = builder.new_text(
+                    // Create colored box for event
+                    let event_text = builder.new_text(
                         format!("{}_event_{}_{}_text", id, cell_index, event_idx),
-                        "•",
+                        &event.title,
                         TextOptions {
-                            font_size: 16.0,
+                            font_size: 10.0,
                             font_family: "Arial".to_string(),
-                            text_color: event.color.clone(),
+                            text_color: "#ffffff".to_string(),
                             font_weight: 400,
-                            line_width: 10,
+                            line_width: 15,
                             line_spacing: 1.0,
                         },
                     );
 
-                    event_indicators.push(indicator_text);
+                    let event_box = builder.new_box(
+                        format!("{}_event_{}_{}", id, cell_index, event_idx),
+                        event_text,
+                        BoxOptions {
+                            width_behavior: SizeBehavior::Content,
+                            height_behavior: SizeBehavior::Content,
+                            fill_color: Fill::Color(event.color.clone()),
+                            stroke_color: event.color.clone(),
+                            stroke_width: 0.0,
+                            padding: 2.0,
+                            border_radius: 2.0,
+                            horizontal_alignment: HorizontalAlignment::Left,
+                        },
+                    );
+
+                    cell_content_children.push(event_box);
                 }
-
-                // Create horizontal stack for event dots
-                let events_row = builder.new_hstack(
-                    format!("{}_events_{}_{}", id, week, day_in_week),
-                    event_indicators,
-                    VerticalAlignment::Center,
-                );
-
-                cell_content_children.push(events_row);
             }
 
             // Create vertical stack for cell content
@@ -495,18 +503,30 @@ pub fn create_calendar(
     }
 
     // Create calendar grid container
-    let calendar_grid = builder.new_vstack(
-        format!("{}_grid", id),
-        week_rows,
-        HorizontalAlignment::Left,
-    );
+    let calendar_grid =
+        builder.new_vstack(format!("{}_grid", id), week_rows, HorizontalAlignment::Left);
 
     // Create main container
     let calendar_container = builder.new_vstack(
-        id.to_string(),
+        format!("{}_calendar_container", id.to_string()),
         vec![header_box, weekday_header, calendar_grid],
         HorizontalAlignment::Left,
     );
 
-    Ok(calendar_container)
+    let box_container = builder.new_box(
+        id.to_string(),
+        calendar_container,
+        BoxOptions {
+            fill_color: Fill::Color("white".to_string()),
+            stroke_color: "".to_owned(),
+            stroke_width: 0.0,
+            padding: 0.0,
+            border_radius: 0.0,
+            width_behavior: SizeBehavior::Content,
+            height_behavior: SizeBehavior::Content,
+            horizontal_alignment: HorizontalAlignment::Center,
+        },
+    );
+
+    Ok(box_container)
 }
