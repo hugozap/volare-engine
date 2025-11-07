@@ -1518,8 +1518,10 @@ mod tests {
     fn test_custom_component_access() {
         // Test that custom components get all attributes
         fn test_component(
+            _id: &str,
             attrs: &Map<String, Value>,
             _builder: &mut DiagramBuilder,
+            _parser: &JsonLinesParser,
         ) -> Result<DiagramTreeNode> {
             // Should be able to access any attribute
             assert!(attrs.contains_key("custom_prop"));

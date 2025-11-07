@@ -28,9 +28,9 @@ pub mod theme;
 /// 
 /// # Example
 /// ```
-/// let user_request = "Create a document with a title and paragraph";
-/// let current_doc = ""; // empty for new document
-/// let prompt = generate_jsonl_prompt(user_request, current_doc);
+// let user_request = "Create a document with a title and paragraph";
+// let current_doc = ""; // empty for new document
+// let prompt = generate_jsonl_prompt(user_request, current_doc);
 /// // Send prompt to LLM...
 /// ```
 pub fn generate_transformations_jsonl_prompt(user_input: &str, current_jsonl: &str) -> String {
