@@ -39,4 +39,4 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }} # e.g., us-east-1
 
       - name: Upload to S3
-        run: aws s3 sync ./pkg s3://your-s3-bucket-name/path/to/folder # Replace with your bucket name and path
+        run: aws s3 sync ./pkg s3://volare-engine-wasm/latest # Replace with your bucket name and path
