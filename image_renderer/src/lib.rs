@@ -347,6 +347,7 @@ fn render_text(
     let size = session.get_size(entity_id.clone());
 
     let font_data = include_bytes!("../../demo/assets/AnonymiceProNerdFont-Regular.ttf");
+  
     let font = Font::try_from_bytes(font_data as &[u8]).unwrap();
 
     let text_color = parse_color(&text_shape.text_options.text_color);
@@ -386,7 +387,8 @@ fn draw_high_quality_text(
     color: Rgba<u8>,
     _max_width: i32,
 ) {
-    let offset_y = 0.0;
+    let v_metrics = font.v_metrics(scale);
+    let offset_y = v_metrics.ascent;
     let mut caret = rusttype::point(0.0, offset_y);
     let mut last_glyph_id = None;
     let mut glyphs: Vec<rusttype::PositionedGlyph> = Vec::new();
