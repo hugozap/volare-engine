@@ -165,7 +165,7 @@ impl Default for Port {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub enum OrthogonalRoutingStrategy {
     // 2-segment strategies (one turn, 3 points)
     HV, // Horizontal then Vertical (Start → Horizontal → Vertical → End)

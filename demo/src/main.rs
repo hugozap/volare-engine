@@ -2,8 +2,9 @@
 
 pub mod measure_text;
 
+use custom_components::layout;
 //import svg_renderer
-// use image_renderer::PNGRenderer;
+use image_renderer::PNGRenderer;
 use resvg::tiny_skia::Rect;
 use svg_renderer::SVGRenderer;
 use volare_engine_layout::{renderer_base::Renderer, BoxOptions, GradientStop, LineOptions};
@@ -348,7 +349,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = session.new_table("table".to_string(), table_items, 5, toptions);
 
     // Calculate layout
-    layout_tree_node(&mut session, &table);
+
+    layout::layout_diagram(&mut session, &table);
 
     //create writer to file ~/temp/svg-render-test.svg
     //get path for ~/temp
@@ -366,19 +368,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("SVG file written to: {}", svg_path.to_str().unwrap());
 
-    // Render PNG
-    // Use other  measure function for PNG rendering
-    // let mut png_path = temp_dir.clone();
-    // png_path.push("png-render-test.png");
-    // let png_renderer = PNGRenderer {};
-    // let mut png_file = File::create(&png_path).unwrap();
-    // let png_res = png_renderer.render(&session, &table, &mut png_file);
-    // if png_res.is_err() {
-    //     println!("PNG Render Error: {}", png_res.err().unwrap());
-    //     std::process::exit(1);
-    // }
-    // println!("PNG file written to: {}", png_path.to_str().unwrap());
-
+    let mut png_path = temp_dir.clone();
+    png_path.push("png-render-test.png");
+    let png_renderer = PNGRenderer {};
+    let mut png_file = File::create(&png_path).unwrap();
+    let png_res = png_renderer.render(&session, &table, &mut png_file);
+    if png_res.is_err() {
+        println!("PNG Render Error: {}", png_res.err().unwrap());
+        std::process::exit(1);
+    }
+    println!("PNG file written to: {}", png_path.to_str().unwrap());
+ //
     Ok(())
 }
 
