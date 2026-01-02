@@ -57,7 +57,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - **One JSON object per line** - No arrays at the root level, strict JSONL
 - **First line is root** - Single root element per diagram
-- **Flat attributes** - No nested objects in attribute values
 - **ID references** - Elements reference each other via string IDs
 
 ### Component Types
